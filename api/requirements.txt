@@ -1,0 +1,28 @@
+# Web Framework
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+
+# Database
+sqlalchemy==2.0.36
+asyncpg==0.30.0          # async PostgreSQL driver (FastAPI)
+psycopg2-binary==2.9.10  # sync driver for Alembic
+alembic==1.14.0
+
+# Validation & Settings
+pydantic==2.10.4
+pydantic-settings==2.7.0
+
+# Celery client (task dispatch only)
+celery==5.4.0
+redis==5.2.1
+
+# HTTP & Utilities
+httpx==0.28.1
+python-dotenv==1.0.1
+python-multipart==0.0.20
+
+# Email
+aiosmtplib==3.0.2
+
+# Logging
+structlog==24.4.0

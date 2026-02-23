@@ -1,0 +1,77 @@
+# ─────────────────────────────────────────
+# Environment & Secrets
+# ─────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+*.secret
+
+# ─────────────────────────────────────────
+# Python
+# ─────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.tox/
+venv/
+.venv/
+env/
+ENV/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# ─────────────────────────────────────────
+# Alembic
+# ─────────────────────────────────────────
+alembic/versions/*.pyc
+
+# ─────────────────────────────────────────
+# Docker
+# ─────────────────────────────────────────
+docker-compose.override.yml
+
+# ─────────────────────────────────────────
+# Celery Beat Schedule
+# ─────────────────────────────────────────
+celerybeat-schedule
+celerybeat-schedule.db
+celerybeat.pid
+
+# ─────────────────────────────────────────
+# IDE & OS
+# ─────────────────────────────────────────
+.vscode/settings.json
+.vscode/launch.json
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ─────────────────────────────────────────
+# Logs
+# ─────────────────────────────────────────
+*.log
+logs/
+
+# ─────────────────────────────────────────
+# Node (Portal/Dashboard)
+# ─────────────────────────────────────────
+node_modules/
+.npm
+.yarn
+dist/
+.next/
+.nuxt/

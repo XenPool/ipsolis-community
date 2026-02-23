@@ -1,0 +1,29 @@
+# Task Queue
+celery==5.4.0
+redis==5.2.1
+
+# Database (sync driver for Celery tasks)
+sqlalchemy==2.0.36
+psycopg2-binary==2.9.10
+
+# Validation & Settings
+pydantic==2.10.4
+pydantic-settings==2.7.0
+
+# WinRM / pypsrp for Active Roles
+pypsrp==0.8.1
+
+# HTTP
+httpx==0.28.1
+
+# Email
+smtplib2==0.1.0
+
+# Utilities
+python-dotenv==1.0.1
+
+# Logging
+structlog==24.4.0
+
+# Flower (Monitoring UI – included in worker image)
+flower==2.0.1
