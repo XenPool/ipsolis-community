@@ -96,7 +96,10 @@ class AssetPool(Base):
         DateTime(timezone=True), nullable=True
     )
     # VM-spezifische Metadaten: vSphere-Objekt-ID, Hostname, IP, etc.
-    metadata: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    # Note: "metadata" is reserved by SQLAlchemy Declarative; column name stays "metadata"
+    asset_metadata: Mapped[dict[str, Any] | None] = mapped_column(
+        JSON, name="metadata", nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

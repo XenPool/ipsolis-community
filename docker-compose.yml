@@ -99,7 +99,7 @@ services:
       --concurrency=4
       --queues=default,provision,reclaim,notifications
     healthcheck:
-      test: ["CMD", "celery", "-A", "tasks", "inspect", "ping", "--destination", "celery@xp_worker"]
+      test: ["CMD", "celery", "-A", "tasks", "inspect", "ping"]
       interval: 30s
       timeout: 10s
       retries: 3

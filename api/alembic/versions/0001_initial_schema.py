@@ -9,6 +9,7 @@ from typing import Sequence, Union
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
+from sqlalchemy.dialects.postgresql import ENUM as PgEnum
 
 revision: str = "0001"
 down_revision: Union[str, None] = None
@@ -17,12 +18,12 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # ── Enums erstellen ───────────────────────────────────────────────────────
-    sa.Enum("vdi", "server", "workstation", "other", name="asset_category").create(op.get_bind(), checkfirst=True)
-    sa.Enum("free", "reserved", "busy", "maintenance", "reclaiming", name="asset_status").create(op.get_bind(), checkfirst=True)
-    sa.Enum("provision", "modify", "extend", "delete", name="order_action").create(op.get_bind(), checkfirst=True)
-    sa.Enum("pending", "processing", "delivered", "failed", "expired", "cancelled", name="order_status").create(op.get_bind(), checkfirst=True)
-    sa.Enum("pending", "running", "success", "failed", "skipped", name="step_status").create(op.get_bind(), checkfirst=True)
+    # ── Enums via raw SQL (no ORM auto-create magic) ──────────────────────────
+    op.execute("CREATE TYPE asset_category AS ENUM ('vdi', 'server', 'workstation', 'other')")
+    op.execute("CREATE TYPE asset_status AS ENUM ('free', 'reserved', 'busy', 'maintenance', 'reclaiming')")
+    op.execute("CREATE TYPE order_action AS ENUM ('provision', 'modify', 'extend', 'delete')")
+    op.execute("CREATE TYPE order_status AS ENUM ('pending', 'processing', 'delivered', 'failed', 'expired', 'cancelled')")
+    op.execute("CREATE TYPE step_status AS ENUM ('pending', 'running', 'success', 'failed', 'skipped')")
 
     # ── asset_types ───────────────────────────────────────────────────────────
     op.create_table(
@@ -32,7 +33,7 @@ def upgrade() -> None:
         sa.Column("description", sa.Text(), nullable=True),
         sa.Column(
             "category",
-            sa.Enum("vdi", "server", "workstation", "other", name="asset_category", create_constraint=False),
+            PgEnum(name="asset_category", create_type=False),
             nullable=False,
             server_default="vdi",
         ),
@@ -58,13 +59,13 @@ def upgrade() -> None:
         sa.Column("requested_until", sa.DateTime(timezone=True), nullable=False),
         sa.Column(
             "action",
-            sa.Enum("provision", "modify", "extend", "delete", name="order_action", create_constraint=False),
+            PgEnum(name="order_action", create_type=False),
             nullable=False,
             server_default="provision",
         ),
         sa.Column(
             "status",
-            sa.Enum("pending", "processing", "delivered", "failed", "expired", "cancelled", name="order_status", create_constraint=False),
+            PgEnum(name="order_status", create_type=False),
             nullable=False,
             server_default="pending",
         ),
@@ -89,7 +90,7 @@ def upgrade() -> None:
         sa.Column("asset_type_id", sa.Integer(), nullable=False),
         sa.Column(
             "status",
-            sa.Enum("free", "reserved", "busy", "maintenance", "reclaiming", name="asset_status", create_constraint=False),
+            PgEnum(name="asset_status", create_type=False),
             nullable=False,
             server_default="free",
         ),
@@ -122,7 +123,7 @@ def upgrade() -> None:
         sa.Column("step_name", sa.String(255), nullable=False),
         sa.Column(
             "status",
-            sa.Enum("pending", "running", "success", "failed", "skipped", name="step_status", create_constraint=False),
+            PgEnum(name="step_status", create_type=False),
             nullable=False,
             server_default="pending",
         ),

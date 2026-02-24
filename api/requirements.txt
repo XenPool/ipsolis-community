@@ -9,7 +9,7 @@ psycopg2-binary==2.9.10  # sync driver for Alembic
 alembic==1.14.0
 
 # Validation & Settings
-pydantic==2.10.4
+pydantic[email]==2.10.4
 pydantic-settings==2.7.0
 
 # Celery client (task dispatch only)
