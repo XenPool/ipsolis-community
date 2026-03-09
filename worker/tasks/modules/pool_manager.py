@@ -89,9 +89,11 @@ def reserve_asset(
     asset.status = AssetStatus.RESERVED
     asset.current_order_id = order_id
     asset.expires_at = expires_at
+    if user_email:
+        asset.metadata = {**(asset.metadata or {}), "owner_email": user_email}
     db.commit()
 
-    logger.info("Asset reserved: asset_id=%s order_id=%s", asset.id, order_id)
+    logger.info("Asset reserved: asset_id=%s order_id=%s owner=%s", asset.id, order_id, user_email)
     return {"success": True, "asset_id": asset.id, "asset_name": asset.name}
 
 

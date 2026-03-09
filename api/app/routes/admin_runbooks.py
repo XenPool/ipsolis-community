@@ -15,8 +15,8 @@ from sqlalchemy.orm import selectinload
 from app.database import get_db
 from app.models.asset import AssetType
 from app.models.runbook import RunbookDefinition, RunbookStep
+from app.models.script_module import ScriptModule
 from app.utils.auth import require_admin_key
-from app.utils.module_registry import MODULE_GROUPS, MODULE_MAP, MODULE_METADATA
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +28,10 @@ router = APIRouter(
 
 
 # ── Schemas ────────────────────────────────────────────────────────────────────
+# TODO: These local schemas bypass the ORM handler in admin.py and therefore do
+# NOT run the 5-rule constraint validation from app.utils.asset_type_constraints.
+# For constraint parity, wire validate_asset_type() into the create/update
+# handlers below (around lines 121–229). See admin.py for the reference impl.
 
 class AssetTypeCreate(BaseModel):
     name: str
@@ -72,7 +76,7 @@ class RunbookUpdate(BaseModel):
 class RunbookStepCreate(BaseModel):
     position: int
     step_name: str
-    module_key: str
+    script_module_id: int
     params_template: dict[str, Any] | None = None
     is_critical: bool = True
     retry_count: int = 3
@@ -81,7 +85,7 @@ class RunbookStepCreate(BaseModel):
 
 class RunbookStepUpdate(BaseModel):
     step_name: str | None = None
-    module_key: str | None = None
+    script_module_id: int | None = None
     params_template: dict[str, Any] | None = None
     is_critical: bool | None = None
     retry_count: int | None = None
@@ -305,6 +309,7 @@ async def get_runbook(runbook_id: int, db: AsyncSession = Depends(get_db)) -> di
                 "id": s.id,
                 "position": s.position,
                 "step_name": s.step_name,
+                "script_module_id": s.script_module_id,
                 "module_key": s.module_key,
                 "params_template": s.params_template,
                 "is_critical": s.is_critical,
@@ -355,23 +360,24 @@ async def add_step(
     rb = await db.get(RunbookDefinition, runbook_id)
     if not rb:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"Runbook {runbook_id} not found")
-    if body.module_key not in MODULE_MAP:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Unknown module_key: {body.module_key!r}")
+    module = await db.get(ScriptModule, body.script_module_id)
+    if not module:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Unknown script_module_id: {body.script_module_id}")
 
     import json as _json
     await db.execute(
         text("""
             INSERT INTO runbook_steps
-                (runbook_id, position, step_name, module_key, params_template,
+                (runbook_id, position, step_name, script_module_id, params_template,
                  is_critical, retry_count, timeout_seconds, created_at)
-            VALUES (:rid, :pos, :sname, :mkey, CAST(:ptpl AS jsonb),
+            VALUES (:rid, :pos, :sname, :smid, CAST(:ptpl AS jsonb),
                     :critical, :retry, :timeout, NOW())
         """),
         {
             "rid": runbook_id,
             "pos": body.position,
             "sname": body.step_name,
-            "mkey": body.module_key,
+            "smid": body.script_module_id,
             "ptpl": _json.dumps(body.params_template) if body.params_template else "null",
             "critical": body.is_critical,
             "retry": body.retry_count,
@@ -393,10 +399,11 @@ async def update_step(
     s = await db.get(RunbookStep, step_id)
     if not s or s.runbook_id != runbook_id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"Step {step_id} not found")
-    if body.module_key is not None:
-        if body.module_key not in MODULE_MAP:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Unknown module_key: {body.module_key!r}")
-        s.module_key = body.module_key
+    if body.script_module_id is not None:
+        module = await db.get(ScriptModule, body.script_module_id)
+        if not module:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Unknown script_module_id: {body.script_module_id}")
+        s.script_module_id = body.script_module_id
     if body.step_name is not None:
         s.step_name = body.step_name
     if body.params_template is not None:
@@ -443,13 +450,21 @@ async def reorder_steps(
     return {"reordered": True, "count": len(body.step_ids)}
 
 
-# ── Module Registry ────────────────────────────────────────────────────────────
+# ── Module Registry (DB-driven) ────────────────────────────────────────────────
 
 @router.get("/modules")
-async def list_modules() -> dict:
-    """Gibt die vollständige Module-Registry als gruppierten Dict zurück."""
-    grouped: dict[str, list] = {g: [] for g in MODULE_GROUPS}
-    for m in MODULE_METADATA:
-        g = m.get("group", "other")
-        grouped.setdefault(g, []).append(m)
-    return {"groups": MODULE_GROUPS, "modules": grouped}
+async def list_modules(db: AsyncSession = Depends(get_db)) -> list[dict]:
+    """Returns active script modules from the database."""
+    result = await db.execute(
+        select(ScriptModule).where(ScriptModule.is_active.is_(True)).order_by(ScriptModule.name)
+    )
+    return [
+        {
+            "id": m.id,
+            "name": m.name,
+            "description": m.description,
+            "script_type": m.script_type,
+            "param_schema": m.param_schema,
+        }
+        for m in result.scalars().all()
+    ]

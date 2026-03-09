@@ -2,7 +2,7 @@ import logging
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -21,6 +21,7 @@ from app.schemas.admin import (
     AuditLogRead,
 )
 from app.schemas.asset import AssetPoolRead, AssetTypeRead
+from app.utils.asset_type_constraints import validate_asset_type
 from app.utils.audit import _asset_snap, _config_snap, _type_snap, aaudit
 from app.utils.auth import require_admin_key
 
@@ -133,6 +134,19 @@ async def create_asset_type(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Asset type {payload.name!r} already exists",
         )
+    violations = validate_asset_type(
+        assignment_model=payload.assignment_model,
+        automation_strategy=payload.automation_strategy,
+        deprovision_policy=payload.deprovision_policy,
+        personal_provisioning_strategy=payload.personal_provisioning_strategy,
+        runbook_provision_id=payload.runbook_provision_id,
+        runbook_revoke_id=payload.runbook_revoke_id,
+    )
+    if violations:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=[{"code": v.code, "message": v.message} for v in violations],
+        )
     asset_type = AssetType(
         name=payload.name,
         description=payload.description,
@@ -168,6 +182,44 @@ async def update_asset_type(
     asset_type = result.scalar_one_or_none()
     if not asset_type:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Asset type {type_id} not found")
+
+    # Merge payload with current DB values to get effective configuration for validation.
+    eff_assignment_model       = payload.assignment_model or asset_type.assignment_model
+    eff_automation_strategy    = payload.automation_strategy or asset_type.automation_strategy
+    eff_deprovision_policy     = payload.deprovision_policy or asset_type.deprovision_policy
+    eff_pps                    = payload.personal_provisioning_strategy or asset_type.personal_provisioning_strategy
+
+    # Runbook IDs: use payload value if supplied, otherwise look up existing runbooks in DB.
+    eff_provision_id = payload.runbook_provision_id
+    if eff_provision_id is None:
+        rb = (await db.execute(
+            text("SELECT id FROM runbook_definitions WHERE asset_type_id = :at AND action = 'provision' AND is_active = true LIMIT 1"),
+            {"at": type_id},
+        )).fetchone()
+        eff_provision_id = rb[0] if rb else None
+
+    eff_revoke_id = payload.runbook_revoke_id
+    if eff_revoke_id is None:
+        rb = (await db.execute(
+            text("SELECT id FROM runbook_definitions WHERE asset_type_id = :at AND action = 'delete' AND is_active = true LIMIT 1"),
+            {"at": type_id},
+        )).fetchone()
+        eff_revoke_id = rb[0] if rb else None
+
+    violations = validate_asset_type(
+        assignment_model=eff_assignment_model,
+        automation_strategy=eff_automation_strategy,
+        deprovision_policy=eff_deprovision_policy,
+        personal_provisioning_strategy=eff_pps,
+        runbook_provision_id=eff_provision_id,
+        runbook_revoke_id=eff_revoke_id,
+    )
+    if violations:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=[{"code": v.code, "message": v.message} for v in violations],
+        )
+
     old_snap = _type_snap(asset_type)
     if payload.name is not None:
         asset_type.name = payload.name

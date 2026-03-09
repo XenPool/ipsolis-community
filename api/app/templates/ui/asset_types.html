@@ -27,7 +27,7 @@
     </thead>
     <tbody class="divide-y divide-gray-100">
       {% for t in asset_types %}
-      <tr class="hover:bg-gray-50">
+      <tr class="hover:bg-gray-50" data-type-id="{{ t.id }}">
         <td class="px-4 py-3">
           <div class="font-medium text-gray-900">{{ t.name }}</div>
           {% if t.description %}
@@ -88,12 +88,8 @@
         <td class="px-4 py-3 text-right text-xs">
           <a href="/ui/asset-types/{{ t.id }}/bearbeiten"
              class="text-gray-500 hover:text-blue-600 mr-3">Bearbeiten</a>
-          <button
-            hx-delete="/admin/asset-types/{{ t.id }}"
-            hx-confirm="Asset-Typ '{{ t.name }}' wirklich löschen? Alle zugehörigen Runbooks werden ebenfalls gelöscht."
-            hx-target="closest tr"
-            hx-swap="outerHTML"
-            class="text-red-400 hover:text-red-600">Löschen</button>
+          <button onclick="deleteAssetType({{ t.id }}, '{{ t.name | replace("'", "\\'") }}')"
+                  class="text-red-400 hover:text-red-600">Löschen</button>
         </td>
       </tr>
       {% else %}
@@ -107,4 +103,19 @@
     </tbody>
   </table>
 </div>
+
+<script>
+async function deleteAssetType(id, name) {
+  if (!confirm("Asset-Typ '" + name + "' wirklich löschen? Alle zugehörigen Runbooks werden ebenfalls gelöscht.")) return;
+  const resp = await fetch('/admin/asset-types/' + id, {method: 'DELETE'});
+  if (resp.status === 204) {
+    var row = document.querySelector('[data-type-id="' + id + '"]');
+    if (row) row.remove();
+  } else {
+    var err = {};
+    try { err = await resp.json(); } catch(e) {}
+    alert(err.detail || 'Fehler beim Löschen (Status ' + resp.status + ')');
+  }
+}
+</script>
 {% endblock %}

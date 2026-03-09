@@ -79,6 +79,9 @@ class AssetTypeCreate(BaseModel):
     max_per_user: int = 1
     automation_strategy: str = "runbook_only"
     composite_steps: list[dict[str, Any]] | None = None
+    # Constraint validation: IDs of existing runbooks (not persisted, validation-time only)
+    runbook_provision_id: int | None = None
+    runbook_revoke_id: int | None = None
 
 
 class AssetTypeUpdate(BaseModel):
@@ -98,6 +101,9 @@ class AssetTypeUpdate(BaseModel):
     max_per_user: int | None = None
     automation_strategy: str | None = None
     composite_steps: list[dict[str, Any]] | None = None
+    # Constraint validation: IDs of existing runbooks (not persisted, validation-time only)
+    runbook_provision_id: int | None = None
+    runbook_revoke_id: int | None = None
 
 
 # ── Asset-Pool ─────────────────────────────────────────────────────────────────

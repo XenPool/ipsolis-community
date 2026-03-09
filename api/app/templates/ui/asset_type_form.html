@@ -123,6 +123,7 @@
         </label>
         {% endfor %}
       </div>
+      <div id="dp-constraint-banner" class="hidden mt-2 text-xs rounded px-3 py-2 bg-amber-50 border border-amber-200 text-amber-700"></div>
     </div>
 
     <!-- Persönliche Zuweisung (nur bei assigned_personal) -->
@@ -442,13 +443,13 @@
 function updateAutomationUI() {
   var sel = document.querySelector('[name="automation_strategy"]:checked');
   var val = sel ? sel.value : 'runbook_only';
-  var isGroup    = val === 'group_only';
-  var isRunbook  = val === 'runbook_only';
+  var isGroup     = val === 'group_only';
   var isComposite = val === 'composite';
 
   document.getElementById('targets-section').classList.toggle('hidden', !isGroup && !isComposite);
-  document.getElementById('runbook-hint').classList.toggle('hidden', !isRunbook && !isComposite);
   document.getElementById('composite-order-section').classList.toggle('hidden', !isComposite);
+  // runbook-hint visibility + content is managed by enforceConstraints()
+  enforceConstraints();
 }
 
 // Compat-Alias (wird von älteren onchange-Attributen gerufen)
@@ -475,15 +476,99 @@ function toggleAssignmentDependents() {
   var dp = _dpDefaults[val] || 'access_only';
   var dpRadio = document.querySelector('[name="deprovision_policy"][value="' + dp + '"]');
   if (dpRadio) dpRadio.checked = true;
+  enforceConstraints();
 }
 
 // Compat-Alias (wird auch von bestehenden Listeners gerufen)
 function toggleCapacity() { toggleAssignmentDependents(); }
 
+// ── Asset-Type Constraint Enforcement (Rules 1–4) ─────────────────────────────
+// Rule 1: GROUP_ONLY forbids deallocate_instance + delete_instance
+// Rule 2: RETURN_TO_POOL requires assigned_personal + assign_existing_free
+// Rule 3: dedicated_shared forbids delete_instance
+// Rule 4: runbook_only needs provision runbook; custom_runbook needs revoke runbook
+function enforceConstraints() {
+  var strategy = (document.querySelector('[name="automation_strategy"]:checked') || {}).value || 'runbook_only';
+  var model    = (document.querySelector('[name="assignment_model"]:checked')    || {}).value || 'assigned_personal';
+  var isGroupOnly   = strategy === 'group_only';
+  var isShared      = model === 'dedicated_shared';
+  var isPersonal    = model === 'assigned_personal';
+  var isRunbookMode = strategy === 'runbook_only' || strategy === 'composite';
+
+  // Build forbidden set for deprovision_policy
+  var forbidden = new Set();
+  if (isGroupOnly) { forbidden.add('deallocate_instance'); forbidden.add('delete_instance'); }
+  if (isShared)    { forbidden.add('delete_instance'); }
+  if (!isPersonal) { forbidden.add('return_to_pool'); }
+
+  // Apply disabled state; auto-fallback to access_only if selected option becomes forbidden
+  var needFallback = false;
+  document.querySelectorAll('[name="deprovision_policy"]').forEach(function(radio) {
+    var card = radio.closest('label');
+    var isForbidden = forbidden.has(radio.value);
+    radio.disabled = isForbidden;
+    if (isForbidden) {
+      card.classList.add('opacity-40', 'cursor-not-allowed', 'pointer-events-none');
+      if (radio.checked) { radio.checked = false; needFallback = true; }
+    } else {
+      card.classList.remove('opacity-40', 'cursor-not-allowed', 'pointer-events-none');
+    }
+  });
+  if (needFallback) {
+    var fb = document.querySelector('[name="deprovision_policy"][value="access_only"]');
+    if (fb && !fb.disabled) fb.checked = true;
+  }
+
+  // Rule 2: if return_to_pool selected, lock personal_provisioning_strategy to assign_existing_free
+  var currentDp = (document.querySelector('[name="deprovision_policy"]:checked') || {}).value || 'access_only';
+  if (currentDp === 'return_to_pool') {
+    var aeRadio = document.querySelector('[name="personal_provisioning_strategy"][value="assign_existing_free"]');
+    if (aeRadio && !aeRadio.checked) aeRadio.checked = true;
+  }
+
+  // Rule 4: runbook hint – visibility + content
+  var hasRunbookPolicy = currentDp === 'custom_runbook';
+  var showHint = isRunbookMode || hasRunbookPolicy;
+  var hintEl = document.getElementById('runbook-hint');
+  if (hintEl) {
+    hintEl.classList.toggle('hidden', !showHint);
+    if (showHint) {
+      var msgs = [];
+      if (isRunbookMode)    msgs.push('Provision-Runbook konfigurieren (Automations-Modus: Runbook).');
+      if (hasRunbookPolicy) msgs.push('Revoke-Runbook konfigurieren (Deprovision-Strategie: Runbook).');
+      hintEl.innerHTML =
+        '<p class="text-xs text-purple-700">Runbook-Abhängigkeiten \u2013 bitte nach dem Speichern im '
+        + '<a href="/ui/runbooks" class="underline hover:text-purple-900">Runbook-Editor</a> einrichten:</p>'
+        + '<ul class="mt-1 list-disc list-inside text-xs text-purple-600">'
+        + msgs.map(function(m) { return '<li>' + m + '</li>'; }).join('')
+        + '</ul>';
+    }
+  }
+
+  // Constraint banner below deprovision policy grid
+  var banner = document.getElementById('dp-constraint-banner');
+  if (banner) {
+    var notes = [];
+    if (isGroupOnly) notes.push('Gruppen-Zugriff: Instanz-Aktionen (Anhalten / L\u00f6schen) nicht verf\u00fcgbar.');
+    if (isShared)    notes.push('Gemeinsames Modell: "Instanz l\u00f6schen" nicht verf\u00fcgbar.');
+    if (!isPersonal) notes.push('"Zur\u00fcck in Pool" nur bei pers\u00f6nlicher Zuweisung m\u00f6glich.');
+    if (notes.length) {
+      banner.textContent = notes.join(' \u2022 ');
+      banner.classList.remove('hidden');
+    } else {
+      banner.classList.add('hidden');
+    }
+  }
+}
+
 document.addEventListener('DOMContentLoaded', function() {
   document.querySelectorAll('[name="assignment_model"]').forEach(function(r) {
     r.addEventListener('change', toggleAssignmentDependents);
   });
+  document.querySelectorAll('[name="deprovision_policy"]').forEach(function(r) {
+    r.addEventListener('change', enforceConstraints);
+  });
+  enforceConstraints();
 });
 
 function addTargetRow() {
@@ -616,6 +701,34 @@ async function submitForm() {
 
   var showTargets = automationStrategy === 'group_only' || automationStrategy === 'composite';
 
+  var dpPolicy   = dpPolicyEl ? dpPolicyEl.value : 'access_only';
+  var psStrategy = psStratEl  ? psStratEl.value  : null;
+
+  // ── Client-side constraint pre-flight (Rules 1–3) ───────────────────────────
+  var constraintErrors = [];
+  if (automationStrategy === 'group_only' &&
+      (dpPolicy === 'deallocate_instance' || dpPolicy === 'delete_instance')) {
+    constraintErrors.push('Gruppen-Zugriff unterst\u00fctzt keine Instanz-Aktionen (Anhalten/L\u00f6schen). W\u00e4hle eine andere Deprovision-Strategie.');
+  }
+  if (dpPolicy === 'return_to_pool' && assignmentModel !== 'assigned_personal') {
+    constraintErrors.push('"Zur\u00fcck in Pool" erfordert das Zuweisungsmodell "Pers\u00f6nlich".');
+  }
+  if (dpPolicy === 'return_to_pool' && assignmentModel === 'assigned_personal' &&
+      psStrategy && psStrategy !== 'assign_existing_free') {
+    constraintErrors.push('"Zur\u00fcck in Pool" erfordert die Provisionierungs-Strategie "Freie Instanz zuweisen".');
+  }
+  if (assignmentModel === 'dedicated_shared' && dpPolicy === 'delete_instance') {
+    constraintErrors.push('Gemeinsame Assets d\u00fcrfen nicht automatisch gel\u00f6scht werden ("Instanz l\u00f6schen" verboten).');
+  }
+  if (constraintErrors.length) {
+    document.getElementById('form-result').innerHTML =
+      '<div class="text-sm text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">'
+      + '<strong>Konfigurationsfehler:</strong><ul class="mt-1 list-disc list-inside">'
+      + constraintErrors.map(function(e) { return '<li>' + e + '</li>'; }).join('')
+      + '</ul></div>';
+    return;
+  }
+
   var payload = {
     name: name,
     description: form.querySelector('[name="description"]').value.trim() || null,
@@ -631,9 +744,9 @@ async function submitForm() {
     composite_steps: compositeSteps,
     targets: showTargets && targets.length ? targets : null,
     config: config.length ? config : null,
-    deprovision_policy: dpPolicyEl ? dpPolicyEl.value : 'access_only',
+    deprovision_policy: dpPolicy,
     personal_provisioning_strategy: assignmentModel === 'assigned_personal' && psStratEl
-      ? psStratEl.value : null,
+      ? psStrategy : null,
     naming_pattern: form.querySelector('[name="naming_pattern"]').value.trim() || null,
     max_per_user: form.querySelector('[name="max_per_user"]').value
       ? parseInt(form.querySelector('[name="max_per_user"]').value) : 1,

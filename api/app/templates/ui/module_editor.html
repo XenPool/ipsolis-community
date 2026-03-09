@@ -1,0 +1,312 @@
+{% extends "base.html" %}
+
+{% block title %}{% if module %}Modul bearbeiten{% else %}Neues Modul{% endif %} – XenPool Admin{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+  <a href="/ui/modules" class="text-sm text-gray-500 hover:text-gray-800">← Module</a>
+</div>
+
+<h1 class="text-lg font-semibold text-gray-900 mb-4">
+  {% if module %}Modul bearbeiten: {{ module.name }}{% else %}Neues Modul{% endif %}
+</h1>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+  <!-- Left: Metadata + Params -->
+  <div class="space-y-4">
+
+    <!-- Basic info -->
+    <div class="bg-white rounded-lg border border-gray-200 p-4 space-y-3">
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">Name <span class="text-red-500">*</span></label>
+        <input type="text" id="mod-name" required
+               value="{{ module.name if module else '' }}"
+               placeholder="z.B. Set-RDPGroup"
+               class="w-full rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">Beschreibung</label>
+        <input type="text" id="mod-desc"
+               value="{{ module.description if module and module.description else '' }}"
+               placeholder="Was macht dieses Modul?"
+               class="w-full rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">Script-Typ</label>
+        <select id="mod-type"
+                class="w-full rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400">
+          <option value="powershell" {% if not module or module.script_type == 'powershell' %}selected{% endif %}>PowerShell</option>
+          <option value="python" {% if module and module.script_type == 'python' %}selected{% endif %}>Python</option>
+          <option value="bash" {% if module and module.script_type == 'bash' %}selected{% endif %}>Bash</option>
+        </select>
+      </div>
+      <div class="flex items-center gap-2">
+        <input type="checkbox" id="mod-active"
+               {% if not module or module.is_active %}checked{% endif %}
+               class="rounded border-gray-300">
+        <label for="mod-active" class="text-sm text-gray-700 cursor-pointer">Aktiv</label>
+      </div>
+    </div>
+
+    <!-- Parameter schema -->
+    <div class="bg-white rounded-lg border border-gray-200 p-4">
+      <div class="flex items-center justify-between mb-3">
+        <label class="text-xs font-semibold text-gray-700">Parameter</label>
+        <button type="button" onclick="addParamRow()"
+                class="text-xs text-blue-600 hover:underline">+ Hinzufügen</button>
+      </div>
+      <div class="space-y-1 text-xs text-gray-400 grid grid-cols-12 gap-1 mb-1 px-0.5">
+        <span class="col-span-4">Name</span>
+        <span class="col-span-3">Typ</span>
+        <span class="col-span-2 text-center">Pflicht</span>
+        <span class="col-span-2">Standard</span>
+      </div>
+      <div id="param-rows" class="space-y-1">
+        {% if module and module.param_schema %}
+          {% for p in module.param_schema %}
+          <div class="param-row grid grid-cols-12 gap-1 items-center">
+            <input type="text" name="param_name[]" value="{{ p.name }}" placeholder="Name"
+                   class="col-span-4 rounded border border-gray-300 text-xs px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400">
+            <select name="param_type[]"
+                    class="col-span-3 rounded border border-gray-300 text-xs px-1 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400">
+              <option value="string" {% if p.type == 'string' %}selected{% endif %}>string</option>
+              <option value="int" {% if p.type == 'int' %}selected{% endif %}>int</option>
+              <option value="bool" {% if p.type == 'bool' %}selected{% endif %}>bool</option>
+              <option value="json" {% if p.type == 'json' %}selected{% endif %}>json</option>
+            </select>
+            <div class="col-span-2 flex justify-center">
+              <input type="checkbox" name="param_required[]" value="1"
+                     {% if p.required %}checked{% endif %}
+                     class="rounded border-gray-300">
+            </div>
+            <input type="text" name="param_default[]" value="{{ p.default or '' }}" placeholder="–"
+                   class="col-span-2 rounded border border-gray-300 text-xs px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400">
+            <button type="button" onclick="this.closest('.param-row').remove()"
+                    class="col-span-1 text-red-400 hover:text-red-600 text-base leading-none text-center">×</button>
+          </div>
+          {% endfor %}
+        {% endif %}
+      </div>
+      <p class="mt-2 text-xs text-gray-400">
+        Parameter werden als <code class="font-mono bg-gray-100 px-1 rounded">$PARAMS.name</code> im Script verfügbar.
+        Globale Variablen sind als <code class="font-mono bg-gray-100 px-1 rounded">$VARS.key</code> zugänglich.
+      </p>
+    </div>
+
+    <!-- Save button -->
+    <div>
+      <button type="button" onclick="saveModule()"
+              class="w-full px-4 py-2.5 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700">
+        {% if module %}Speichern{% else %}Anlegen{% endif %} →
+      </button>
+      <div id="save-result" class="mt-2"></div>
+    </div>
+  </div>
+
+  <!-- Right: Monaco Editor + Test Runner -->
+  <div class="lg:col-span-2 flex flex-col gap-3" style="min-height: 600px;">
+
+    <!-- Editor header -->
+    <div class="flex items-center justify-between bg-white rounded border border-gray-200 px-3 py-2">
+      <span class="text-sm text-gray-600 font-mono" id="editor-lang-label">
+        {% if module %}{{ module.script_type | title }}{% else %}PowerShell{% endif %}
+      </span>
+      <span class="text-xs text-gray-400">Script-Inhalt</span>
+    </div>
+
+    <!-- Monaco editor -->
+    <div class="flex-1 rounded border border-gray-200 overflow-hidden bg-gray-900" style="min-height:400px;">
+      <div id="monaco-editor" class="w-full h-full" style="min-height:400px;"></div>
+    </div>
+
+    <!-- Test runner -->
+    <div class="bg-white rounded border border-gray-200 p-3">
+      <div class="flex items-center gap-3 mb-2">
+        <span class="text-xs font-semibold text-gray-700">Testlauf</span>
+        <input id="test-params-input" type="text" placeholder='{"param1": "value1"}'
+               class="flex-1 rounded border border-gray-300 text-xs font-mono px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400">
+        <button onclick="runTest()"
+                class="px-3 py-1.5 bg-green-600 text-white text-xs font-medium rounded hover:bg-green-700 whitespace-nowrap">
+          ▶ Ausführen
+        </button>
+      </div>
+      <div id="test-output" class="hidden">
+        <pre id="test-output-pre"
+             class="rounded bg-gray-900 text-gray-100 text-xs font-mono p-3 overflow-auto max-h-48"></pre>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Monaco CDN -->
+<script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js"></script>
+<script>
+var MODULE_ID = {{ module.id if module else 'null' }};
+var editor;
+
+// Initial script content
+var INITIAL_CONTENT = {{ (module.script_content if module else "") | tojson }};
+
+require.config({ paths: { vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs' } });
+require(['vs/editor/editor.main'], function () {
+  var lang = document.getElementById('mod-type').value;
+  var monacoLang = lang === 'powershell' ? 'powershell' : (lang === 'python' ? 'python' : 'shell');
+  editor = monaco.editor.create(document.getElementById('monaco-editor'), {
+    value: INITIAL_CONTENT,
+    language: monacoLang,
+    theme: 'vs-dark',
+    fontSize: 13,
+    minimap: { enabled: false },
+    automaticLayout: true,
+    scrollBeyondLastLine: false,
+  });
+});
+
+document.getElementById('mod-type').addEventListener('change', function() {
+  var lang = this.value;
+  var monacoLang = lang === 'powershell' ? 'powershell' : (lang === 'python' ? 'python' : 'shell');
+  document.getElementById('editor-lang-label').textContent = lang.charAt(0).toUpperCase() + lang.slice(1);
+  if (editor) monaco.editor.setModelLanguage(editor.getModel(), monacoLang);
+});
+
+function addParamRow() {
+  var row = document.createElement('div');
+  row.className = 'param-row grid grid-cols-12 gap-1 items-center';
+  row.innerHTML =
+    '<input type="text" name="param_name[]" placeholder="Name"'
+    + ' class="col-span-4 rounded border border-gray-300 text-xs px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400">'
+    + '<select name="param_type[]"'
+    + ' class="col-span-3 rounded border border-gray-300 text-xs px-1 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400">'
+    + '<option value="string">string</option>'
+    + '<option value="int">int</option>'
+    + '<option value="bool">bool</option>'
+    + '<option value="json">json</option>'
+    + '</select>'
+    + '<div class="col-span-2 flex justify-center">'
+    + '<input type="checkbox" name="param_required[]" value="1" class="rounded border-gray-300">'
+    + '</div>'
+    + '<input type="text" name="param_default[]" placeholder="\u2013"'
+    + ' class="col-span-2 rounded border border-gray-300 text-xs px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400">'
+    + '<button type="button" onclick="this.closest(\'.param-row\').remove()"'
+    + ' class="col-span-1 text-red-400 hover:text-red-600 text-base leading-none text-center">\xd7</button>';
+  document.getElementById('param-rows').appendChild(row);
+}
+
+function collectParams() {
+  var rows = document.querySelectorAll('.param-row');
+  var params = [];
+  rows.forEach(function(row) {
+    var name = row.querySelector('[name="param_name[]"]').value.trim();
+    if (!name) return;
+    var type = row.querySelector('[name="param_type[]"]').value;
+    var required = row.querySelector('[name="param_required[]"]').checked;
+    var def = row.querySelector('[name="param_default[]"]').value.trim();
+    var entry = { name: name, type: type, required: required };
+    if (def) entry.default = def;
+    params.push(entry);
+  });
+  return params;
+}
+
+async function saveModule() {
+  var name = document.getElementById('mod-name').value.trim();
+  if (!name) { alert('Name ist erforderlich'); return; }
+
+  var btn = document.querySelector('[onclick="saveModule()"]');
+  if (btn) { btn.disabled = true; btn.textContent = 'Speichern…'; }
+
+  var payload = {
+    name: name,
+    description: document.getElementById('mod-desc').value.trim() || null,
+    script_content: editor ? editor.getValue() : '',
+    script_type: document.getElementById('mod-type').value,
+    param_schema: collectParams(),
+    is_active: document.getElementById('mod-active').checked,
+  };
+
+  var url = MODULE_ID ? '/admin/script-modules/' + MODULE_ID : '/admin/script-modules';
+  var method = MODULE_ID ? 'PUT' : 'POST';
+
+  try {
+    var resp = await fetch(url, {
+      method: method,
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload),
+    });
+
+    if (resp.ok) {
+      var data = await resp.json();
+      if (!MODULE_ID) {
+        MODULE_ID = data.id;
+        history.replaceState(null, '', '/ui/modules/' + MODULE_ID + '/bearbeiten');
+      }
+      document.getElementById('save-result').innerHTML =
+        '<div class="text-xs text-green-700 bg-green-50 border border-green-200 rounded px-3 py-2">Gespeichert.</div>';
+      setTimeout(function() { document.getElementById('save-result').innerHTML = ''; }, 3000);
+    } else {
+      var err = {};
+      try { err = await resp.json(); } catch(e) {}
+      document.getElementById('save-result').innerHTML =
+        '<div class="text-xs text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">'
+        + (err.detail ? JSON.stringify(err.detail) : 'HTTP ' + resp.status) + '</div>';
+    }
+  } catch (ex) {
+    document.getElementById('save-result').innerHTML =
+      '<div class="text-xs text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">'
+      + 'Netzwerkfehler: ' + ex.message + '</div>';
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = (MODULE_ID ? 'Speichern' : 'Anlegen') + ' →';
+    }
+  }
+}
+
+async function runTest() {
+  if (!MODULE_ID) { alert('Bitte zuerst speichern.'); return; }
+  var paramsRaw = document.getElementById('test-params-input').value.trim() || '{}';
+  var params;
+  try { params = JSON.parse(paramsRaw); } catch(e) { alert('Ungültiges JSON in Parametern.'); return; }
+
+  document.getElementById('test-output').classList.remove('hidden');
+  document.getElementById('test-output-pre').textContent = 'Wird ausgeführt…';
+
+  // Trigger test via Celery task
+  var resp = await fetch('/admin/script-modules/' + MODULE_ID + '/test', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ params: params }),
+  });
+
+  if (!resp.ok) {
+    var err = {};
+    try { err = await resp.json(); } catch(e) {}
+    document.getElementById('test-output-pre').textContent = 'Fehler: ' + JSON.stringify(err.detail || err);
+    return;
+  }
+
+  var data = await resp.json();
+  var taskId = data.task_id;
+  if (!taskId) {
+    document.getElementById('test-output-pre').textContent = JSON.stringify(data, null, 2);
+    return;
+  }
+
+  // Poll for result
+  for (var i = 0; i < 30; i++) {
+    await new Promise(function(r) { setTimeout(r, 1000); });
+    var pollResp = await fetch('/admin/script-module-test/' + taskId);
+    if (!pollResp.ok) continue;
+    var pollData = await pollResp.json();
+    if (pollData.status === 'SUCCESS' || pollData.status === 'FAILURE') {
+      document.getElementById('test-output-pre').textContent =
+        JSON.stringify(pollData.result || pollData, null, 2);
+      return;
+    }
+    document.getElementById('test-output-pre').textContent = 'Status: ' + pollData.status + '…';
+  }
+  document.getElementById('test-output-pre').textContent = 'Timeout – bitte Flower prüfen.';
+}
+</script>
+{% endblock %}

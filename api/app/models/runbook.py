@@ -72,7 +72,10 @@ class RunbookStep(Base):
     )
     position: Mapped[int] = mapped_column(Integer, nullable=False)
     step_name: Mapped[str] = mapped_column(String(255), nullable=False)
-    module_key: Mapped[str] = mapped_column(String(255), nullable=False)
+    module_key: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    script_module_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("script_modules.id", ondelete="SET NULL"), nullable=True
+    )
     params_template: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     is_critical: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     retry_count: Mapped[int] = mapped_column(Integer, nullable=False, default=3)
@@ -84,9 +87,11 @@ class RunbookStep(Base):
     runbook: Mapped["RunbookDefinition"] = relationship(
         "RunbookDefinition", back_populates="steps"
     )
+    script_module: Mapped["Any"] = relationship("ScriptModule")  # noqa: F821
 
     def __repr__(self) -> str:
+        ref = self.module_key or f"script_module:{self.script_module_id}"
         return (
             f"<RunbookStep id={self.id} runbook={self.runbook_id} "
-            f"pos={self.position} module={self.module_key!r}>"
+            f"pos={self.position} module={ref!r}>"
         )

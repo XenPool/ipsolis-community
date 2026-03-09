@@ -1,0 +1,282 @@
+{% extends "base.html" %}
+
+{% block title %}PS-Module – XenPool Admin{% endblock %}
+
+{% macro status_class(s) %}{% if s == 'installed' %}bg-green-100 text-green-700{% elif s == 'installing' %}bg-blue-100 text-blue-700{% elif s == 'failed' %}bg-red-100 text-red-600{% else %}bg-gray-100 text-gray-600{% endif %}{% endmacro %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-4">
+  <h1 class="text-lg font-semibold text-gray-900">PowerShell-Module</h1>
+</div>
+
+<!-- Add module form -->
+<div class="bg-white rounded-lg border border-gray-200 p-4 mb-6">
+  <h2 class="text-sm font-semibold text-gray-700 mb-3">Modul hinzufügen</h2>
+  <div class="flex gap-3 items-end">
+    <div class="relative">
+      <label class="block text-xs font-medium text-gray-600 mb-1">Name <span class="text-red-500">*</span></label>
+      <input type="text" id="add-name" autocomplete="off"
+             placeholder="Modul suchen…"
+             oninput="onSearchInput()"
+             onkeydown="if(event.key==='Escape') document.getElementById('search-dropdown').classList.add('hidden')"
+             class="rounded border border-gray-300 text-sm px-3 py-2 w-96 focus:outline-none focus:ring-1 focus:ring-blue-400">
+      <div id="search-dropdown"
+           class="hidden absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded shadow-lg max-h-64 overflow-y-auto text-sm">
+      </div>
+    </div>
+    <div>
+      <label class="block text-xs font-medium text-gray-600 mb-1">Version (optional)</label>
+      <input type="text" id="add-version" placeholder="z.B. 13.2.1"
+             class="rounded border border-gray-300 text-sm px-3 py-2 w-36 focus:outline-none focus:ring-1 focus:ring-blue-400">
+    </div>
+    <button onclick="addModule()"
+            class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700">
+      Hinzufügen
+    </button>
+    <span id="add-result" class="text-sm"></span>
+  </div>
+</div>
+
+<!-- Module table -->
+<div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+  <table class="w-full text-sm">
+    <thead class="bg-gray-50 border-b border-gray-200">
+      <tr>
+        <th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-600">Name</th>
+        <th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-600">Gewünschte Version</th>
+        <th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-600">Status</th>
+        <th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-600">Installierte Version</th>
+        <th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-600">Aktionen</th>
+      </tr>
+    </thead>
+    <tbody id="module-table-body" class="divide-y divide-gray-100">
+      {% if ps_modules %}
+        {% for m in ps_modules %}
+        <tr data-module-id="{{ m.id }}" data-status="{{ m.status }}">
+          <td class="px-4 py-3 font-mono text-xs text-gray-900">{{ m.name }}</td>
+          <td class="px-4 py-3 text-xs text-gray-600">{{ m.required_version or '–' }}</td>
+          <td class="px-4 py-3">
+            <span class="status-badge {{ status_class(m.status) }} text-xs font-medium px-2 py-0.5 rounded-full">
+              {{ m.status }}{% if m.status == 'installing' %} <span class="animate-pulse">…</span>{% endif %}
+            </span>
+          </td>
+          <td class="px-4 py-3 text-xs text-gray-600 font-mono">{{ m.installed_version or '–' }}</td>
+          <td class="px-4 py-3 flex gap-3">
+            <button onclick="reinstall({{ m.id }})"
+                    class="text-xs text-blue-600 hover:underline">Neu installieren</button>
+            <button onclick="deleteModule({{ m.id }}, '{{ m.name }}')"
+                    class="text-xs text-red-400 hover:text-red-600">Löschen</button>
+          </td>
+        </tr>
+        {% if m.error_log %}
+        <tr data-error-for="{{ m.id }}">
+          <td colspan="5" class="px-4 pb-3">
+            <pre class="text-xs text-red-600 bg-red-50 rounded p-2 overflow-auto max-h-24">{{ m.error_log }}</pre>
+          </td>
+        </tr>
+        {% endif %}
+        {% endfor %}
+      {% else %}
+        <tr id="empty-row">
+          <td colspan="5" class="px-4 py-6 text-center text-sm text-gray-400">
+            Noch keine PS-Module konfiguriert.
+          </td>
+        </tr>
+      {% endif %}
+    </tbody>
+  </table>
+</div>
+
+<script>
+// ── PSGallery search autocomplete ─────────────────────────────────────────────
+var _searchTimer = null;
+
+function onSearchInput() {
+  var q = document.getElementById('add-name').value.trim();
+  var dd = document.getElementById('search-dropdown');
+  clearTimeout(_searchTimer);
+  if (q.length < 2) { dd.classList.add('hidden'); return; }
+  _searchTimer = setTimeout(async function() {
+    try {
+      var resp = await fetch('/admin/ps-modules/search?q=' + encodeURIComponent(q));
+      if (!resp.ok) return;
+      var results = await resp.json();
+      if (!results.length) { dd.classList.add('hidden'); return; }
+      dd.innerHTML = results.map(function(r) {
+        var safeName = r.name.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+        var safeVer  = (r.version || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+        var safeDesc = (r.description || '').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        return '<div class="px-3 py-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-0"'
+          + ' data-name="' + safeName + '" data-version="' + safeVer + '">'
+          + '<span class="font-mono font-medium text-gray-900">' + safeName + '</span>'
+          + '<span class="ml-2 text-xs text-gray-400">' + safeVer + '</span>'
+          + (safeDesc ? '<div class="text-xs text-gray-500 mt-0.5">' + safeDesc + '</div>' : '')
+          + '</div>';
+      }).join('');
+      dd.classList.remove('hidden');
+    } catch(e) {}
+  }, 350);
+}
+
+document.getElementById('search-dropdown').addEventListener('click', function(e) {
+  var item = e.target.closest('[data-name]');
+  if (!item) return;
+  document.getElementById('add-name').value = item.dataset.name;
+  document.getElementById('add-version').value = item.dataset.version;
+  this.classList.add('hidden');
+});
+
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('#add-name') && !e.target.closest('#search-dropdown')) {
+    var dd = document.getElementById('search-dropdown');
+    if (dd) dd.classList.add('hidden');
+  }
+});
+
+// ── Module status polling ──────────────────────────────────────────────────────
+var _pollingInterval = null;
+
+function _statusClass(status) {
+  var map = {
+    pending:    'bg-gray-100 text-gray-600',
+    installing: 'bg-blue-100 text-blue-700',
+    installed:  'bg-green-100 text-green-700',
+    failed:     'bg-red-100 text-red-600',
+  };
+  return map[status] || 'bg-gray-100 text-gray-600';
+}
+
+function _updateRowStatus(id, data) {
+  var row = document.querySelector('[data-module-id="' + id + '"]');
+  if (!row) return;
+  row.setAttribute('data-status', data.status);
+  var badge = row.querySelector('.status-badge');
+  if (badge) {
+    badge.className = 'status-badge ' + _statusClass(data.status) + ' text-xs font-medium px-2 py-0.5 rounded-full';
+    badge.textContent = data.status + (data.status === 'installing' ? ' …' : '');
+  }
+  var cells = row.querySelectorAll('td');
+  if (cells[3]) cells[3].textContent = data.installed_version || '–';
+
+  // Update error row
+  var errRow = document.querySelector('[data-error-for="' + id + '"]');
+  if (data.error_log) {
+    if (!errRow) {
+      errRow = document.createElement('tr');
+      errRow.setAttribute('data-error-for', id);
+      errRow.innerHTML = '<td colspan="5" class="px-4 pb-3"><pre class="text-xs text-red-600 bg-red-50 rounded p-2 overflow-auto max-h-24"></pre></td>';
+      row.insertAdjacentElement('afterend', errRow);
+    }
+    errRow.querySelector('pre').textContent = data.error_log;
+  } else if (errRow) {
+    errRow.remove();
+  }
+}
+
+function _startPolling() {
+  if (_pollingInterval) return;
+  _pollingInterval = setInterval(async function() {
+    var installing = document.querySelectorAll('[data-status="installing"],[data-status="pending"]');
+    if (installing.length === 0) {
+      clearInterval(_pollingInterval);
+      _pollingInterval = null;
+      return;
+    }
+    // Refresh the full list
+    try {
+      var resp = await fetch('/admin/ps-modules');
+      if (!resp.ok) return;
+      var modules = await resp.json();
+      modules.forEach(function(m) { _updateRowStatus(m.id, m); });
+    } catch(e) {}
+  }, 3000);
+}
+
+async function addModule() {
+  var name = document.getElementById('add-name').value.trim();
+  if (!name) { alert('Name ist erforderlich'); return; }
+  var version = document.getElementById('add-version').value.trim() || null;
+  var resultEl = document.getElementById('add-result');
+  resultEl.textContent = 'Wird hinzugefügt…';
+  try {
+    var resp = await fetch('/admin/ps-modules', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({name: name, required_version: version}),
+    });
+    if (resp.status === 409) {
+      resultEl.textContent = 'Modul existiert bereits.';
+      resultEl.className = 'text-sm text-orange-600';
+      return;
+    }
+    if (!resp.ok) {
+      var err = {}; try { err = await resp.json(); } catch(e) {}
+      resultEl.textContent = err.detail || ('HTTP ' + resp.status);
+      resultEl.className = 'text-sm text-red-600';
+      return;
+    }
+    var data = await resp.json();
+    // Add row to table
+    var emptyRow = document.getElementById('empty-row');
+    if (emptyRow) emptyRow.remove();
+    var tbody = document.getElementById('module-table-body');
+    var tr = document.createElement('tr');
+    tr.setAttribute('data-module-id', data.id);
+    tr.setAttribute('data-status', data.status);
+    tr.innerHTML =
+      '<td class="px-4 py-3 font-mono text-xs text-gray-900">' + data.name + '</td>'
+      + '<td class="px-4 py-3 text-xs text-gray-600">' + (data.required_version || '–') + '</td>'
+      + '<td class="px-4 py-3"><span class="status-badge ' + _statusClass(data.status) + ' text-xs font-medium px-2 py-0.5 rounded-full">' + data.status + '</span></td>'
+      + '<td class="px-4 py-3 text-xs text-gray-600 font-mono">–</td>'
+      + '<td class="px-4 py-3 flex gap-3">'
+      + '<button onclick="reinstall(' + data.id + ')" class="text-xs text-blue-600 hover:underline">Neu installieren</button>'
+      + '<button onclick="deleteModule(' + data.id + ', \'' + data.name + '\')" class="text-xs text-red-400 hover:text-red-600">Löschen</button>'
+      + '</td>';
+    tbody.appendChild(tr);
+    document.getElementById('add-name').value = '';
+    document.getElementById('add-version').value = '';
+    resultEl.textContent = 'Hinzugefügt – Installation läuft…';
+    resultEl.className = 'text-sm text-blue-600';
+    setTimeout(function() { resultEl.textContent = ''; }, 5000);
+    _startPolling();
+  } catch(ex) {
+    resultEl.textContent = 'Fehler: ' + ex.message;
+    resultEl.className = 'text-sm text-red-600';
+  }
+}
+
+async function reinstall(id) {
+  try {
+    var resp = await fetch('/admin/ps-modules/' + id + '/install', {method: 'POST'});
+    if (!resp.ok) { alert('Fehler beim Starten der Installation'); return; }
+    _updateRowStatus(id, {status: 'pending', installed_version: null, error_log: null});
+    _startPolling();
+  } catch(ex) {
+    alert('Fehler: ' + ex.message);
+  }
+}
+
+async function deleteModule(id, name) {
+  if (!confirm('PS-Modul \'' + name + '\' wirklich entfernen?\n\nDas Modul bleibt im System installiert, wird aber nicht mehr verwaltet.')) return;
+  try {
+    var resp = await fetch('/admin/ps-modules/' + id, {method: 'DELETE'});
+    if (resp.status === 204) {
+      var row = document.querySelector('[data-module-id="' + id + '"]');
+      if (row) row.remove();
+      var errRow = document.querySelector('[data-error-for="' + id + '"]');
+      if (errRow) errRow.remove();
+    } else {
+      alert('Fehler beim Löschen (HTTP ' + resp.status + ')');
+    }
+  } catch(ex) {
+    alert('Fehler: ' + ex.message);
+  }
+}
+
+// Start polling if any module is in a transient state on page load
+(function() {
+  var transient = document.querySelectorAll('[data-status="installing"],[data-status="pending"]');
+  if (transient.length > 0) _startPolling();
+})();
+</script>
+{% endblock %}

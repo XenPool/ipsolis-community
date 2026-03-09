@@ -251,7 +251,7 @@ def check_expiring_assets() -> dict:
                 WHERE a.status = 'busy'
                   AND a.expires_at > NOW()
                   AND a.expires_at <= :reminder_time
-                  AND o.status = 'delivered'
+                  AND o.status IN ('delivered', 'provisioned')
             """),
             {"reminder_time": reminder_time},
         ).fetchall()

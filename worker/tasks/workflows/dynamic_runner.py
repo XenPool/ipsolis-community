@@ -8,6 +8,8 @@ Python-Änderungen oder Redeploy angepasst werden.
 import json
 import logging
 import os
+import subprocess
+import tempfile
 import time
 from datetime import datetime, timezone
 
@@ -349,6 +351,111 @@ def _run_targets_mode(
     return {"success": True, "order_id": order_id}
 
 
+def _load_global_vars(db: Session) -> dict:
+    """Loads all active global_vars from DB as key→value dict."""
+    rows = db.execute(text("SELECT key, value FROM global_vars ORDER BY key")).fetchall()
+    return {row[0]: (row[1] or "") for row in rows}
+
+
+def _build_ps_preamble(global_vars: dict, params: dict) -> str:
+    """Builds PowerShell variable injection header.
+
+    $VARS = @{ key = 'value'; ... }
+    $PARAMS = @{ name = 'value'; ... }
+    """
+    def _ps_escape(v) -> str:
+        if v is None:
+            return "$null"
+        s = str(v).replace("'", "''")
+        return f"'{s}'"
+
+    vars_pairs = "; ".join(f"{k} = {_ps_escape(v)}" for k, v in global_vars.items())
+    params_pairs = "; ".join(f"{k} = {_ps_escape(v)}" for k, v in params.items())
+    return f"$VARS = @{{ {vars_pairs} }}\n$PARAMS = @{{ {params_pairs} }}\n"
+
+
+def _run_db_script(
+    db: Session,
+    script_module_id: int,
+    rendered_params: dict,
+) -> dict:
+    """Executes a script_module from the DB.
+
+    In development mode: returns a mock success result without actually running.
+    In production: writes to a temp file and calls pwsh.
+    Returns a dict with at minimum {"success": bool}.
+    """
+    # Load script content
+    row = db.execute(
+        text("SELECT name, script_content, script_type FROM script_modules WHERE id = :id"),
+        {"id": script_module_id},
+    ).fetchone()
+    if not row:
+        return {"success": False, "error": f"script_module {script_module_id} not found"}
+
+    script_name, script_content, script_type = row[0], row[1], row[2]
+
+    if ENVIRONMENT == "development":
+        logger.info(
+            "[MOCK] script_module=%s params=%s – returning mock success",
+            script_name, list(rendered_params.keys()),
+        )
+        return {"success": True, "mock": True, "module": script_name}
+
+    global_vars = _load_global_vars(db)
+    preamble = _build_ps_preamble(global_vars, rendered_params)
+    full_script = preamble + "\n" + script_content
+
+    suffix = ".ps1" if script_type == "powershell" else (".py" if script_type == "python" else ".sh")
+    with tempfile.NamedTemporaryFile(mode="w", suffix=suffix, delete=False, encoding="utf-8") as tmp:
+        tmp.write(full_script)
+        tmp_path = tmp.name
+
+    try:
+        if script_type == "powershell":
+            cmd = ["pwsh", "-NonInteractive", "-NoProfile", "-File", tmp_path]
+        elif script_type == "python":
+            cmd = ["python", tmp_path]
+        else:
+            cmd = ["bash", tmp_path]
+
+        proc = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+
+        if proc.returncode != 0:
+            return {
+                "success": False,
+                "module": script_name,
+                "error": proc.stderr.strip() or f"Exit code {proc.returncode}",
+                "stdout": proc.stdout.strip(),
+            }
+
+        stdout = proc.stdout.strip()
+        try:
+            result = json.loads(stdout)
+            if "success" not in result:
+                result["success"] = True
+        except (json.JSONDecodeError, ValueError):
+            result = {"success": True, "output": stdout}
+
+        result["module"] = script_name
+        return result
+
+    except subprocess.TimeoutExpired:
+        return {"success": False, "module": script_name, "error": "Script timed out after 120s"}
+    except Exception as e:
+        return {"success": False, "module": script_name, "error": str(e)}
+    finally:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+
+
 def _render_params(params_template: dict, ctx: dict) -> dict:
     """Rendert params_template: {{key}} wird type-safe durch ctx[key] ersetzt."""
     rendered = {}
@@ -369,6 +476,9 @@ def _run_runbook_path(
     action: str,
     asset_type_name: str,
     asset_type_description: str,
+    assignment_model: str = "assigned_personal",
+    deprovision_policy: str = "access_only",
+    automation_strategy: str = "runbook_only",
     _set_delivered: bool = True,
 ) -> dict:
     """Führt das konfigurierte Runbook für den Asset-Typ und die Action aus.
@@ -403,8 +513,8 @@ def _run_runbook_path(
     # 2. Steps laden
     step_rows = db.execute(
         text("""
-            SELECT id, position, step_name, module_key, params_template,
-                   is_critical, retry_count, timeout_seconds
+            SELECT id, position, step_name, module_key, script_module_id,
+                   params_template, is_critical, retry_count, timeout_seconds
             FROM runbook_steps
             WHERE runbook_id = :rid
             ORDER BY position
@@ -415,7 +525,7 @@ def _run_runbook_path(
     if not step_rows:
         logger.warning("Runbook '%s' hat keine Steps – Order wird als delivered markiert", runbook_name)
         if _set_delivered:
-            update_order_status(db, order_id, "delivered")
+            update_order_status(db, order_id, _final_status(action))
         return {"success": True, "order_id": order_id}
 
     # 3. Execution-Kontext aufbauen
@@ -457,18 +567,18 @@ def _run_runbook_path(
     }
 
     # 4. Steps ausführen
-    from tasks.modules.registry import MODULE_REGISTRY
-
     for step_row in step_rows:
         step = step_row._asdict()
         step_name = step["step_name"]
         module_key = step["module_key"]
+        script_module_id = step["script_module_id"]
         params_template = step["params_template"] or {}
         is_critical = step["is_critical"]
 
+        step_ref = module_key or f"script_module:{script_module_id}"
         logger.info(
             "[runbook_path] Step pos=%s: %s (%s)",
-            step["position"], step_name, module_key,
+            step["position"], step_name, step_ref,
         )
         update_order_step(
             db, order_id, step_name, "running",
@@ -477,29 +587,34 @@ def _run_runbook_path(
 
         t_start = time.monotonic()
         try:
-            if module_key not in MODULE_REGISTRY:
-                raise RuntimeError(f"Unbekanntes Modul: {module_key!r}")
-
-            reg = MODULE_REGISTRY[module_key]
-            fn = reg["fn"]
-            needs_db = reg.get("needs_db", False)
             rendered = _render_params(params_template, ctx)
 
-            logger.debug("[runbook_path] %s params: %s", module_key, list(rendered.keys()))
-
-            result = fn(db, **rendered) if needs_db else fn(**rendered)
-            duration_ms = (time.monotonic() - t_start) * 1000
-            mock = result.get("mock", ENVIRONMENT == "development")
-
-            for ok in reg.get("output_keys", []):
-                if ok in result:
-                    ctx[ok] = result[ok]
-                    logger.debug("[runbook_path] ctx[%s] = %s", ok, result[ok])
-
-            log_json = make_log_json(module_key, rendered, result, duration_ms, mock)
+            if script_module_id:
+                # New path: execute DB script with global vars injected
+                logger.debug("[runbook_path] script_module_id=%s params: %s", script_module_id, list(rendered.keys()))
+                result = _run_db_script(db, script_module_id, rendered)
+                mock = result.get("mock", ENVIRONMENT == "development")
+                log_json = make_log_json(step_ref, rendered, result, (time.monotonic() - t_start) * 1000, mock)
+            else:
+                # Legacy path: Python module registry
+                from tasks.modules.registry import MODULE_REGISTRY
+                if module_key not in MODULE_REGISTRY:
+                    raise RuntimeError(f"Unbekanntes Modul: {module_key!r}")
+                reg = MODULE_REGISTRY[module_key]
+                fn = reg["fn"]
+                needs_db = reg.get("needs_db", False)
+                logger.debug("[runbook_path] %s params: %s", module_key, list(rendered.keys()))
+                result = fn(db, **rendered) if needs_db else fn(**rendered)
+                duration_ms = (time.monotonic() - t_start) * 1000
+                mock = result.get("mock", ENVIRONMENT == "development")
+                for ok in reg.get("output_keys", []):
+                    if ok in result:
+                        ctx[ok] = result[ok]
+                        logger.debug("[runbook_path] ctx[%s] = %s", ok, result[ok])
+                log_json = make_log_json(module_key, rendered, result, duration_ms, mock)
 
             if not result.get("success", True):
-                raise RuntimeError(result.get("error", f"Modul {module_key} gab success=False zurück"))
+                raise RuntimeError(result.get("error", f"Modul {step_ref} gab success=False zurück"))
 
             update_order_step(
                 db, order_id, step_name, "success",
@@ -510,7 +625,7 @@ def _run_runbook_path(
         except Exception as e:
             duration_ms = (time.monotonic() - t_start) * 1000
             log_json = make_log_json(
-                module_key, params_template, {"error": str(e)}, duration_ms
+                step_ref, params_template, {"error": str(e)}, duration_ms
             )
             update_order_step(
                 db, order_id, step_name, "failed",
@@ -541,13 +656,25 @@ def _run_runbook_path(
                     step_name, e,
                 )
 
-    # DELIVERED (optional)
+    # provisioned_state nach erfolgreicher Provision schreiben
+    if action == "provision":
+        _write_provisioned_state(
+            db, order_id,
+            assignment_model=assignment_model,
+            automation_strategy=automation_strategy,
+            deprovision_policy=deprovision_policy,
+            asset_id=ctx.get("asset_id"),
+            asset_name=ctx.get("asset_name"),
+        )
+
+    # Finalen Status setzen (optional – im Composite-Modus übernimmt _run_composite_mode)
     if _set_delivered:
-        update_order_status(db, order_id, "delivered")
+        final = _final_status(action)
+        update_order_status(db, order_id, final)
         audit_helper.waudit(
             db, "order", order_id, "status_changed",
             old={"status": "processing"},
-            new={"status": "delivered"},
+            new={"status": final},
             by="celery:dynamic_runner",
             ctx=str(celery_task.request.id),
         )
@@ -602,6 +729,7 @@ def _run_composite_mode(
                 celery_task, db, order_id, order, action,
                 asset_type_name, asset_type_description, assignment_model,
                 deprovision_policy=deprovision_policy,
+                automation_strategy="composite",
                 _set_delivered=False,
             )
             if not result.get("success"):
@@ -611,6 +739,9 @@ def _run_composite_mode(
             result = _run_runbook_path(
                 celery_task, db, order_id, order, action,
                 asset_type_name, asset_type_description,
+                assignment_model=assignment_model,
+                deprovision_policy=deprovision_policy,
+                automation_strategy="composite",
                 _set_delivered=False,
             )
             if not result.get("success"):
@@ -619,12 +750,13 @@ def _run_composite_mode(
         else:
             logger.warning("[composite] Unbekannter step_type=%r – übersprungen", step_type)
 
-    # Alle Schritte erfolgreich – DELIVERED setzen
-    update_order_status(db, order_id, "delivered")
+    # Alle Schritte erfolgreich – Status setzen
+    final = _final_status(action)
+    update_order_status(db, order_id, final)
     audit_helper.waudit(
         db, "order", order_id, "status_changed",
         old={"status": "processing"},
-        new={"status": "delivered"},
+        new={"status": final},
         by="celery:dynamic_runner[composite]",
         ctx=str(celery_task.request.id),
     )
@@ -656,7 +788,8 @@ def run(self: Task, order_id: int) -> dict:
                 SELECT o.id, o.user_email, o.user_name, o.owner_email, o.owner_name,
                        o.asset_type_id, o.rdp_users, o.admin_users,
                        o.requested_from, o.requested_until, o.action,
-                       o.servicenow_ref, o.snow_req, o.assigned_asset_id
+                       o.servicenow_ref, o.snow_req, o.assigned_asset_id,
+                       o.provisioned_state
                 FROM orders o WHERE o.id = :id
             """),
             {"id": order_id},
@@ -672,6 +805,9 @@ def run(self: Task, order_id: int) -> dict:
         if hasattr(action, "value"):
             action = action.value
         action = str(action).lower()
+
+        # provisioned_state für deterministischen Revoke
+        provisioned_state = order.get("provisioned_state") or {}
 
         # 1.5. Asset-Typ laden – Automation-Strategy + Deprovision-Policy bestimmen
         at_row = db.execute(
@@ -694,9 +830,27 @@ def run(self: Task, order_id: int) -> dict:
         if not automation_strategy:
             automation_strategy = "group_only" if automation_mode == "targets_only" else "runbook_only"
 
+        # Bei Delete/Revoke: deprovision_policy + automation_strategy aus provisioned_state lesen
+        # (deterministisch – auch wenn Asset-Typ nachträglich geändert wurde)
+        if action == "delete" and provisioned_state:
+            snap_policy = provisioned_state.get("deprovision_policy")
+            snap_strategy = provisioned_state.get("automation_strategy")
+            if snap_policy:
+                logger.info(
+                    "[dynamic_runner] deprovision_policy from snapshot: %s (current config: %s)",
+                    snap_policy, deprovision_policy,
+                )
+                deprovision_policy = snap_policy
+            if snap_strategy:
+                logger.info(
+                    "[dynamic_runner] automation_strategy from snapshot: %s (current config: %s)",
+                    snap_strategy, automation_strategy,
+                )
+                automation_strategy = snap_strategy
+
         logger.info(
-            "[dynamic_runner] automation_strategy=%s assignment_model=%s",
-            automation_strategy, assignment_model,
+            "[dynamic_runner] automation_strategy=%s assignment_model=%s deprovision_policy=%s",
+            automation_strategy, assignment_model, deprovision_policy,
         )
 
         # 2. Dispatch nach automation_strategy
@@ -705,6 +859,7 @@ def run(self: Task, order_id: int) -> dict:
                 self, db, order_id, order, action,
                 asset_type_name, asset_type_description, assignment_model,
                 deprovision_policy=deprovision_policy,
+                automation_strategy=automation_strategy,
             )
 
         if automation_strategy == "composite":
@@ -719,6 +874,9 @@ def run(self: Task, order_id: int) -> dict:
         return _run_runbook_path(
             self, db, order_id, order, action,
             asset_type_name, asset_type_description,
+            assignment_model=assignment_model,
+            deprovision_policy=deprovision_policy,
+            automation_strategy=automation_strategy,
         )
 
     except Exception as e:
@@ -737,39 +895,22 @@ def run(self: Task, order_id: int) -> dict:
 
 
 @app.task(
-    name="tasks.workflows.dynamic_runner.test_module_run",
+    name="tasks.workflows.dynamic_runner.test_script_module",
     bind=True,
     queue="provision",
 )
-def test_module_run(self: Task, module_key: str, params: dict) -> dict:
-    """Führt ein einzelnes Modul aus (für den Script-Editor Test-Runner).
+def test_script_module(self: Task, script_module_id: int, params: dict) -> dict:
+    """Executes a DB script_module for the module editor test runner.
 
-    Gibt immer ein strukturiertes Ergebnis zurück – kein raise.
+    Always returns a structured result dict – never raises.
     """
-    from tasks.modules.registry import MODULE_REGISTRY
-
-    if module_key not in MODULE_REGISTRY:
-        return {"success": False, "error": f"Unbekanntes Modul: {module_key!r}"}
-
-    reg = MODULE_REGISTRY[module_key]
-    fn = reg["fn"]
-    needs_db = reg.get("needs_db", False)
-
+    db = _get_db_session()
     t_start = time.monotonic()
     try:
-        if needs_db:
-            db = _get_db_session()
-            try:
-                result = fn(db, **params)
-            finally:
-                db.close()
-        else:
-            result = fn(**params)
-
+        result = _run_db_script(db, script_module_id, params)
         duration_ms = (time.monotonic() - t_start) * 1000
         return {
-            "success": True,
-            "module": module_key,
+            "success": result.get("success", True),
             "output": result,
             "duration_ms": round(duration_ms),
         }
@@ -777,7 +918,9 @@ def test_module_run(self: Task, module_key: str, params: dict) -> dict:
         duration_ms = (time.monotonic() - t_start) * 1000
         return {
             "success": False,
-            "module": module_key,
+            "script_module_id": script_module_id,
             "error": str(e),
             "duration_ms": round(duration_ms),
         }
+    finally:
+        db.close()

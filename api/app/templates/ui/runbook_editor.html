@@ -45,7 +45,9 @@
       <div class="flex-1 min-w-0">
         <div class="flex items-center gap-2">
           <span class="text-sm font-medium text-gray-900">{{ step.step_name }}</span>
-          <span class="text-xs font-mono px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">{{ step.module_key }}</span>
+          <span class="text-xs font-mono px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">
+            {% if step.script_module %}{{ step.script_module.name }}{% else %}{{ step.module_key or '–' }}{% endif %}
+          </span>
           {% if step.is_critical %}
           <span class="text-xs px-1 py-0.5 rounded bg-red-100 text-red-600">kritisch</span>
           {% else %}
@@ -92,30 +94,34 @@
     </div>
     <div>
       <label class="block text-xs font-medium text-gray-600 mb-1">Modul <span class="text-red-500">*</span></label>
-      <select id="new-step-module"
-              hx-get="/ui/_module-params"
-              hx-trigger="change"
-              hx-include="this"
-              hx-vals='{"key": ""}'
-              hx-target="#module-info"
-              onchange="this.setAttribute('hx-vals', JSON.stringify({key: this.value})); htmx.trigger(this, 'change')"
+      <select id="new-step-module" onchange="updateModuleInfo()"
               class="w-full rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400">
         <option value="">– Modul wählen –</option>
-        {% for group in module_groups %}
-        {% if grouped_modules.get(group) %}
-        <optgroup label="{{ group }}">
-          {% for m in grouped_modules[group] %}
-          <option value="{{ m.key }}">{{ m.key }}</option>
-          {% endfor %}
-        </optgroup>
-        {% endif %}
+        {% for m in script_modules %}
+        <option value="{{ m.id }}"
+                data-params='{{ (m.param_schema | tojson) if m.param_schema else "[]" }}'>
+          {{ m.name }}{% if m.description %} – {{ m.description }}{% endif %}
+        </option>
+        {% else %}
+        <option disabled>Keine Module vorhanden</option>
         {% endfor %}
       </select>
+      {% if not script_modules %}
+      <p class="text-xs text-amber-600 mt-1">
+        Noch keine Module erstellt.
+        <a href="/ui/modules/neu" class="underline hover:text-amber-800">Modul anlegen →</a>
+      </p>
+      {% endif %}
     </div>
   </div>
 
-  <!-- Modul-Info (HTMX) -->
-  <div id="module-info" class="mb-4"></div>
+  <!-- Modul-Param-Hints -->
+  <div id="module-info" class="mb-4 hidden">
+    <div class="rounded bg-gray-50 border border-gray-200 px-3 py-2">
+      <p class="text-xs font-medium text-gray-600 mb-1">Erwartete Parameter dieses Moduls:</p>
+      <div id="module-param-list" class="text-xs font-mono text-gray-500"></div>
+    </div>
+  </div>
 
   <div class="grid grid-cols-3 gap-4 mb-4">
     <div>
@@ -166,41 +172,61 @@ const RUNBOOK_ID = {{ runbook.id }};
 
 async function toggleActive() {
   const active = document.getElementById('is-active-toggle').checked;
-  await fetch(`/admin/runbooks/${RUNBOOK_ID}`, {
+  await fetch('/admin/runbooks/' + RUNBOOK_ID, {
     method: 'PUT',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({is_active: active}),
   });
 }
 
-async function addStep() {
-  const name = document.getElementById('new-step-name').value.trim();
-  const module_key = document.getElementById('new-step-module').value;
-  const paramsRaw = document.getElementById('new-step-params').value.trim();
+function updateModuleInfo() {
+  var sel = document.getElementById('new-step-module');
+  var opt = sel.options[sel.selectedIndex];
+  var infoEl = document.getElementById('module-info');
+  var listEl = document.getElementById('module-param-list');
+  if (!sel.value) { infoEl.classList.add('hidden'); return; }
+  try {
+    var params = JSON.parse(opt.getAttribute('data-params') || '[]');
+    if (!params.length) { infoEl.classList.add('hidden'); return; }
+    listEl.innerHTML = params.map(function(p) {
+      return '<span class="inline-block mr-4">'
+        + (p.required ? '<span class="text-red-400">*</span> ' : '')
+        + p.name
+        + ' <span class="text-gray-400">(' + p.type + ')</span>'
+        + (p.default ? ' = ' + p.default : '')
+        + '</span>';
+    }).join('');
+    infoEl.classList.remove('hidden');
+  } catch(e) { infoEl.classList.add('hidden'); }
+}
 
-  if (!name || !module_key) {
+async function addStep() {
+  var name = document.getElementById('new-step-name').value.trim();
+  var script_module_id = parseInt(document.getElementById('new-step-module').value);
+  var paramsRaw = document.getElementById('new-step-params').value.trim();
+
+  if (!name || !script_module_id) {
     alert('Step-Name und Modul sind erforderlich');
     return;
   }
 
-  let params_template = null;
+  var params_template = null;
   if (paramsRaw) {
     try { params_template = JSON.parse(paramsRaw); }
     catch(e) { alert('Params Template ist kein gültiges JSON'); return; }
   }
 
-  // Position = nächste nach letztem Step
-  const rows = document.querySelectorAll('.step-row');
-  const position = rows.length + 1;
+  var rows = document.querySelectorAll('.step-row');
+  var position = rows.length + 1;
 
-  const resp = await fetch(`/admin/runbooks/${RUNBOOK_ID}/steps`, {
+  var resp = await fetch('/admin/runbooks/' + RUNBOOK_ID + '/steps', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({
-      position,
+      position: position,
       step_name: name,
-      module_key,
-      params_template,
+      script_module_id: script_module_id,
+      params_template: params_template,
       is_critical: document.getElementById('new-step-critical').checked,
       retry_count: parseInt(document.getElementById('new-step-retry').value),
       timeout_seconds: parseInt(document.getElementById('new-step-timeout').value),
@@ -210,29 +236,29 @@ async function addStep() {
   if (resp.ok) {
     location.reload();
   } else {
-    const err = await resp.json();
+    var err = await resp.json().catch(function() { return {}; });
     document.getElementById('step-result').innerHTML =
-      `<div class="text-xs text-red-600">${JSON.stringify(err)}</div>`;
+      '<div class="text-xs text-red-600">' + JSON.stringify(err.detail || err) + '</div>';
   }
 }
 
 async function deleteStep(stepId) {
   if (!confirm('Step wirklich entfernen?')) return;
-  const resp = await fetch(`/admin/runbooks/${RUNBOOK_ID}/steps/${stepId}`, {method: 'DELETE'});
+  var resp = await fetch('/admin/runbooks/' + RUNBOOK_ID + '/steps/' + stepId, {method: 'DELETE'});
   if (resp.ok) location.reload();
 }
 
 async function moveStep(stepId, direction) {
-  const rows = [...document.querySelectorAll('.step-row')];
-  const idx = rows.findIndex(r => r.dataset.stepId == stepId);
+  var rows = Array.from(document.querySelectorAll('.step-row'));
+  var idx = rows.findIndex(function(r) { return r.dataset.stepId == stepId; });
   if (direction === 'up' && idx === 0) return;
   if (direction === 'down' && idx === rows.length - 1) return;
 
-  const swap = direction === 'up' ? idx - 1 : idx + 1;
-  [rows[idx], rows[swap]] = [rows[swap], rows[idx]];
+  var swap = direction === 'up' ? idx - 1 : idx + 1;
+  var tmp = rows[idx]; rows[idx] = rows[swap]; rows[swap] = tmp;
 
-  const newOrder = rows.map(r => parseInt(r.dataset.stepId));
-  await fetch(`/admin/runbooks/${RUNBOOK_ID}/steps/reorder`, {
+  var newOrder = rows.map(function(r) { return parseInt(r.dataset.stepId); });
+  await fetch('/admin/runbooks/' + RUNBOOK_ID + '/steps/reorder', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({step_ids: newOrder}),
@@ -242,7 +268,10 @@ async function moveStep(stepId, direction) {
 
 function editStep(stepId, step) {
   document.getElementById('new-step-name').value = step.step_name;
-  document.getElementById('new-step-module').value = step.module_key;
+  if (step.script_module_id) {
+    document.getElementById('new-step-module').value = step.script_module_id;
+    updateModuleInfo();
+  }
   document.getElementById('new-step-critical').checked = step.is_critical;
   document.getElementById('new-step-retry').value = step.retry_count;
   document.getElementById('new-step-timeout').value = step.timeout_seconds;

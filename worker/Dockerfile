@@ -18,13 +18,6 @@ RUN PWSH_VERSION=7.4.6 && \
     rm /tmp/powershell.deb && \
     rm -rf /var/lib/apt/lists/*
 
-# Install PowerCLI (requires PowerShell Core)
-RUN pwsh -Command "\
-    Set-PSRepository -Name PSGallery -InstallationPolicy Trusted; \
-    Install-Module -Name VMware.PowerCLI -Scope AllUsers -Force -AllowClobber; \
-    Set-PowerCLIConfiguration -InvalidCertificateAction Ignore -Confirm:\$false; \
-    Set-PowerCLIConfiguration -ParticipateInCEIP \$false -Confirm:\$false"
-
 # Install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt

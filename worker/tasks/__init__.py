@@ -17,6 +17,7 @@ app = Celery(
         "tasks.workflows.vdi_modify",
         "tasks.workflows.vdi_reclaim",
         "tasks.workflows.dynamic_runner",
+        "tasks.workflows.ps_module_installer",
     ],
 )
 
@@ -34,6 +35,7 @@ app.conf.update(
         "tasks.workflows.vdi_modify.*": {"queue": "provision"},
         "tasks.workflows.vdi_reclaim.*": {"queue": "reclaim"},
         "tasks.workflows.dynamic_runner.*": {"queue": "provision"},
+        "tasks.workflows.ps_module_installer.*": {"queue": "provision"},
         "tasks.modules.notifications.*": {"queue": "notifications"},
     },
     beat_schedule={

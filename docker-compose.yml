@@ -91,6 +91,7 @@ services:
     volumes:
       - ./worker/tasks:/app/tasks  # Hot-Reload im Dev-Modus
       - ./scripts:/app/scripts:ro  # PowerShell Scripts (read-only)
+      - ps_user_modules:/root/.local/share/powershell/Modules  # Persistente PS-Module
     depends_on:
       postgres:
         condition: service_healthy
@@ -125,6 +126,7 @@ services:
     volumes:
       - ./worker/tasks:/app/tasks
       - beat_schedule:/app/beat_schedule
+      - ps_user_modules:/root/.local/share/powershell/Modules
     depends_on:
       postgres:
         condition: service_healthy
@@ -165,3 +167,4 @@ volumes:
   postgres_data:
   redis_data:
   beat_schedule:
+  ps_user_modules:

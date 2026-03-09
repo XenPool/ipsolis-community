@@ -154,7 +154,7 @@ async def cancel_order(
 
     old_status = order.status.value
 
-    if order.status in (OrderStatus.DELIVERED, OrderStatus.PROCESSING):
+    if order.status in (OrderStatus.DELIVERED, OrderStatus.PROCESSING, OrderStatus.PROVISIONED):
         # Bei PROCESSING: Reclaim-Runbook triggern
         from app.routes.webhook import _dispatch_runbook
         from app.models.order import OrderAction

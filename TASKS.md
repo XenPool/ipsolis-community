@@ -7,6 +7,50 @@ Neue Tasks oben eintragen. Erledigte bleiben als Referenz.
 
 ## Offen
 
+### [erledigt] Module System Overhaul + Delete Bug Fix + Data Cleanup — 2026-03-09
+
+**Bug Fix**
+- [x] `asset_types.html`: Delete-Button von HTMX (`hx-delete` + 204) auf JS-Funktion umgestellt → Browser confirm + row.remove() bei 204, alert bei Fehler
+- [x] `data-type-id` Attribut an `<tr>` ergänzt
+
+**Test Data Cleanup**
+- [x] Migration `0011_cleanup_test_data.py`: DELETE aller Seed-Daten (order_steps, order_change_log, orders, runbook_steps, runbook_definitions, asset_pool, asset_types, audit_log) in FK-Reihenfolge
+
+**New Schema (0012)**
+- [x] Migration `0012_script_modules_and_global_vars.py`: Tabellen `script_modules` + `global_vars`; `runbook_steps.script_module_id` FK + `module_key` nullable
+- [x] ORM-Models `models/script_module.py` + `models/global_var.py` neu
+- [x] `models/runbook.py`: `module_key` nullable, `script_module_id` FK + relationship
+
+**New Admin API (`admin_modules.py`)**
+- [x] CRUD für `script_modules` (list, create, get, update, delete mit FK-Check)
+- [x] Test-Execution: `POST /admin/script-modules/{id}/test` → Celery task, `GET /admin/script-module-test/{task_id}` → Result Poll
+- [x] CRUD für `global_vars` (list, create, update, delete), Masking bei `is_secret=True`
+- [x] In `main.py` registriert
+
+**Updated admin_runbooks.py**
+- [x] `RunbookStepCreate/Update`: `module_key` → `script_module_id` (FK zu `script_modules`)
+- [x] `GET /admin/modules`: liest jetzt aus `script_modules`-DB statt `MODULE_METADATA` hardcoded
+- [x] Step-Create/-Update validiert `script_module_id` gegen DB; alle MODULE_MAP/MODULE_GROUPS/MODULE_METADATA Importe entfernt
+
+**New UI Pages**
+- [x] `modules.html`: Liste aller Module (Name, Typ, Params, Status, Aktionen)
+- [x] `module_editor.html`: Monaco Editor + Param-Schema-Builder + Test-Runner
+- [x] `global_vars.html`: Tabelle + Inline-Edit-Modal + Create-Form
+- [x] `base.html`: Nav-Links "Module" + "Glob. Variablen" ergänzt
+- [x] `ui.py`: neue Routen `/ui/modules`, `/ui/modules/neu`, `/ui/modules/{id}/bearbeiten`, `/ui/global-vars`
+
+**Updated Runbook Editor**
+- [x] `runbook_editor.html`: Modul-Dropdown zeigt `script_modules` aus DB (Jinja2 loop), kein HTMX-Fragment mehr
+- [x] `updateModuleInfo()`: zeigt Param-Hints bei Modul-Auswahl
+- [x] `addStep()` + `editStep()`: nutzen `script_module_id` statt `module_key`
+
+**Updated Worker (dynamic_runner.py)**
+- [x] `_load_global_vars()`: liest alle `global_vars` aus DB
+- [x] `_build_ps_preamble()`: baut `$VARS` + `$PARAMS` PS-Hashtable-Header
+- [x] `_run_db_script()`: führt script_module aus (mock in dev, pwsh/python/bash in prod); temp file + cleanup
+- [x] `_run_runbook_path()`: Schritt-Query um `script_module_id` erweitert; neuer Pfad für `script_module_id`, Legacy-Pfad für `module_key`
+- [x] Neuer Celery Task `test_script_module`: für Module-Editor Test-Runner
+
 ### [erledigt] Phase 1: Deprovision Policy + Personal Provisioning Strategy — 2026-02-25
 **DB (`0008_deprovision_policy_and_provisioning_strategy.py`)**
 - [x] Neue Spalten `asset_types`: `deprovision_policy`, `personal_provisioning_strategy`, `naming_pattern`, `max_per_user`
@@ -86,24 +130,55 @@ visibleWhen-Logik. Portal rendert Bestellformular dynamisch nach Attribut-Defini
 
 ---
 
-### [offen] Phase 4: Order State Persistence + Deterministic Revoke — Prio 4
+### [erledigt] Phase 4: Order State Persistence + Deterministic Revoke — 2026-02-26
 Persistiert nach erfolgreicher Provision einen Snapshot auf der Order (provisioned_state JSONB).
 Revoke liest ausschließlich aus diesem Snapshot — deterministisch auch wenn Asset-Typ geändert wurde.
 Idempotenz für Gruppen-Grants via eindeutigem Key.
 
 **DB (`0010_order_provisioned_state.py`)**
-- [ ] Neue Spalte `orders.provisioned_state` JSONB
-- [ ] Neue Spalten `order_change_log`: `idempotency_key` VARCHAR(255), `resolved_object_id` VARCHAR(255), Index auf idempotency_key
-- [ ] `OrderStatus`-Enum erweitern: PROVISIONING / PROVISIONED / REVOKING / REVOKED (via `ALTER TYPE ... ADD VALUE IF NOT EXISTS`)
-- [ ] Status-Badge-Updates in Portal: DELIVERED | PROVISIONED = aktiv; REVOKED = abgeschlossen
+- [x] Neue Spalte `orders.provisioned_state` JSONB
+- [x] Neue Spalten `order_change_log`: `idempotency_key` VARCHAR(255), `resolved_object_id` VARCHAR(255), Index auf idempotency_key
+- [x] `OrderStatus`-Enum erweitern: PROVISIONING / PROVISIONED / REVOKING / REVOKED (via `ALTER TYPE ... ADD VALUE IF NOT EXISTS`)
+- [x] Status-Badge-Updates in Portal: DELIVERED | PROVISIONED = aktiv; REVOKED = abgeschlossen
 
 **Backend**
-- [ ] `models/order.py`: `provisioned_state` Spalte + neue OrderStatus-Werte
-- [ ] `models/change_log.py`: idempotency_key + resolved_object_id
-- [ ] `dynamic_runner.py`: nach Provision `provisioned_state` schreiben; Revoke liest deprovision_policy aus Snapshot (Fallback auf current config)
-- [ ] `target_executor.py`: idempotency_key generieren + Duplikat-Check vor Grant; resolved_object_id schreiben
-- [ ] `pool_manager.py`: `asset_metadata` mit owner_email anreichern (→ REUSE_BY_OWNER-Lookup)
-- [ ] `check_expiring_assets` in `vdi_reclaim.py`: auch PROVISIONED-Status berücksichtigen
+- [x] `models/order.py`: `provisioned_state` Spalte + neue OrderStatus-Werte
+- [x] `models/change_log.py`: idempotency_key + resolved_object_id
+- [x] `dynamic_runner.py`: nach Provision `provisioned_state` schreiben; Revoke liest deprovision_policy aus Snapshot (Fallback auf current config)
+- [x] `target_executor.py`: idempotency_key generieren + Duplikat-Check vor Grant; resolved_object_id schreiben
+- [x] `pool_manager.py`: `asset_metadata` mit owner_email anreichern (→ REUSE_BY_OWNER-Lookup)
+- [x] `check_expiring_assets` in `vdi_reclaim.py`: auch PROVISIONED-Status berücksichtigen
+- [x] `portal.py`: Cancel-Endpoint kopiert `provisioned_state` in neue Delete-Order; Status-Check erweitert auf PROVISIONED; `orders.py` idem
+- [x] Migration 0009 → 0010 auf laufendem Container angewendet (`docker cp` + `alembic upgrade head`)
+
+**Verifikation**
+- [x] Migration 0010 fehlerfrei (`0009 -> 0010`)
+- [x] Provision → status=`provisioned` + `provisioned_state` JSON in DB ✓
+- [x] `idempotency_key` in `order_change_log` geschrieben ✓
+- [x] Cancel (PROVISIONED) → Delete-Order erbt Snapshot → `deprovision_policy from snapshot` im Worker-Log ✓
+- [x] Delete-Order → status=`revoked` ✓
+
+---
+
+### [erledigt] AssetType Constraint Validation (5 Regeln) — 2026-02-26
+Fügt eine saubere, testbare Constraint-Validierung für Asset-Typ-Create/Update hinzu.
+
+**Neue Dateien**
+- [x] `api/app/utils/asset_type_constraints.py` – pure Validator-Funktion (kein DB-Zugriff), 5 Regeln:
+  1. `supportsInstanceLifecycle = (automationStrategy != GROUP_ONLY)` → deallocate/delete_instance verboten bei group_only
+  2. `RETURN_TO_POOL` erfordert `assigned_personal` + `assign_existing_free`
+  3. `dedicated_shared` verbietet `delete_instance`
+  4. `runbook_only` erfordert `runbook_provision_id`; `custom_runbook`-Policy erfordert `runbook_revoke_id`
+  5. `composite` erlaubt alle Policies (Rule 2/3 gelten weiterhin)
+- [x] `api/tests/__init__.py` + `api/tests/test_asset_type_constraints.py` – 17 Unit-Tests (5 PASS + 7 FAIL + 5 Extras)
+
+**Geänderte Dateien**
+- [x] `api/app/schemas/admin.py`: `AssetTypeCreate` + `AssetTypeUpdate` um `runbook_provision_id` / `runbook_revoke_id` erweitert (nur Validierung, nicht persistiert)
+- [x] `api/app/routes/admin.py`: Validator in `create_asset_type` + `update_asset_type` eingebunden; Update mergt DB-Werte mit Payload; Runbook-IDs per DB-Lookup wenn nicht im Payload
+- [x] `api/app/routes/admin_runbooks.py`: `# TODO`-Kommentar für fehlende Constraint-Parity
+
+**Verifikation**
+- [x] `python -m pytest tests/test_asset_type_constraints.py -v` → 17/17 PASSED ✓
 
 ---
 

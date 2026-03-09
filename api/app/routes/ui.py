@@ -12,10 +12,12 @@ from sqlalchemy.orm import selectinload
 
 from app.database import get_db
 from app.models.asset import AssetPool, AssetStatus, AssetType
+from app.models.global_var import GlobalVar
+from app.models.ps_module import PsModule
 from app.models.order import Order, OrderStatus
 from app.models.runbook import RunbookDefinition, RunbookStep
+from app.models.script_module import ScriptModule
 from app.utils.auth import require_admin_key
-from app.utils.module_registry import MODULE_GROUPS, MODULE_MAP, MODULE_METADATA
 
 logger = logging.getLogger(__name__)
 
@@ -351,18 +353,18 @@ async def runbook_editor(
 
     at = await db.get(AssetType, rb.asset_type_id)
 
-    # Module gruppiert für Dropdown
-    grouped_modules: dict[str, list] = {g: [] for g in MODULE_GROUPS}
-    for m in MODULE_METADATA:
-        grouped_modules.setdefault(m["group"], []).append(m)
+    # Load script modules from DB for step editor dropdown
+    mod_result = await db.execute(
+        select(ScriptModule).where(ScriptModule.is_active.is_(True)).order_by(ScriptModule.name)
+    )
+    script_modules = mod_result.scalars().all()
 
     return templates.TemplateResponse(
         request, "ui/runbook_editor.html",
         {
             "runbook": rb,
             "asset_type": at,
-            "grouped_modules": grouped_modules,
-            "module_groups": MODULE_GROUPS,
+            "script_modules": script_modules,
             "active_page": "runbooks",
         },
     )
@@ -371,21 +373,102 @@ async def runbook_editor(
 @router.get("/_module-params", response_class=HTMLResponse)
 async def module_params_fragment(
     request: Request,
-    key: str = "",
+    module_id: int | None = None,
+    db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
-    """HTMX-Fragment: Param-Felder für das gewählte Modul."""
-    module = MODULE_MAP.get(key)
+    """HTMX-Fragment: Param-Felder für das gewählte Script-Modul."""
+    module = await db.get(ScriptModule, module_id) if module_id else None
     return templates.TemplateResponse(
         request, "ui/fragments/module_params.html",
-        {"module": module, "module_key": key},
+        {"module": module},
     )
 
 
-# ── Script-Editor UI ───────────────────────────────────────────────────────────
+# ── Script-Editor UI (read-only reference browser) ────────────────────────────
 
 @router.get("/scripts", response_class=HTMLResponse)
 async def scripts_editor(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(
         request, "ui/scripts.html",
         {"active_page": "scripts"},
+    )
+
+
+# ── Script Modules UI ──────────────────────────────────────────────────────────
+
+@router.get("/modules", response_class=HTMLResponse)
+async def modules_list(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> HTMLResponse:
+    result = await db.execute(select(ScriptModule).order_by(ScriptModule.name))
+    modules = result.scalars().all()
+    return templates.TemplateResponse(
+        request, "ui/modules.html",
+        {"modules": modules, "active_page": "modules"},
+    )
+
+
+@router.get("/modules/neu", response_class=HTMLResponse)
+async def module_new_form(request: Request) -> HTMLResponse:
+    return templates.TemplateResponse(
+        request, "ui/module_editor.html",
+        {"module": None, "active_page": "modules"},
+    )
+
+
+@router.get("/modules/{module_id}/bearbeiten", response_class=HTMLResponse)
+async def module_edit_form(
+    request: Request,
+    module_id: int,
+    db: AsyncSession = Depends(get_db),
+) -> HTMLResponse:
+    module = await db.get(ScriptModule, module_id)
+    if not module:
+        raise HTTPException(status.HTTP_404_NOT_FOUND)
+    return templates.TemplateResponse(
+        request, "ui/module_editor.html",
+        {"module": module, "active_page": "modules"},
+    )
+
+
+# ── PS Modules UI ──────────────────────────────────────────────────────────────
+
+@router.get("/ps-modules", response_class=HTMLResponse)
+async def ps_modules_page(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> HTMLResponse:
+    result = await db.execute(select(PsModule).order_by(PsModule.name))
+    ps_modules = result.scalars().all()
+    return templates.TemplateResponse(
+        request, "ui/ps_modules.html",
+        {"ps_modules": ps_modules, "active_page": "ps-modules"},
+    )
+
+
+# ── Global Variables UI ────────────────────────────────────────────────────────
+
+@router.get("/global-vars", response_class=HTMLResponse)
+async def global_vars_page(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> HTMLResponse:
+    result = await db.execute(select(GlobalVar).order_by(GlobalVar.key))
+    vars_list = result.scalars().all()
+    _SECRET_MASK = "***"
+    masked = [
+        {
+            "id": v.id,
+            "key": v.key,
+            "value": _SECRET_MASK if v.is_secret else (v.value or ""),
+            "description": v.description or "",
+            "is_secret": v.is_secret,
+            "updated_at": v.updated_at,
+        }
+        for v in vars_list
+    ]
+    return templates.TemplateResponse(
+        request, "ui/global_vars.html",
+        {"vars": masked, "active_page": "global-vars"},
     )

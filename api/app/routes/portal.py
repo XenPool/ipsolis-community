@@ -23,12 +23,16 @@ router = APIRouter(prefix="/portal", tags=["portal"])
 templates = Jinja2Templates(directory="/app/app/templates")
 
 _STATUS_COLORS = {
-    "pending":    "bg-gray-100 text-gray-700",
-    "processing": "bg-blue-100 text-blue-700",
-    "delivered":  "bg-green-100 text-green-700",
-    "failed":     "bg-red-100 text-red-700",
-    "expired":    "bg-orange-100 text-orange-700",
-    "cancelled":  "bg-gray-100 text-gray-500",
+    "pending":      "bg-gray-100 text-gray-700",
+    "processing":   "bg-blue-100 text-blue-700",
+    "provisioning": "bg-blue-100 text-blue-700",
+    "delivered":    "bg-green-100 text-green-700",
+    "provisioned":  "bg-green-100 text-green-700",
+    "revoking":     "bg-orange-100 text-orange-700",
+    "revoked":      "bg-gray-100 text-gray-500",
+    "failed":       "bg-red-100 text-red-700",
+    "expired":      "bg-orange-100 text-orange-700",
+    "cancelled":    "bg-gray-100 text-gray-500",
 }
 
 _STEP_COLORS = {
@@ -381,10 +385,10 @@ async def portal_cancel_order(
     if not original:
         raise HTTPException(status_code=404, detail="Bestellung nicht gefunden")
 
-    if original.status != OrderStatus.DELIVERED:
+    if original.status not in (OrderStatus.DELIVERED, OrderStatus.PROVISIONED):
         raise HTTPException(
             status_code=422,
-            detail="Nur aktive Bestellungen (DELIVERED) können abbestellt werden",
+            detail="Nur aktive Bestellungen (DELIVERED/PROVISIONED) können abbestellt werden",
         )
 
     cancel_order = Order(
@@ -400,6 +404,8 @@ async def portal_cancel_order(
         requested_until=original.requested_until,
         action=OrderAction.DELETE,
         status=OrderStatus.PENDING,
+        # Snapshot aus der Provision-Order übernehmen → deterministischer Revoke
+        provisioned_state=original.provisioned_state,
     )
     db.add(cancel_order)
     await db.flush()
