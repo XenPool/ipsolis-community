@@ -52,7 +52,13 @@
             <div class="text-xs text-gray-500">{{ order.user_email }}</div>
           </td>
           <td class="px-4 py-3 text-gray-700">
-            {{ asset_names.get(order.assigned_asset_id, "–") if order.assigned_asset_id else "–" }}
+            {% if order.assigned_asset_id %}
+              {{ asset_names.get(order.assigned_asset_id, "–") }}
+            {% elif asset_type_models.get(order.asset_type_id) == "dedicated_shared" %}
+              <span class="text-xs text-gray-500">Gemeinsam</span>
+            {% elif asset_type_models.get(order.asset_type_id) == "capacity_pooled" %}
+              <span class="text-xs text-gray-500">Kontingent</span>
+            {% else %}–{% endif %}
           </td>
           <td class="px-4 py-3">
             <span class="inline-block px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">

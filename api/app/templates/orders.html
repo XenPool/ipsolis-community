@@ -51,6 +51,7 @@
         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Laufzeit bis</th>
         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Erstellt</th>
         <th class="px-4 py-3"></th>
+        <th class="px-4 py-3"></th>
       </tr>
     </thead>
     <tbody class="divide-y divide-gray-100">
@@ -62,7 +63,13 @@
           <div class="text-xs text-gray-500">{{ order.user_email }}</div>
         </td>
         <td class="px-4 py-3 text-gray-700">
-          {{ asset_names.get(order.assigned_asset_id, "–") if order.assigned_asset_id else "–" }}
+          {% if order.assigned_asset_id %}
+            {{ asset_names.get(order.assigned_asset_id, "–") }}
+          {% elif asset_type_models.get(order.asset_type_id) == "dedicated_shared" %}
+            <span class="text-xs text-gray-500">Gemeinsam</span>
+          {% elif asset_type_models.get(order.asset_type_id) == "capacity_pooled" %}
+            <span class="text-xs text-gray-500">Kontingent</span>
+          {% else %}–{% endif %}
         </td>
         <td class="px-4 py-3">
           <span class="inline-block px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">
@@ -88,10 +95,33 @@
         <td class="px-4 py-3 text-right">
           <a href="/ui/orders/{{ order.id }}" class="text-blue-600 hover:underline text-xs">Detail</a>
         </td>
+        <td class="px-4 py-3 text-right">
+          {% if order.status.value in ("delivered", "provisioned") %}
+          <div class="relative inline-block text-left admin-action-menu">
+            <button onclick="toggleMenu(this)"
+                    class="text-xs px-2 py-1 rounded border border-gray-300 text-gray-600 hover:bg-gray-50 whitespace-nowrap">
+              Aktionen ▾
+            </button>
+            <div class="admin-dropdown hidden absolute right-0 z-20 mt-1 w-44 bg-white rounded-lg border border-gray-200 shadow-lg py-1">
+              <a href="/ui/orders/{{ order.id }}#admin-actions"
+                 class="block px-4 py-2 text-xs text-gray-700 hover:bg-gray-50">
+                Verlängern / Ändern
+              </a>
+              <form method="post" action="/ui/orders/{{ order.id }}/cancel"
+                    onsubmit="return confirm('Bestellung #{{ order.id }} wirklich abbestellen?')">
+                <button type="submit"
+                        class="block w-full text-left px-4 py-2 text-xs text-red-600 hover:bg-red-50">
+                  Abbestellen
+                </button>
+              </form>
+            </div>
+          </div>
+          {% endif %}
+        </td>
       </tr>
       {% else %}
       <tr>
-        <td colspan="9" class="px-4 py-8 text-center text-gray-400 text-sm">Keine Bestellungen gefunden.</td>
+        <td colspan="10" class="px-4 py-8 text-center text-gray-400 text-sm">Keine Bestellungen gefunden.</td>
       </tr>
       {% endfor %}
     </tbody>
@@ -114,4 +144,19 @@
   </div>
 </div>
 {% endif %}
+
+<script>
+function toggleMenu(btn) {
+  var menu = btn.nextElementSibling;
+  var isOpen = !menu.classList.contains('hidden');
+  // Close all open menus first
+  document.querySelectorAll('.admin-dropdown').forEach(function(d) { d.classList.add('hidden'); });
+  if (!isOpen) { menu.classList.remove('hidden'); }
+}
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.admin-action-menu')) {
+    document.querySelectorAll('.admin-dropdown').forEach(function(d) { d.classList.add('hidden'); });
+  }
+});
+</script>
 {% endblock %}

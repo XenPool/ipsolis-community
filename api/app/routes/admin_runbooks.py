@@ -133,7 +133,7 @@ async def create_asset_type(
             INSERT INTO asset_types
                 (name, description, category, assignment_model, pool_capacity, config,
                  automation_mode, targets, lifecycle_ttl_days, lifecycle_renewable,
-                 created_at, updated_at)
+                 allow_user_lists, created_at, updated_at)
             VALUES (
                 :name, :desc,
                 CAST(:cat AS asset_category),
@@ -142,6 +142,7 @@ async def create_asset_type(
                 :amode,
                 CAST(:tgts AS jsonb),
                 :ttl, :renewable,
+                :allow_user_lists,
                 NOW(), NOW()
             )
         """),
@@ -156,6 +157,7 @@ async def create_asset_type(
             "tgts": _json.dumps(body.targets) if body.targets else "null",
             "ttl": body.lifecycle_ttl_days,
             "renewable": body.lifecycle_renewable,
+            "allow_user_lists": body.allow_user_lists,
         },
     )
     await db.commit()
@@ -181,6 +183,7 @@ async def get_asset_type(type_id: int, db: AsyncSession = Depends(get_db)) -> di
         "targets": t.targets,
         "lifecycle_ttl_days": t.lifecycle_ttl_days,
         "lifecycle_renewable": t.lifecycle_renewable,
+        "allow_user_lists": t.allow_user_lists,
     }
 
 
@@ -224,6 +227,8 @@ async def update_asset_type(
         t.lifecycle_ttl_days = body.lifecycle_ttl_days
     if body.lifecycle_renewable is not None:
         t.lifecycle_renewable = body.lifecycle_renewable
+    if body.allow_user_lists is not None:
+        t.allow_user_lists = body.allow_user_lists
 
     await db.execute(
         text("UPDATE asset_types SET updated_at = NOW() WHERE id = :id"),

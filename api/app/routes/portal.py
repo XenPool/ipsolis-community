@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.database import get_db
-from app.models.asset import AssetType
+from app.models.asset import AssetPool, AssetType
 from app.models.order import Order, OrderAction, OrderStatus
 from app.utils.ad_lookup import lookup_user
 
@@ -58,17 +58,31 @@ async def portal_index(request: Request, db: AsyncSession = Depends(get_db)):
 
     type_ids = {o.asset_type_id for o in orders}
     asset_type_names: dict[int, str] = {}
+    asset_type_categories: dict[int, str] = {}
     if type_ids:
         types_result = await db.execute(
             select(AssetType).where(AssetType.id.in_(type_ids))
         )
-        asset_type_names = {t.id: t.name for t in types_result.scalars().all()}
+        for t in types_result.scalars().all():
+            asset_type_names[t.id] = t.name
+            asset_type_categories[t.id] = t.category.value
+
+    # Asset name lookup for personally assigned assets
+    asset_ids = [o.assigned_asset_id for o in orders if o.assigned_asset_id]
+    asset_names: dict[int, str] = {}
+    if asset_ids:
+        asset_rows = await db.execute(
+            select(AssetPool.id, AssetPool.name).where(AssetPool.id.in_(asset_ids))
+        )
+        asset_names = {row.id: row.name for row in asset_rows}
 
     return templates.TemplateResponse("portal/index.html", {
         "request": request,
         "active_page": "overview",
         "orders": orders,
         "asset_type_names": asset_type_names,
+        "asset_type_categories": asset_type_categories,
+        "asset_names": asset_names,
         "status_colors": _STATUS_COLORS,
     })
 
@@ -262,9 +276,17 @@ async def portal_order_detail(
         raise HTTPException(status_code=404, detail="Bestellung nicht gefunden")
 
     asset_type_name = None
+    asset_type = None
     if order.asset_type_id:
-        t = await db.get(AssetType, order.asset_type_id)
-        asset_type_name = t.name if t else None
+        asset_type = await db.get(AssetType, order.asset_type_id)
+        asset_type_name = asset_type.name if asset_type else None
+
+    asset_name = None
+    if order.assigned_asset_id and asset_type and asset_type.category.value == "platform_access":
+        asset_row = await db.execute(
+            select(AssetPool.name).where(AssetPool.id == order.assigned_asset_id)
+        )
+        asset_name = asset_row.scalar_one_or_none()
 
     steps_with_duration = []
     for step in sorted(order.steps, key=lambda s: s.id):
@@ -278,7 +300,9 @@ async def portal_order_detail(
         "request": request,
         "active_page": "overview",
         "order": order,
+        "asset_type": asset_type,
         "asset_type_name": asset_type_name,
+        "asset_name": asset_name,
         "steps_with_duration": steps_with_duration,
         "status_colors": _STATUS_COLORS,
         "step_colors": _STEP_COLORS,
@@ -373,6 +397,77 @@ async def portal_modify_order(
     return RedirectResponse(url=f"/portal/bestellungen/{new_order.id}", status_code=303)
 
 
+# ── Asset ändern (kombiniert: Laufzeit + User-Listen) ──────────────────────────
+
+@router.post("/bestellungen/{order_id}/change")
+async def portal_change_order(
+    order_id: int,
+    db: AsyncSession = Depends(get_db),
+    new_until: str | None = Form(default=None),
+    rdp_users: list[str] = Form(default=[]),
+    admin_users: list[str] = Form(default=[]),
+):
+    result = await db.execute(select(Order).where(Order.id == order_id))
+    original = result.scalar_one_or_none()
+    if not original:
+        raise HTTPException(status_code=404, detail="Bestellung nicht gefunden")
+
+    is_active = original.status in (OrderStatus.DELIVERED, OrderStatus.PROVISIONED)
+    is_failed_change = (
+        original.status == OrderStatus.FAILED
+        and original.action in (OrderAction.MODIFY, OrderAction.EXTEND)
+    )
+    if not (is_active or is_failed_change):
+        raise HTTPException(
+            status_code=422,
+            detail="Nur aktive Bestellungen (DELIVERED/PROVISIONED) können geändert werden",
+        )
+
+    # Resolve requested_until
+    if new_until:
+        try:
+            requested_until = datetime.fromisoformat(new_until).replace(tzinfo=timezone.utc)
+        except ValueError:
+            raise HTTPException(status_code=422, detail="Ungültiges Datumsformat")
+    else:
+        requested_until = original.requested_until
+
+    rdp_clean = [u.strip() for u in rdp_users if u.strip()]
+    admin_clean = [u.strip() for u in admin_users if u.strip()]
+
+    # Sync asset expires_at when the date changed
+    if original.assigned_asset_id and requested_until != original.requested_until:
+        from app.models.asset import AssetPool
+        asset = await db.get(AssetPool, original.assigned_asset_id)
+        if asset:
+            asset.expires_at = requested_until
+
+    new_order = Order(
+        user_email=original.user_email,
+        user_name=original.user_name,
+        owner_email=original.owner_email,
+        owner_name=original.owner_name,
+        asset_type_id=original.asset_type_id,
+        assigned_asset_id=original.assigned_asset_id,
+        rdp_users=rdp_clean,
+        admin_users=admin_clean,
+        requested_from=original.requested_from,
+        requested_until=requested_until,
+        action=OrderAction.MODIFY,
+        status=OrderStatus.PENDING,
+    )
+    db.add(new_order)
+    await db.flush()
+
+    from app.routes.webhook import _dispatch_runbook
+    new_order.celery_task_id = _dispatch_runbook(new_order)
+    new_order.status = OrderStatus.PROCESSING
+    await db.commit()
+
+    logger.info("Portal: Change order id=%s from order=%s", new_order.id, order_id)
+    return RedirectResponse(url=f"/portal/bestellungen/{new_order.id}", status_code=303)
+
+
 # ── Abbestellen ────────────────────────────────────────────────────────────────
 
 @router.post("/bestellungen/{order_id}/cancel")
@@ -417,6 +512,89 @@ async def portal_cancel_order(
 
     logger.info("Portal: Cancel order id=%s from order=%s", cancel_order.id, order_id)
     return RedirectResponse(url=f"/portal/bestellungen/{cancel_order.id}", status_code=303)
+
+
+# ── Meine IT – Übersicht aktiver Assets ────────────────────────────────────────
+
+@router.get("/meine-it", response_class=HTMLResponse)
+async def portal_meine_it(request: Request, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(
+        select(Order)
+        .options(selectinload(Order.steps))
+        .where(Order.action == OrderAction.PROVISION)
+        .where(Order.status.in_([OrderStatus.DELIVERED, OrderStatus.PROVISIONED]))
+        .order_by(Order.created_at.desc())
+    )
+    orders = list(result.scalars().all())
+
+    type_ids = {o.asset_type_id for o in orders}
+    asset_type_names: dict[int, str] = {}
+    asset_type_categories: dict[int, str] = {}
+    asset_types_by_id: dict[int, AssetType] = {}
+    if type_ids:
+        types_result = await db.execute(select(AssetType).where(AssetType.id.in_(type_ids)))
+        for t in types_result.scalars().all():
+            asset_type_names[t.id] = t.name
+            asset_type_categories[t.id] = t.category.value
+            asset_types_by_id[t.id] = t
+
+    asset_ids = [o.assigned_asset_id for o in orders if o.assigned_asset_id]
+    asset_names: dict[int, str] = {}
+    if asset_ids:
+        asset_rows = await db.execute(
+            select(AssetPool.id, AssetPool.name).where(AssetPool.id.in_(asset_ids))
+        )
+        asset_names = {row.id: row.name for row in asset_rows}
+
+    return templates.TemplateResponse("portal/meine_it.html", {
+        "request": request,
+        "active_page": "meine-it",
+        "orders": orders,
+        "asset_type_names": asset_type_names,
+        "asset_type_categories": asset_type_categories,
+        "asset_types_by_id": asset_types_by_id,
+        "asset_names": asset_names,
+        "status_colors": _STATUS_COLORS,
+    })
+
+
+@router.get("/meine-it/{order_id}", response_class=HTMLResponse)
+async def portal_meine_it_detail(
+    request: Request,
+    order_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(Order).where(Order.id == order_id))
+    order = result.scalar_one_or_none()
+    if not order:
+        raise HTTPException(status_code=404, detail="Bestellung nicht gefunden")
+
+    if order.status not in (OrderStatus.DELIVERED, OrderStatus.PROVISIONED):
+        raise HTTPException(status_code=422, detail="Nur aktive Assets können hier verwaltet werden")
+
+    asset_type = None
+    asset_type_name = None
+    if order.asset_type_id:
+        asset_type = await db.get(AssetType, order.asset_type_id)
+        asset_type_name = asset_type.name if asset_type else None
+
+    asset_name = None
+    if order.assigned_asset_id:
+        asset_row = await db.execute(
+            select(AssetPool.name).where(AssetPool.id == order.assigned_asset_id)
+        )
+        asset_name = asset_row.scalar_one_or_none()
+
+    return templates.TemplateResponse("portal/meine_it_detail.html", {
+        "request": request,
+        "active_page": "meine-it",
+        "order": order,
+        "asset_type": asset_type,
+        "asset_type_name": asset_type_name,
+        "asset_name": asset_name,
+        "today": date.today().isoformat(),
+        "status_colors": _STATUS_COLORS,
+    })
 
 
 # ── HTMX: User-Validierung ─────────────────────────────────────────────────────

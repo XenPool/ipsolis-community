@@ -73,6 +73,7 @@ class AssetTypeCreate(BaseModel):
     targets: list[dict[str, Any]] | None = None
     lifecycle_ttl_days: int | None = None
     lifecycle_renewable: bool = True
+    allow_user_lists: bool = False
     deprovision_policy: str = "access_only"
     personal_provisioning_strategy: str | None = None
     naming_pattern: str | None = None
@@ -95,6 +96,7 @@ class AssetTypeUpdate(BaseModel):
     targets: list[dict[str, Any]] | None = None
     lifecycle_ttl_days: int | None = None
     lifecycle_renewable: bool | None = None
+    allow_user_lists: bool | None = None
     deprovision_policy: str | None = None
     personal_provisioning_strategy: str | None = None
     naming_pattern: str | None = None

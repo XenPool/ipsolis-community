@@ -198,6 +198,13 @@
                  class="rounded border-gray-300">
           Verlängerbar
         </label>
+        <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer pb-1">
+          <input type="checkbox" name="allow_user_lists"
+                 {% if asset_type and asset_type.allow_user_lists %}checked{% endif %}
+                 class="rounded border-gray-300">
+          RDP- und Admin-User-Listen aktivieren
+          <span class="text-xs text-gray-400">(für VDI / Server / Cloud Assets)</span>
+        </label>
       </div>
     </div>
 
@@ -739,6 +746,7 @@ async function submitForm() {
     lifecycle_ttl_days: form.querySelector('[name="lifecycle_ttl_days"]').value
       ? parseInt(form.querySelector('[name="lifecycle_ttl_days"]').value) : null,
     lifecycle_renewable: form.querySelector('[name="lifecycle_renewable"]').checked,
+    allow_user_lists: form.querySelector('[name="allow_user_lists"]').checked,
     automation_mode: automationMode,
     automation_strategy: automationStrategy,
     composite_steps: compositeSteps,

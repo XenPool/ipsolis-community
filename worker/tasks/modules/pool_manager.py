@@ -38,7 +38,7 @@ def reserve_asset(
         {"success": False, "error": str}
     """
     if MOCK_SCRIPTS:
-        return _mock_reserve_asset(order_id, asset_type_id, expires_at)
+        return _mock_reserve_asset(db, order_id, asset_type_id, expires_at)
 
     # REUSE_EXISTING_BY_OWNER: User hat bereits eine zugewiesene Instanz
     if personal_provisioning_strategy == "reuse_existing_by_owner" and user_email:
@@ -107,6 +107,10 @@ def reserve_asset(
             "metadata": json.dumps(metadata),
         },
     )
+    db.execute(
+        sql_text("UPDATE orders SET assigned_asset_id = :aid WHERE id = :oid"),
+        {"aid": asset_id, "oid": order_id},
+    )
     db.commit()
 
     logger.info("Asset reserved: asset_id=%s order_id=%s owner=%s", asset_id, order_id, user_email)
@@ -114,10 +118,8 @@ def reserve_asset(
 
 
 def release_asset(db: Session, asset_id: int) -> dict:
-    """Gibt eine VM zurück in den Pool (Status FREE)."""
-    if MOCK_SCRIPTS:
-        return _mock_release_asset(asset_id)
-
+    """Gibt eine VM zurück in den Pool (Status FREE).
+    Kein Mock: reine DB-Operation, immer ausführen."""
     result = db.execute(
         sql_text("""
             UPDATE asset_pool
@@ -139,10 +141,7 @@ def release_asset(db: Session, asset_id: int) -> dict:
 
 def set_asset_busy(db: Session, asset_id: int, order_id: int, expires_at: datetime) -> dict:
     """Setzt VM auf BUSY nach erfolgreicher Bereitstellung."""
-    if MOCK_SCRIPTS:
-        logger.info("[MOCK] set_asset_busy: asset_id=%s order_id=%s", asset_id, order_id)
-        return {"success": True}
-
+    # Kein Mock: reine DB-Operation, immer ausführen
     result = db.execute(
         sql_text("""
             UPDATE asset_pool
@@ -193,18 +192,54 @@ def check_capacity(db: Session, asset_type_id: int, pool_capacity: int) -> dict:
 
 # ── Mocks ─────────────────────────────────────────────────────────────────────
 
-def _mock_reserve_asset(order_id: int, asset_type_id: int, expires_at: datetime) -> dict:
+def _mock_reserve_asset(db: Session, order_id: int, asset_type_id: int, expires_at: datetime) -> dict:
     import time
     logger.info(
         "[MOCK] Searching pool for asset_type_id=%s order_id=%s ...",
         asset_type_id, order_id,
     )
     time.sleep(0.5)  # Simuliert DB-Zugriff
+
+    # Versuche ein echtes freies Asset zu nehmen, damit assigned_asset_id auf der Order stimmt
+    row = db.execute(
+        sql_text("""
+            SELECT id, name FROM asset_pool
+            WHERE asset_type_id = :at AND status = 'free'
+            LIMIT 1
+            FOR UPDATE SKIP LOCKED
+        """),
+        {"at": asset_type_id},
+    ).fetchone()
+
+    if row:
+        asset_id, asset_name = row[0], row[1]
+        db.execute(
+            sql_text("""
+                UPDATE asset_pool
+                SET status = 'reserved',
+                    current_order_id = :order_id,
+                    expires_at = :expires_at
+                WHERE id = :id
+            """),
+            {"id": asset_id, "order_id": order_id, "expires_at": expires_at},
+        )
+        db.execute(
+            sql_text("UPDATE orders SET assigned_asset_id = :aid WHERE id = :oid"),
+            {"aid": asset_id, "oid": order_id},
+        )
+        db.commit()
+        logger.info(
+            "[MOCK] Asset reserved: %s (id=%s) for order %s until %s",
+            asset_name, asset_id, order_id, expires_at.isoformat(),
+        )
+        return {"success": True, "asset_id": asset_id, "asset_name": asset_name}
+
+    # Kein echtes Asset im Pool – Fallback auf Mock-ID (Development ohne befüllten Pool)
     mock_asset_id = 1000 + order_id
     mock_asset_name = f"VDI-MOCK-{mock_asset_id:04d}"
     logger.info(
-        "[MOCK] Asset reserved: %s (id=%s) for order %s until %s",
-        mock_asset_name, mock_asset_id, order_id, expires_at.isoformat(),
+        "[MOCK] No real asset found – using mock: %s (id=%s) for order %s",
+        mock_asset_name, mock_asset_id, order_id,
     )
     return {"success": True, "asset_id": mock_asset_id, "asset_name": mock_asset_name}
 

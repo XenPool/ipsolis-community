@@ -1,0 +1,157 @@
+{% extends "portal/base_portal.html" %}
+
+{% block title %}Meine IT – {{ asset_type_name or "Asset" }} – XenPool Self-Service{% endblock %}
+
+{% block content %}
+<div class="mb-5">
+  <a href="/portal/meine-it" class="text-sm text-gray-500 hover:text-gray-800">← Meine IT</a>
+</div>
+
+<!-- Header -->
+<div class="flex items-start justify-between mb-6">
+  <div>
+    <h1 class="text-xl font-semibold text-gray-900">{{ asset_type_name or "Asset" }}</h1>
+    <p class="text-sm text-gray-500 mt-0.5">
+      {% if asset_name %}<span class="font-mono">{{ asset_name }}</span> · {% endif %}
+      Bestellung #{{ order.id }} · Laufzeit bis {{ order.requested_until.strftime("%d.%m.%Y") }}
+    </p>
+  </div>
+  <span class="inline-block px-3 py-1 rounded-full text-sm font-semibold {{ status_colors.get(order.status.value, 'bg-gray-100 text-gray-700') }}">
+    {{ order.status.value }}
+  </span>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+  <!-- Verlängern / Ändern -->
+  <div class="bg-white rounded-lg border border-gray-200 p-5">
+    <h2 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-4">Verlängern / Ändern</h2>
+    <form method="post" action="/portal/bestellungen/{{ order.id }}/change" class="space-y-4">
+
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">Laufzeit bis</label>
+        <input type="date" name="new_until"
+               value="{{ order.requested_until.strftime('%Y-%m-%d') if order.requested_until else '' }}"
+               min="{{ today }}"
+               class="rounded border border-gray-300 text-sm px-3 py-1.5 w-full focus:outline-none focus:ring-1 focus:ring-blue-400">
+      </div>
+
+      {% if asset_type and asset_type.allow_user_lists %}
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">
+          RDP-User
+          <span class="text-gray-400 font-normal ml-1">Eingabe bestätigen mit Enter oder Komma</span>
+        </label>
+        <div class="tag-editor rounded border border-gray-300 bg-white px-2 py-1.5 flex flex-wrap gap-1 min-h-[2.5rem] focus-within:ring-1 focus-within:ring-blue-400 cursor-text"
+             data-field="rdp_users">
+          {% for u in order.rdp_users or [] %}
+          <span class="tag inline-flex items-center gap-1 bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded">
+            {{ u }}
+            <button type="button" class="tag-remove text-blue-500 hover:text-blue-800 leading-none">&times;</button>
+            <input type="hidden" name="rdp_users" value="{{ u }}">
+          </span>
+          {% endfor %}
+          <input type="text" class="tag-input text-sm outline-none flex-1 min-w-[8rem] bg-transparent" placeholder="user@domain.com">
+        </div>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">
+          Admin-User
+          <span class="text-gray-400 font-normal ml-1">Eingabe bestätigen mit Enter oder Komma</span>
+        </label>
+        <div class="tag-editor rounded border border-gray-300 bg-white px-2 py-1.5 flex flex-wrap gap-1 min-h-[2.5rem] focus-within:ring-1 focus-within:ring-blue-400 cursor-text"
+             data-field="admin_users">
+          {% for u in order.admin_users or [] %}
+          <span class="tag inline-flex items-center gap-1 bg-purple-100 text-purple-800 text-xs px-2 py-0.5 rounded">
+            {{ u }}
+            <button type="button" class="tag-remove text-purple-500 hover:text-purple-800 leading-none">&times;</button>
+            <input type="hidden" name="admin_users" value="{{ u }}">
+          </span>
+          {% endfor %}
+          <input type="text" class="tag-input text-sm outline-none flex-1 min-w-[8rem] bg-transparent" placeholder="user@domain.com">
+        </div>
+      </div>
+      {% endif %}
+
+      <button type="submit"
+              class="px-4 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 focus:outline-none">
+        Ändern
+      </button>
+    </form>
+  </div>
+
+  <!-- Zugang abbestellen -->
+  <div class="bg-white rounded-lg border border-gray-200 p-5">
+    <h2 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-4">Zugang abbestellen</h2>
+    <p class="text-xs text-gray-500 mb-4">
+      Beendet den Zugang und gibt das Asset zurück in den Pool. Diese Aktion kann nicht rückgängig gemacht werden.
+    </p>
+    <form method="post" action="/portal/bestellungen/{{ order.id }}/cancel"
+          onsubmit="return confirm('Zugang wirklich abbestellen? Diese Aktion kann nicht rückgängig gemacht werden.')">
+      <button type="submit"
+              class="px-4 py-1.5 bg-red-600 text-white text-sm rounded hover:bg-red-700 focus:outline-none">
+        Jetzt abbestellen
+      </button>
+    </form>
+  </div>
+
+</div>
+
+<script>
+// Tag-Editor
+document.querySelectorAll('.tag-editor').forEach(function(editor) {
+  var field = editor.dataset.field;
+  var tagColor = field === 'rdp_users'
+    ? 'bg-blue-100 text-blue-800'
+    : 'bg-purple-100 text-purple-800';
+  var removeColor = field === 'rdp_users'
+    ? 'text-blue-500 hover:text-blue-800'
+    : 'text-purple-500 hover:text-purple-800';
+
+  var input = editor.querySelector('.tag-input');
+
+  function addTag(value) {
+    value = value.trim();
+    if (!value) return;
+    // No duplicates
+    var existing = Array.from(editor.querySelectorAll('input[type=hidden]')).map(function(i) { return i.value; });
+    if (existing.indexOf(value) !== -1) return;
+
+    var span = document.createElement('span');
+    span.className = 'tag inline-flex items-center gap-1 ' + tagColor + ' text-xs px-2 py-0.5 rounded';
+    span.innerHTML = value
+      + '<button type="button" class="tag-remove ' + removeColor + ' leading-none">&times;</button>'
+      + '<input type="hidden" name="' + field + '" value="' + value.replace(/"/g, '&quot;') + '">';
+    editor.insertBefore(span, input);
+
+    span.querySelector('.tag-remove').addEventListener('click', function() {
+      span.remove();
+    });
+    input.value = '';
+  }
+
+  input.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      addTag(input.value.replace(/,$/, ''));
+    } else if (e.key === 'Backspace' && input.value === '') {
+      var tags = editor.querySelectorAll('.tag');
+      if (tags.length) tags[tags.length - 1].remove();
+    }
+  });
+
+  input.addEventListener('blur', function() {
+    if (input.value.trim()) addTag(input.value);
+  });
+
+  editor.addEventListener('click', function() { input.focus(); });
+
+  // Wire up existing remove buttons
+  editor.querySelectorAll('.tag-remove').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      btn.closest('.tag').remove();
+    });
+  });
+});
+</script>
+{% endblock %}

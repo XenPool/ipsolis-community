@@ -90,10 +90,10 @@
         <dt class="text-gray-500">Bis</dt>
         <dd class="text-gray-900">{{ order.requested_until.strftime("%d.%m.%Y") }}</dd>
       </div>
-      {% if order.assigned_asset_id %}
+      {% if asset_name %}
       <div class="flex justify-between">
-        <dt class="text-gray-500">Asset-ID</dt>
-        <dd class="font-mono text-gray-900 text-xs">{{ order.assigned_asset_id }}</dd>
+        <dt class="text-gray-500">Hostname</dt>
+        <dd class="font-mono font-medium text-gray-900">{{ asset_name }}</dd>
       </div>
       {% endif %}
     </dl>
@@ -140,156 +140,10 @@
   {% endif %}
 </div>
 
-<!-- Aktionen (nur bei delivered) -->
-{% if order.status.value == "delivered" %}
-
-<!-- Laufzeit verlängern -->
-<div class="bg-white rounded-lg border border-gray-200 p-5 mb-4">
-  <h2 class="text-sm font-semibold text-gray-700 mb-1">Laufzeit verlängern</h2>
-  <p class="text-xs text-gray-500 mb-4">
-    Aktuell bis <strong>{{ order.requested_until.strftime("%d.%m.%Y") }}</strong>.
-    Neues Enddatum auswählen:
-  </p>
-  <form method="post" action="/portal/bestellungen/{{ order.id }}/extend"
-        class="flex flex-wrap gap-3 items-end">
-    <div>
-      <label class="block text-xs font-medium text-gray-600 mb-1">Neues Enddatum</label>
-      <input type="date" name="new_until" required
-             min="{{ today }}"
-             value="{{ order.requested_until.strftime('%Y-%m-%d') }}"
-             class="rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400">
-    </div>
-    <button type="submit"
-            class="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded hover:bg-green-700">
-      Verlängern →
-    </button>
-  </form>
+{% if order.status.value in ("delivered", "provisioned") and order.action.value == "provision" %}
+<div class="mt-6 rounded-lg bg-blue-50 border border-blue-200 px-4 py-3 text-sm text-blue-700">
+  Aktives Asset – Änderungen und Abbestellungen unter
+  <a href="/portal/meine-it/{{ order.id }}" class="font-medium underline hover:text-blue-900">Meine IT →</a>
 </div>
-
-<!-- Zugang ändern -->
-<div class="bg-white rounded-lg border border-gray-200 p-5">
-  <h2 class="text-sm font-semibold text-gray-700 mb-1">Zugang ändern</h2>
-  <p class="text-xs text-gray-500 mb-4">RDP- und Admin-User neu setzen (ersetzt bestehende Liste vollständig).</p>
-
-  <form method="post" action="/portal/bestellungen/{{ order.id }}/modify" class="space-y-5">
-
-    <!-- RDP-User -->
-    <div>
-      <h3 class="text-xs font-medium text-gray-700 mb-2">RDP-User</h3>
-      <div id="mod-rdp-list" class="flex flex-wrap gap-2 mb-3">
-        {% for u in order.rdp_users %}
-        <div class="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-full px-3 py-1 text-sm">
-          <span class="text-blue-800">{{ u }}</span>
-          <input type="hidden" name="rdp_users" value="{{ u }}">
-          <button type="button" onclick="this.closest('div').remove()" class="text-blue-400 hover:text-red-500 font-bold leading-none">×</button>
-        </div>
-        {% endfor %}
-      </div>
-      <div class="flex gap-2 items-start">
-        <div class="flex-1">
-          <input type="text" id="mod-rdp-input" name="q" placeholder="s.muster oder s.muster@firma.de"
-                 hx-get="/portal/_validate-user"
-                 hx-trigger="blur changed delay:400ms"
-                 hx-target="#mod-rdp-validate"
-                 hx-include="this"
-                 class="w-full rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400"
-                 onkeydown="if(event.key==='Enter'){event.preventDefault();addModUser('rdp')}">
-          <div id="mod-rdp-validate" class="mt-1 h-4"></div>
-        </div>
-        <button type="button" onclick="addModUser('rdp')"
-                class="px-3 py-2 bg-gray-100 text-gray-700 text-sm rounded border border-gray-300 hover:bg-gray-200">
-          + Hinzufügen
-        </button>
-      </div>
-    </div>
-
-    <!-- Admin-User -->
-    <div>
-      <h3 class="text-xs font-medium text-gray-700 mb-2">Admin-User</h3>
-      <div id="mod-admin-list" class="flex flex-wrap gap-2 mb-3">
-        {% for u in order.admin_users %}
-        <div class="flex items-center gap-2 bg-purple-50 border border-purple-200 rounded-full px-3 py-1 text-sm">
-          <span class="text-purple-800">{{ u }}</span>
-          <input type="hidden" name="admin_users" value="{{ u }}">
-          <button type="button" onclick="this.closest('div').remove()" class="text-purple-400 hover:text-red-500 font-bold leading-none">×</button>
-        </div>
-        {% endfor %}
-      </div>
-      <div class="flex gap-2 items-start">
-        <div class="flex-1">
-          <input type="text" id="mod-admin-input" name="q" placeholder="s.muster oder s.muster@firma.de"
-                 hx-get="/portal/_validate-user"
-                 hx-trigger="blur changed delay:400ms"
-                 hx-target="#mod-admin-validate"
-                 hx-include="this"
-                 class="w-full rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400"
-                 onkeydown="if(event.key==='Enter'){event.preventDefault();addModUser('admin')}">
-          <div id="mod-admin-validate" class="mt-1 h-4"></div>
-        </div>
-        <button type="button" onclick="addModUser('admin')"
-                class="px-3 py-2 bg-gray-100 text-gray-700 text-sm rounded border border-gray-300 hover:bg-gray-200">
-          + Hinzufügen
-        </button>
-      </div>
-    </div>
-
-    <div class="pt-1">
-      <button type="submit"
-              class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700">
-        Zugang aktualisieren →
-      </button>
-    </div>
-  </form>
-</div>
-
-<!-- Abbestellen -->
-<div class="mt-4 bg-white rounded-lg border border-red-100 p-5">
-  <h2 class="text-sm font-semibold text-red-700 mb-1">Zugang abbestellen</h2>
-  <p class="text-xs text-gray-500 mb-4">
-    Entfernt alle erteilten Zugänge und gibt das Asset ggf. wieder frei.
-    Diese Aktion kann nicht rückgängig gemacht werden.
-  </p>
-  <details>
-    <summary class="text-sm text-red-600 cursor-pointer hover:text-red-800 select-none font-medium">
-      Abbestellen bestätigen →
-    </summary>
-    <div class="mt-3 border-t border-red-100 pt-3">
-      <p class="text-xs text-gray-500 mb-3">
-        Bitte bestätige, dass du den Zugang <strong>{{ asset_type_name or "dieses Assets" }}</strong>
-        für <strong>{{ order.user_email }}</strong> wirklich abbestellen möchtest.
-      </p>
-      <form method="post" action="/portal/bestellungen/{{ order.id }}/cancel">
-        <button type="submit"
-                class="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded hover:bg-red-700">
-          Ja, Zugang abbestellen
-        </button>
-      </form>
-    </div>
-  </details>
-</div>
-
-<script>
-function addModUser(type) {
-  const input = document.getElementById('mod-' + type + '-input');
-  const val = input.value.trim();
-  if (!val) return;
-
-  const list = document.getElementById('mod-' + type + '-list');
-  const isRdp = type === 'rdp';
-
-  const chip = document.createElement('div');
-  chip.className = `flex items-center gap-2 ${isRdp ? 'bg-blue-50 border-blue-200' : 'bg-purple-50 border-purple-200'} border rounded-full px-3 py-1 text-sm`;
-  chip.innerHTML = `
-    <span class="${isRdp ? 'text-blue-800' : 'text-purple-800'}">${val}</span>
-    <input type="hidden" name="${type}_users" value="${val}">
-    <button type="button" onclick="this.closest('div').remove()"
-            class="${isRdp ? 'text-blue-400' : 'text-purple-400'} hover:text-red-500 font-bold leading-none">×</button>
-  `;
-  list.appendChild(chip);
-  input.value = '';
-  document.getElementById('mod-' + type + '-validate').innerHTML = '';
-}
-</script>
-
 {% endif %}
 {% endblock %}

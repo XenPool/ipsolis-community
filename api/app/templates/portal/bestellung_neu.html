@@ -17,9 +17,9 @@
 
 <form method="post" action="/portal/bestellung/neu" class="space-y-6">
 
-  <!-- VM-Typ -->
+  <!-- Asset-Typ -->
   <div class="bg-white rounded-lg border border-gray-200 p-5">
-    <h2 class="text-sm font-semibold text-gray-700 mb-4">VM-Typ</h2>
+    <h2 class="text-sm font-semibold text-gray-700 mb-4">Asset-Typ</h2>
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
       {% for t in asset_types %}
       <label class="relative flex cursor-pointer rounded-lg border border-gray-200 p-4 hover:border-blue-400 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
@@ -163,7 +163,9 @@
     </div>
   </div>
 
-  <!-- RDP-User -->
+  <!-- RDP-User + Admin-User (nur wenn allow_user_lists) -->
+  <div id="user-lists-section" class="hidden space-y-4">
+
   <div class="bg-white rounded-lg border border-gray-200 p-5">
     <h2 class="text-sm font-semibold text-gray-700 mb-1">RDP-User</h2>
     <p class="text-xs text-gray-500 mb-4">Benutzer mit Remote-Desktop-Zugriff (sAMAccountName oder E-Mail)</p>
@@ -233,6 +235,8 @@
     </div>
   </div>
 
+  </div><!-- /#user-lists-section -->
+
   <!-- Submit -->
   <div class="flex items-center justify-between">
     <a href="/portal/" class="text-sm text-gray-500 hover:text-gray-800">Abbrechen</a>
@@ -267,6 +271,19 @@ function addUser(type) {
   list.appendChild(chip);
   input.value = '';
   document.getElementById(type + '-validate-result').innerHTML = '';
+}
+
+// ── User-Listen-Sichtbarkeit je Asset-Typ ──────────────────────────────────────
+
+var _allowUserLists = { {% for t in asset_types %}{{ t.id }}: {{ 'true' if t.allow_user_lists else 'false' }}{% if not loop.last %}, {% endif %}{% endfor %} };
+
+function updateUserListsSection() {
+  var checked = document.querySelector('[name="asset_type_id"]:checked');
+  var typeId = checked ? parseInt(checked.value) : null;
+  var section = document.getElementById('user-lists-section');
+  if (section) {
+    section.classList.toggle('hidden', !typeId || !_allowUserLists[typeId]);
+  }
 }
 
 // ── Attribut-Abschnitt je Asset-Typ ────────────────────────────────────────────
@@ -315,6 +332,7 @@ document.addEventListener('DOMContentLoaded', function() {
   // Asset-Typ-Wechsel
   document.querySelectorAll('[name="asset_type_id"]').forEach(function(r) {
     r.addEventListener('change', updateAttrSection);
+    r.addEventListener('change', updateUserListsSection);
   });
 
   // visibleWhen: Felder innerhalb jedes Abschnitts beobachten
@@ -342,11 +360,17 @@ document.addEventListener('DOMContentLoaded', function() {
       document.querySelectorAll('.attr-field.hidden input, .attr-field.hidden select').forEach(function(el) {
         el.disabled = true;
       });
+      // Disable user-list inputs when section is hidden (so they don't submit)
+      var userListsSection = document.getElementById('user-lists-section');
+      if (userListsSection && userListsSection.classList.contains('hidden')) {
+        userListsSection.querySelectorAll('input').forEach(function(el) { el.disabled = true; });
+      }
     });
   }
 
   // Initialen Zustand setzen
   updateAttrSection();
+  updateUserListsSection();
 });
 </script>
 {% endblock %}

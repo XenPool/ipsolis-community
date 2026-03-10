@@ -246,6 +246,10 @@ def _run_targets_mode(
             reserved_asset_id = result.get("asset_id")
             reserved_asset_name = result.get("asset_name")
 
+        # Asset auf BUSY setzen (reine DB-Op, kein Mock)
+        if reserved_asset_id:
+            pool_manager.set_asset_busy(db, reserved_asset_id, order_id, expires_at)
+
         # provisioned_state nach erfolgreicher Provision schreiben
         _write_provisioned_state(
             db, order_id,
@@ -511,6 +515,14 @@ def _run_runbook_path(
     ).fetchone()
 
     if not runbook_row:
+        if action in ("modify", "extend"):
+            logger.info(
+                "[runbook] No runbook defined for action=%s asset_type_id=%s — treating as success (no-op)",
+                action, order["asset_type_id"],
+            )
+            update_order_status(db, order_id, "delivered", None)
+            db.commit()
+            return {"success": True, "skipped": True}
         err = f"No runbook found for asset_type_id={order['asset_type_id']} action={action}"
         logger.error(err)
         update_order_status(db, order_id, "failed", err)
@@ -898,30 +910,64 @@ def run(self: Task, order_id: int) -> dict:
 
         # 2. Dispatch nach automation_strategy
         if automation_strategy == "group_only":
-            return _run_targets_mode(
+            result = _run_targets_mode(
                 self, db, order_id, order, action,
                 asset_type_name, asset_type_description, assignment_model,
                 deprovision_policy=deprovision_policy,
                 automation_strategy=automation_strategy,
             )
-
-        if automation_strategy == "composite":
-            return _run_composite_mode(
+        elif automation_strategy == "composite":
+            result = _run_composite_mode(
                 self, db, order_id, order, action,
                 asset_type_name, asset_type_description, assignment_model,
                 deprovision_policy=deprovision_policy,
                 composite_steps=composite_steps,
             )
+        else:
+            # runbook_only: Runbook ausführen
+            result = _run_runbook_path(
+                self, db, order_id, order, action,
+                asset_type_name, asset_type_description,
+                assignment_model=assignment_model,
+                deprovision_policy=deprovision_policy,
+                automation_strategy=automation_strategy,
+                personal_provisioning_strategy=personal_provisioning_strategy,
+            )
 
-        # runbook_only: Runbook ausführen
-        return _run_runbook_path(
-            self, db, order_id, order, action,
-            asset_type_name, asset_type_description,
-            assignment_model=assignment_model,
-            deprovision_policy=deprovision_policy,
-            automation_strategy=automation_strategy,
-            personal_provisioning_strategy=personal_provisioning_strategy,
-        )
+        # Post-DELETE: Asset zurück in Pool + originale PROVISION-Order revoken
+        if action == "delete" and result.get("success"):
+            asset_id = order.get("assigned_asset_id")
+            if asset_id:
+                # Asset freigeben (idempotent – _run_targets_mode hat es evtl. schon getan)
+                try:
+                    from tasks.modules.pool_manager import release_asset as _release_asset
+                    _release_asset(db, asset_id)
+                    logger.info("[dynamic_runner] Asset %s released after DELETE", asset_id)
+                except Exception as _e:
+                    logger.warning("[dynamic_runner] release_asset failed (non-critical): %s", _e)
+
+                # Originale PROVISION-Order(s) auf revoked setzen
+                try:
+                    db.execute(
+                        text("""
+                            UPDATE orders
+                            SET status = 'revoked'
+                            WHERE assigned_asset_id = :aid
+                              AND action = 'provision'
+                              AND status IN ('delivered', 'provisioned')
+                        """),
+                        {"aid": asset_id},
+                    )
+                    db.commit()
+                    logger.info(
+                        "[dynamic_runner] PROVISION orders for asset %s set to revoked", asset_id
+                    )
+                except Exception as _e:
+                    logger.warning(
+                        "[dynamic_runner] provision order revoke failed (non-critical): %s", _e
+                    )
+
+        return result
 
     except Exception as e:
         logger.error(

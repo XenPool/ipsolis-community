@@ -3,8 +3,8 @@
 import logging
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
-from fastapi.responses import HTMLResponse
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,7 +14,7 @@ from app.database import get_db
 from app.models.asset import AssetPool, AssetStatus, AssetType
 from app.models.global_var import GlobalVar
 from app.models.ps_module import PsModule
-from app.models.order import Order, OrderStatus
+from app.models.order import Order, OrderAction, OrderStatus
 from app.models.runbook import RunbookDefinition, RunbookStep
 from app.models.script_module import ScriptModule
 from app.utils.auth import require_admin_key
@@ -116,12 +116,22 @@ async def dashboard(
         )
         asset_names = {row.id: row.name for row in asset_rows}
 
+    # Assignment model lookup for shared/pooled assets
+    type_ids = list({o.asset_type_id for o in recent_orders if o.asset_type_id})
+    asset_type_models: dict[int, str] = {}
+    if type_ids:
+        type_rows = await db.execute(
+            select(AssetType.id, AssetType.assignment_model).where(AssetType.id.in_(type_ids))
+        )
+        asset_type_models = {row.id: row.assignment_model for row in type_rows}
+
     return templates.TemplateResponse(
         request, "dashboard.html",
         {
             "summary": summary,
             "recent_orders": recent_orders,
             "asset_names": asset_names,
+            "asset_type_models": asset_type_models,
             "status_colors": _STATUS_COLORS,
             "asset_status_colors": _ASSET_STATUS_COLORS,
             "now": datetime.now(timezone.utc),
@@ -166,7 +176,7 @@ async def orders_list(
         count_query = count_query.where(Order.user_email.ilike(f"%{user_email}%"))
     total_count = (await db.execute(count_query)).scalar_one()
 
-    # Asset name lookup
+    # Asset name lookup (for personal assets with assigned_asset_id)
     asset_ids = [o.assigned_asset_id for o in orders if o.assigned_asset_id]
     asset_names: dict[int, str] = {}
     if asset_ids:
@@ -175,11 +185,21 @@ async def orders_list(
         )
         asset_names = {row.id: row.name for row in asset_rows}
 
+    # Assignment model lookup (for shared/pooled assets without assigned_asset_id)
+    type_ids = list({o.asset_type_id for o in orders if o.asset_type_id})
+    asset_type_models: dict[int, str] = {}
+    if type_ids:
+        type_rows = await db.execute(
+            select(AssetType.id, AssetType.assignment_model).where(AssetType.id.in_(type_ids))
+        )
+        asset_type_models = {row.id: row.assignment_model for row in type_rows}
+
     return templates.TemplateResponse(
         request, "orders.html",
         {
             "orders": orders,
             "asset_names": asset_names,
+            "asset_type_models": asset_type_models,
             "status_colors": _STATUS_COLORS,
             "status_filter": status_filter or "",
             "user_email": user_email or "",
@@ -218,6 +238,9 @@ async def order_detail(
         )
         asset_name = asset_row.scalar_one_or_none()
 
+    # Asset type (for allow_user_lists flag in admin actions)
+    asset_type = await db.get(AssetType, order.asset_type_id) if order.asset_type_id else None
+
     # Compute step durations
     steps_with_duration = []
     for step in sorted(order.steps, key=lambda s: s.id):
@@ -236,11 +259,121 @@ async def order_detail(
         {
             "order": order,
             "asset_name": asset_name,
+            "asset_type": asset_type,
             "steps_with_duration": steps_with_duration,
             "status_colors": _STATUS_COLORS,
             "step_colors": _STEP_COLORS,
         },
     )
+
+
+# ── Admin Order Actions ────────────────────────────────────────────────────────
+
+@router.post("/orders/{order_id}/change")
+async def admin_change_order(
+    order_id: int,
+    db: AsyncSession = Depends(get_db),
+    new_until: str | None = Form(default=None),
+    rdp_users: list[str] = Form(default=[]),
+    admin_users: list[str] = Form(default=[]),
+):
+    """Admin: Bestellung im Namen des Users ändern (Laufzeit + User-Listen)."""
+    result = await db.execute(select(Order).where(Order.id == order_id))
+    original = result.scalar_one_or_none()
+    if not original:
+        raise HTTPException(status_code=404, detail="Bestellung nicht gefunden")
+
+    if original.status not in (OrderStatus.DELIVERED, OrderStatus.PROVISIONED):
+        raise HTTPException(
+            status_code=422,
+            detail="Nur aktive Bestellungen (DELIVERED/PROVISIONED) können geändert werden",
+        )
+
+    if new_until:
+        try:
+            requested_until = datetime.fromisoformat(new_until).replace(tzinfo=timezone.utc)
+        except ValueError:
+            raise HTTPException(status_code=422, detail="Ungültiges Datumsformat")
+    else:
+        requested_until = original.requested_until
+
+    # Textarea sends newline-separated values as a single string; split them
+    rdp_clean = [u.strip() for line in rdp_users for u in line.splitlines() if u.strip()]
+    admin_clean = [u.strip() for line in admin_users for u in line.splitlines() if u.strip()]
+
+    if original.assigned_asset_id and requested_until != original.requested_until:
+        asset = await db.get(AssetPool, original.assigned_asset_id)
+        if asset:
+            asset.expires_at = requested_until
+
+    new_order = Order(
+        user_email=original.user_email,
+        user_name=original.user_name,
+        owner_email=original.owner_email,
+        owner_name=original.owner_name,
+        asset_type_id=original.asset_type_id,
+        assigned_asset_id=original.assigned_asset_id,
+        rdp_users=rdp_clean,
+        admin_users=admin_clean,
+        requested_from=original.requested_from,
+        requested_until=requested_until,
+        action=OrderAction.MODIFY,
+        status=OrderStatus.PENDING,
+    )
+    db.add(new_order)
+    await db.flush()
+
+    from app.routes.webhook import _dispatch_runbook
+    new_order.celery_task_id = _dispatch_runbook(new_order)
+    new_order.status = OrderStatus.PROCESSING
+    await db.commit()
+
+    logger.info("Admin: Change order id=%s from order=%s", new_order.id, order_id)
+    return RedirectResponse(url=f"/ui/orders/{new_order.id}", status_code=303)
+
+
+@router.post("/orders/{order_id}/cancel")
+async def admin_cancel_order(
+    order_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """Admin: Bestellung im Namen des Users abbestellen (DELETE)."""
+    result = await db.execute(select(Order).where(Order.id == order_id))
+    original = result.scalar_one_or_none()
+    if not original:
+        raise HTTPException(status_code=404, detail="Bestellung nicht gefunden")
+
+    if original.status not in (OrderStatus.DELIVERED, OrderStatus.PROVISIONED):
+        raise HTTPException(
+            status_code=422,
+            detail="Nur aktive Bestellungen (DELIVERED/PROVISIONED) können abbestellt werden",
+        )
+
+    cancel_order = Order(
+        user_email=original.user_email,
+        user_name=original.user_name,
+        owner_email=original.owner_email,
+        owner_name=original.owner_name,
+        asset_type_id=original.asset_type_id,
+        assigned_asset_id=original.assigned_asset_id,
+        rdp_users=original.rdp_users,
+        admin_users=original.admin_users,
+        requested_from=original.requested_from,
+        requested_until=original.requested_until,
+        action=OrderAction.DELETE,
+        status=OrderStatus.PENDING,
+        provisioned_state=original.provisioned_state,
+    )
+    db.add(cancel_order)
+    await db.flush()
+
+    from app.routes.webhook import _dispatch_runbook
+    cancel_order.celery_task_id = _dispatch_runbook(cancel_order)
+    cancel_order.status = OrderStatus.PROCESSING
+    await db.commit()
+
+    logger.info("Admin: Cancel order id=%s from order=%s", cancel_order.id, order_id)
+    return RedirectResponse(url=f"/ui/orders/{cancel_order.id}", status_code=303)
 
 
 # ── Asset Types UI ─────────────────────────────────────────────────────────────

@@ -159,6 +159,7 @@ async def create_asset_type(
         targets=payload.targets,
         lifecycle_ttl_days=payload.lifecycle_ttl_days,
         lifecycle_renewable=payload.lifecycle_renewable,
+        allow_user_lists=payload.allow_user_lists,
         deprovision_policy=payload.deprovision_policy,
         personal_provisioning_strategy=payload.personal_provisioning_strategy,
         naming_pattern=payload.naming_pattern,
@@ -242,6 +243,8 @@ async def update_asset_type(
         asset_type.lifecycle_ttl_days = payload.lifecycle_ttl_days
     if payload.lifecycle_renewable is not None:
         asset_type.lifecycle_renewable = payload.lifecycle_renewable
+    if payload.allow_user_lists is not None:
+        asset_type.allow_user_lists = payload.allow_user_lists
     if payload.deprovision_policy is not None:
         asset_type.deprovision_policy = payload.deprovision_policy
     if payload.personal_provisioning_strategy is not None:
