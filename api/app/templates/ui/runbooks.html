@@ -5,7 +5,7 @@
 {% block content %}
 <div class="mb-6">
   <h1 class="text-lg font-semibold text-gray-900">Runbooks</h1>
-  <p class="text-sm text-gray-500 mt-1">Pro Asset-Typ und Action ein DB-gesteuertes Runbook.</p>
+  <p class="text-sm text-gray-500 mt-1">One DB-driven runbook per asset type and action.</p>
 </div>
 
 {% for at in asset_types %}
@@ -16,13 +16,13 @@
       <span class="ml-2 text-xs text-gray-400">
         {% if at.asset_model == 'pooled' %}
         <span class="inline-block px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">pooled</span>
-        {% if at.pool_capacity %} · max. {{ at.pool_capacity }} Slots{% endif %}
+        {% if at.pool_capacity %} · max. {{ at.pool_capacity }} slots{% endif %}
         {% else %}
         <span class="inline-block px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">named</span>
         {% endif %}
       </span>
     </div>
-    <a href="/ui/asset-types/{{ at.id }}/bearbeiten" class="text-xs text-gray-400 hover:text-gray-600">Asset-Typ bearbeiten</a>
+    <a href="/ui/asset-types/{{ at.id }}/edit" class="text-xs text-gray-400 hover:text-gray-600">Edit Asset Type</a>
   </div>
 
   <table class="min-w-full divide-y divide-gray-100 text-sm">
@@ -57,23 +57,23 @@
         <td class="px-4 py-3">
           {% if rb %}
             {% if rb.is_active %}
-            <span class="inline-block px-2 py-0.5 rounded text-xs bg-green-100 text-green-700">Aktiv</span>
+            <span class="inline-block px-2 py-0.5 rounded text-xs bg-green-100 text-green-700">Active</span>
             {% else %}
-            <span class="inline-block px-2 py-0.5 rounded text-xs bg-gray-100 text-gray-500">Inaktiv</span>
+            <span class="inline-block px-2 py-0.5 rounded text-xs bg-gray-100 text-gray-500">Inactive</span>
             {% endif %}
           {% else %}
-            <span class="inline-block px-2 py-0.5 rounded text-xs bg-orange-100 text-orange-600">Kein Runbook</span>
+            <span class="inline-block px-2 py-0.5 rounded text-xs bg-orange-100 text-orange-600">No Runbook</span>
           {% endif %}
         </td>
         <td class="px-4 py-3 text-right text-xs">
           {% if rb %}
           <button onclick="deleteRunbook({{ rb.id }}, '{{ rb.name | replace("'", "\\'") }}')"
-                  class="text-red-400 hover:text-red-600 mr-3">Löschen</button>
-          <a href="/ui/runbooks/{{ rb.id }}/bearbeiten" class="text-blue-600 hover:underline">Bearbeiten →</a>
+                  class="text-red-400 hover:text-red-600 mr-3">Delete</button>
+          <a href="/ui/runbooks/{{ rb.id }}/edit" class="text-blue-600 hover:underline">Edit →</a>
           {% else %}
           <button
             onclick="createRunbook({{ at.id }}, '{{ action }}', '{{ at.name }}')"
-            class="text-blue-600 hover:underline">+ Runbook anlegen</button>
+            class="text-blue-600 hover:underline">+ Create Runbook</button>
           {% endif %}
         </td>
       </tr>
@@ -83,19 +83,19 @@
 </div>
 {% else %}
 <div class="text-center text-gray-400 py-12 text-sm">
-  Noch keine Asset-Typen vorhanden.
-  <a href="/ui/asset-types/neu" class="ml-1 text-blue-600 hover:underline">Jetzt anlegen →</a>
+  No asset types defined yet.
+  <a href="/ui/asset-types/new" class="ml-1 text-blue-600 hover:underline">Create one →</a>
 </div>
 {% endfor %}
 
 <script>
 async function deleteRunbook(runbookId, name) {
-  if (!confirm('Runbook "' + name + '" inklusive aller Steps wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.')) return;
+  if (!confirm('Really delete runbook "' + name + '" including all steps? This action cannot be undone.')) return;
   const resp = await fetch('/admin/runbooks/' + runbookId, {method: 'DELETE'});
   if (resp.ok) {
     location.reload();
   } else {
-    alert('Fehler beim Löschen des Runbooks');
+    alert('Error deleting runbook');
   }
 }
 
@@ -113,9 +113,9 @@ async function createRunbook(assetTypeId, action, typeName) {
   });
   if (resp.ok) {
     const data = await resp.json();
-    window.location.href = `/ui/runbooks/${data.id}/bearbeiten`;
+    window.location.href = `/ui/runbooks/${data.id}/edit`;
   } else {
-    alert('Fehler beim Anlegen des Runbooks');
+    alert('Error creating runbook');
   }
 }
 </script>

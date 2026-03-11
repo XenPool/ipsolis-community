@@ -1,10 +1,10 @@
 {% extends "portal/base_portal.html" %}
 
-{% block title %}Meine IT – {{ asset_type_name or "Asset" }} – XenPool Self-Service{% endblock %}
+{% block title %}My IT – {{ asset_type_name or "Asset" }} – XenPool Self-Service{% endblock %}
 
 {% block content %}
 <div class="mb-5">
-  <a href="/portal/meine-it" class="text-sm text-gray-500 hover:text-gray-800">← Meine IT</a>
+  <a href="/portal/my-it" class="text-sm text-gray-500 hover:text-gray-800">← My IT</a>
 </div>
 
 <!-- Header -->
@@ -13,7 +13,7 @@
     <h1 class="text-xl font-semibold text-gray-900">{{ asset_type_name or "Asset" }}</h1>
     <p class="text-sm text-gray-500 mt-0.5">
       {% if asset_name %}<span class="font-mono">{{ asset_name }}</span> · {% endif %}
-      Bestellung #{{ order.id }} · Laufzeit bis {{ order.requested_until.strftime("%d.%m.%Y") }}
+      Order #{{ order.id }} · Valid until {{ order.requested_until.strftime("%d.%m.%Y") }}
     </p>
   </div>
   <span class="inline-block px-3 py-1 rounded-full text-sm font-semibold {{ status_colors.get(order.status.value, 'bg-gray-100 text-gray-700') }}">
@@ -23,13 +23,13 @@
 
 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 
-  <!-- Verlängern / Ändern -->
+  <!-- Extend / Modify -->
   <div class="bg-white rounded-lg border border-gray-200 p-5">
-    <h2 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-4">Verlängern / Ändern</h2>
-    <form method="post" action="/portal/bestellungen/{{ order.id }}/change" class="space-y-4">
+    <h2 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-4">Extend / Modify</h2>
+    <form method="post" action="/portal/orders/{{ order.id }}/change" class="space-y-4">
 
       <div>
-        <label class="block text-xs font-medium text-gray-600 mb-1">Laufzeit bis</label>
+        <label class="block text-xs font-medium text-gray-600 mb-1">Valid Until</label>
         <input type="date" name="new_until"
                value="{{ order.requested_until.strftime('%Y-%m-%d') if order.requested_until else '' }}"
                min="{{ today }}"
@@ -40,7 +40,7 @@
       <div>
         <label class="block text-xs font-medium text-gray-600 mb-1">
           RDP-User
-          <span class="text-gray-400 font-normal ml-1">Eingabe bestätigen mit Enter oder Komma</span>
+          <span class="text-gray-400 font-normal ml-1">Confirm entry with Enter or comma</span>
         </label>
         <div class="tag-editor rounded border border-gray-300 bg-white px-2 py-1.5 flex flex-wrap gap-1 min-h-[2.5rem] focus-within:ring-1 focus-within:ring-blue-400 cursor-text"
              data-field="rdp_users">
@@ -57,7 +57,7 @@
       <div>
         <label class="block text-xs font-medium text-gray-600 mb-1">
           Admin-User
-          <span class="text-gray-400 font-normal ml-1">Eingabe bestätigen mit Enter oder Komma</span>
+          <span class="text-gray-400 font-normal ml-1">Confirm entry with Enter or comma</span>
         </label>
         <div class="tag-editor rounded border border-gray-300 bg-white px-2 py-1.5 flex flex-wrap gap-1 min-h-[2.5rem] focus-within:ring-1 focus-within:ring-blue-400 cursor-text"
              data-field="admin_users">
@@ -75,22 +75,22 @@
 
       <button type="submit"
               class="px-4 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 focus:outline-none">
-        Ändern
+        Update
       </button>
     </form>
   </div>
 
-  <!-- Zugang abbestellen -->
+  <!-- Cancel Access -->
   <div class="bg-white rounded-lg border border-gray-200 p-5">
-    <h2 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-4">Zugang abbestellen</h2>
+    <h2 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-4">Cancel Access</h2>
     <p class="text-xs text-gray-500 mb-4">
-      Beendet den Zugang und gibt das Asset zurück in den Pool. Diese Aktion kann nicht rückgängig gemacht werden.
+      Ends access and returns the asset to the pool. This action cannot be undone.
     </p>
-    <form method="post" action="/portal/bestellungen/{{ order.id }}/cancel"
-          onsubmit="return confirm('Zugang wirklich abbestellen? Diese Aktion kann nicht rückgängig gemacht werden.')">
+    <form method="post" action="/portal/orders/{{ order.id }}/cancel"
+          onsubmit="return confirm('Really cancel access? This action cannot be undone.')">
       <button type="submit"
               class="px-4 py-1.5 bg-red-600 text-white text-sm rounded hover:bg-red-700 focus:outline-none">
-        Jetzt abbestellen
+        Cancel now
       </button>
     </form>
   </div>
@@ -98,7 +98,7 @@
 </div>
 
 <script>
-// Tag-Editor
+// Tag editor
 document.querySelectorAll('.tag-editor').forEach(function(editor) {
   var field = editor.dataset.field;
   var tagColor = field === 'rdp_users'

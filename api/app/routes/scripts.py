@@ -1,7 +1,7 @@
 """Script-Editor API – PowerShell-Dateien im Browser verwalten und testen.
 
 Alle Endpunkte erfordern X-Admin-Key (via require_admin_key).
-- scripts/ivanti/ ist read-only (Referenz-Scripts, nicht verändern)
+- scripts/ivanti/ is read-only (reference scripts, do not modify)
 - scripts/vsphere/, scripts/active_roles/ sind editierbar
 """
 
@@ -25,22 +25,22 @@ router = APIRouter(
 )
 
 SCRIPTS_BASE = Path("/app/scripts")
-READONLY_DIRS = {"ivanti"}  # scripts/ivanti/ ist nur Referenz
+READONLY_DIRS = {"ivanti"}  # scripts/ivanti/ is read-only reference
 ALLOWED_EXTENSIONS = {".ps1", ".py", ".sh", ".txt"}
 
 _SAFE_NAME = re.compile(r"^[a-zA-Z0-9_\-\.]+$")
 
 
 def _validate_path(category: str, name: str) -> Path:
-    """Gibt den validierten Pfad zurück oder wirft HTTPException."""
+    """Returns the validated path or raises HTTPException."""
     if not _SAFE_NAME.match(category) or not _SAFE_NAME.match(name):
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Ungültiger Pfad")
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid path")
     path = SCRIPTS_BASE / category / name
-    # Sicherheitscheck: Pfad darf nicht aus dem scripts-Verzeichnis ausbrechen
+    # Security check: path must not escape the scripts directory
     try:
         path.relative_to(SCRIPTS_BASE)
     except ValueError:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Pfad unzulässig")
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Path not allowed")
     return path
 
 
@@ -56,7 +56,7 @@ def _check_writable(category: str) -> None:
 
 @router.get("")
 async def list_scripts() -> dict:
-    """Gibt die Verzeichnisstruktur als JSON zurück."""
+    """Returns the directory structure as JSON."""
     structure: dict[str, list] = {}
 
     if not SCRIPTS_BASE.exists():

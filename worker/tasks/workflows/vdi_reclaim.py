@@ -1,15 +1,15 @@
-"""Runbook: VDI Reclaim – VM zurückführen und SCCM Reinstall triggern.
+"""Runbook: VDI Reclaim – return VM to pool and trigger SCCM reinstall.
 
-Entspricht dem Ivanti-Runbook 'VDI Rückführen'.
+Corresponds to the Ivanti runbook 'VDI Reclaim'.
 
-Ablauf:
-  1. Active Roles: Alle Gruppen leeren
-  2. SCCM: Unattended Reinstall triggern
-  3. Pool: Status auf RECLAIMING setzen
-  4. Notification: Rückgabe-Benachrichtigung senden
-  (5. Nach SCCM-Abschluss: Status auf FREE – separater Beat-Task)
+Flow:
+  1. Active Roles: clear all groups
+  2. SCCM: trigger unattended reinstall
+  3. Pool: set status to RECLAIMING
+  4. Notification: send reclaim notification
+  (5. After SCCM completes: set status to FREE – separate beat task)
 
-Celery Beat Task: check_expiring_assets – prüft stündlich ablaufende Assets.
+Celery Beat Task: check_expiring_assets – checks hourly for expiring assets.
 """
 
 import logging
@@ -41,7 +41,7 @@ DATABASE_URL = os.getenv(
 )
 def run(self: Task, order_id: int) -> dict:
     """
-    Runbook: VM aus dem Betrieb nehmen und SCCM-Reinstall starten.
+    Runbook: Decommission VM and start SCCM reinstall.
     """
     logger.info("=== vdi_reclaim START: order_id=%s ===", order_id)
 
@@ -67,7 +67,7 @@ def run(self: Task, order_id: int) -> dict:
         asset_name = order.get("asset_name") or f"VDI-MOCK-{order_id}"
         asset_id = order.get("assigned_asset_id")
 
-        # ── Schritt 1/4: AD-Gruppen leeren ────────────────────────────────────
+        # ── Step 1/4: Clear AD groups ────────────────────────────────────
         step = "active_roles.remove_all_groups"
         logger.info("[Step 1/4] %s for '%s'", step, asset_name)
         update_order_step(db, order_id, step, "running", started_at=datetime.now(timezone.utc))
@@ -83,7 +83,7 @@ def run(self: Task, order_id: int) -> dict:
                               finished_at=datetime.now(timezone.utc))
             logger.warning("[Step 1/4] %s failed (non-critical): %s", step, e)
 
-        # ── Schritt 2/4: SCCM Reinstall triggern ──────────────────────────────
+        # ── Step 2/4: Trigger SCCM reinstall ──────────────────────────────
         step = "sccm.trigger_reinstall"
         logger.info("[Step 2/4] %s for '%s'", step, asset_name)
         update_order_step(db, order_id, step, "running", started_at=datetime.now(timezone.utc))
@@ -107,7 +107,7 @@ def run(self: Task, order_id: int) -> dict:
             logger.error("[Step 2/4] FAILED: %s", e)
             raise self.retry(exc=e)
 
-        # ── Schritt 3/4: Asset auf RECLAIMING setzen ──────────────────────────
+        # ── Step 3/4: Set asset to RECLAIMING ──────────────────────────────
         step = "pool.set_reclaiming"
         logger.info("[Step 3/4] %s asset_id=%s", step, asset_id)
         update_order_step(db, order_id, step, "running", started_at=datetime.now(timezone.utc))
@@ -149,7 +149,7 @@ def run(self: Task, order_id: int) -> dict:
             logger.error("[Step 3/4] FAILED: %s", e)
             raise self.retry(exc=e)
 
-        # ── Schritt 4/4: Benachrichtigung ─────────────────────────────────────
+        # ── Step 4/4: Notification ─────────────────────────────────────
         step = "notifications.send_reclaim_notification"
         logger.info("[Step 4/4] %s to %s", step, order["user_email"])
         update_order_step(db, order_id, step, "running", started_at=datetime.now(timezone.utc))
@@ -166,7 +166,7 @@ def run(self: Task, order_id: int) -> dict:
             update_order_step(db, order_id, step, "failed", error=str(e),
                               finished_at=datetime.now(timezone.utc))
 
-        # ── Order auf EXPIRED setzen ───────────────────────────────────────────
+        # ── Set order to EXPIRED ───────────────────────────────────────────
         update_order_status(db, order_id, "expired")
         audit_helper.waudit(
             db, "order", order_id, "status_changed",
@@ -204,10 +204,10 @@ def run(self: Task, order_id: int) -> dict:
 )
 def check_expiring_assets() -> dict:
     """
-    Celery Beat Task: Prüft stündlich ablaufende Assets und triggert Reclaim.
+    Celery Beat Task: Checks hourly for expiring assets and triggers reclaim.
 
-    - Sofortiger Ablauf (expires_at <= NOW): Reclaim-Runbook starten
-    - Bald ablaufend (expires_at <= NOW + REMINDER_HOURS): Erinnerungsmail
+    - Immediately expired (expires_at <= NOW): start reclaim runbook
+    - Expiring soon (expires_at <= NOW + REMINDER_HOURS): send reminder email
     """
     from datetime import timedelta
 
@@ -219,7 +219,7 @@ def check_expiring_assets() -> dict:
     db = Session(engine)
 
     try:
-        # Abgelaufene Assets (sofort reclaimen)
+        # Expired assets (reclaim immediately)
         expired = db.execute(
             text("""
                 SELECT a.id as asset_id, a.name as asset_name, o.id as order_id,
@@ -241,7 +241,7 @@ def check_expiring_assets() -> dict:
             run.delay(row.order_id)
             reclaim_count += 1
 
-        # Bald ablaufende Assets (Erinnerungsmail)
+        # Assets expiring soon (reminder email)
         reminder_time = datetime.now(timezone.utc) + timedelta(hours=reminder_hours)
         expiring_soon = db.execute(
             text("""

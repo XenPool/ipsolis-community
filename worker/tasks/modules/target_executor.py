@@ -1,7 +1,7 @@
 """Modul: Target Executor – Config-driven Gruppen-Zugriff.
 
-Liest 'targets' aus asset_types und fügt/entfernt Principals aus Gruppen hinzu.
-Schreibt deterministisches Order-Change-Log für Revoke.
+Reads 'targets' from asset_types and adds/removes principals from groups.
+Writes deterministic order change log for revoke.
 
 targets-Format (JSONB in asset_types):
     [{"type": "ad_group", "identifier": "CN=App-Users,OU=...", "principal_source": "requester"}]
@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 
 
-# ── Principal-Auflösung ────────────────────────────────────────────────────────
+# ── Principal resolution ────────────────────────────────────────────────────────
 
 def _resolve_principals(
     principal_source: str,
@@ -34,7 +34,7 @@ def _resolve_principals(
     rdp_users: list,
     admin_users: list,
 ) -> list[str]:
-    """Gibt die Liste der betroffenen User-Principals zurück."""
+    """Returns the list of affected user principals."""
     if principal_source == "requester":
         return [user_email] if user_email else []
     if principal_source == "rdp_users":
@@ -91,7 +91,7 @@ def _write_change_log(
 # ── Handler-Funktionen ─────────────────────────────────────────────────────────
 
 def _grant_ad_group(identifier: str, principal: str) -> dict:
-    """Fügt principal zur AD-Gruppe identifier hinzu."""
+    """Adds principal to the AD group identified by identifier."""
     if ENVIRONMENT == "development":
         logger.info("[MOCK] AD Group grant: %s → %s", principal, identifier)
         time.sleep(0.1)
@@ -101,7 +101,7 @@ def _grant_ad_group(identifier: str, principal: str) -> dict:
 
 
 def _grant_entra_group(identifier: str, principal: str) -> dict:
-    """Fügt principal zur Entra-Gruppe identifier hinzu (MS Graph)."""
+    """Adds principal to the Entra group identified by identifier (MS Graph)."""
     if ENVIRONMENT == "development":
         logger.info("[MOCK] Entra Group grant: %s → %s", principal, identifier)
         time.sleep(0.1)
@@ -138,7 +138,7 @@ _REVOKE_HANDLERS: dict[str, object] = {
 }
 
 
-# ── Öffentliche Modul-Funktionen ───────────────────────────────────────────────
+# ── Public module functions ───────────────────────────────────────────────
 
 def grant(
     db: Session,
@@ -148,8 +148,8 @@ def grant(
     rdp_users: list | None = None,
     admin_users: list | None = None,
 ) -> dict:
-    """Liest targets aus asset_types, fügt Principals zu Gruppen hinzu,
-    schreibt Order-Change-Log.
+    """Reads targets from asset_types, adds principals to groups,
+    writes order change log.
 
     Returns:
         {"success": True, "grants": n, "mock": bool}
@@ -193,7 +193,7 @@ def grant(
         for principal in principals:
             ikey = f"order-{order_id}-{target_type}-{identifier}-{principal}"
 
-            # Idempotenz-Check: Grant wurde bereits erfolgreich ausgeführt → überspringen
+            # Idempotency check: grant already executed successfully → skip
             existing = db.execute(
                 text("""
                     SELECT 1 FROM order_change_log
@@ -243,10 +243,10 @@ def revoke(
     user_email: str,
     asset_type_id: int,
 ) -> dict:
-    """Findet alle erfolgreichen grant-Einträge für user_email + asset_type_id
-    im Order-Change-Log und invertiert diese deterministisch.
+    """Finds all successful grant entries for user_email + asset_type_id
+    in the order change log and inverts them deterministically.
 
-    Setzt state = 'rolled_back' für erfolgreich zurückgenommene Einträge.
+    Sets state = 'rolled_back' for successfully rolled back entries.
 
     Returns:
         {"success": True, "revokes": n, "mock": bool}

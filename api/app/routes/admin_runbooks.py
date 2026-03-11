@@ -93,7 +93,7 @@ class RunbookStepUpdate(BaseModel):
 
 
 class ReorderRequest(BaseModel):
-    step_ids: list[int]  # Neue Reihenfolge der Step-IDs (von oben nach unten)
+    step_ids: list[int]  # New order of step IDs (top to bottom)
 
 
 # ── Asset Types ────────────────────────────────────────────────────────────────
@@ -457,7 +457,7 @@ async def reorder_steps(
     body: ReorderRequest,
     db: AsyncSession = Depends(get_db),
 ) -> dict:
-    """Setzt die Positionen der Steps gemäß der übergebenen ID-Reihenfolge."""
+    """Sets step positions according to the provided ID order."""
     for new_pos, step_id in enumerate(body.step_ids, start=1):
         await db.execute(
             text("UPDATE runbook_steps SET position = :pos WHERE id = :id AND runbook_id = :rid"),

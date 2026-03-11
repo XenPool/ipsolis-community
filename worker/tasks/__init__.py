@@ -1,4 +1,4 @@
-"""Celery App – Einstiegspunkt für Worker, Beat und Flower."""
+"""Celery App – entry point for worker, beat, and flower."""
 
 import os
 
@@ -28,8 +28,8 @@ app.conf.update(
     timezone="Europe/Berlin",
     enable_utc=True,
     task_track_started=True,
-    task_acks_late=True,                     # Erst ACK nach erfolgreichem Abschluss
-    worker_prefetch_multiplier=1,            # Keine Prefetch-Häufung bei langen Tasks
+    task_acks_late=True,                     # ACK only after successful completion
+    worker_prefetch_multiplier=1,            # No prefetch accumulation for long-running tasks
     task_routes={
         "tasks.workflows.vdi_provision.*": {"queue": "provision"},
         "tasks.workflows.vdi_modify.*": {"queue": "provision"},
@@ -39,10 +39,10 @@ app.conf.update(
         "tasks.modules.notifications.*": {"queue": "notifications"},
     },
     beat_schedule={
-        # Stündlich ablaufende Assets prüfen + Erinnerungsmails senden
+        # Check hourly expiring assets + send reminder emails
         "check-expiring-assets": {
             "task": "tasks.workflows.vdi_reclaim.check_expiring_assets",
-            "schedule": crontab(minute=0),  # Jede volle Stunde
+            "schedule": crontab(minute=0),  # Every full hour
         },
     },
 )

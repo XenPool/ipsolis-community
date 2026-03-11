@@ -1,7 +1,7 @@
-"""Sync Audit-Helper für Celery-Worker.
+"""Sync audit helper for Celery worker.
 
-Schreibt Audit-Einträge per Raw-SQL (kein ORM-Import aus api/).
-Der Caller ist für das Commit zuständig.
+Writes audit entries via raw SQL (no ORM import from api/).
+The caller is responsible for the commit.
 """
 
 import json
@@ -24,17 +24,17 @@ def waudit(
     by: str,
     ctx: str | None = None,
 ) -> None:
-    """Schreibt einen Audit-Log-Eintrag (sync, kein Commit).
+    """Writes an audit log entry (sync, no commit).
 
     Args:
-        db:          Aktive SQLAlchemy Session (psycopg2)
+        db:          Active SQLAlchemy Session (psycopg2)
         entity_type: "order" | "asset" | "asset_type" | "app_config"
-        entity_id:   PK des geänderten Datensatzes
+        entity_id:   PK of the changed record
         action:      "created" | "status_changed" | "updated" | "deleted"
-        old:         Snapshot vor der Änderung
-        new:         Snapshot nach der Änderung
-        by:          Auslöser, z.B. "celery:vdi_provision"
-        ctx:         Optionaler Kontext (celery_task_id, etc.)
+        old:         Snapshot before the change
+        new:         Snapshot after the change
+        by:          Trigger, e.g. "celery:vdi_provision"
+        ctx:         Optional context (celery_task_id, etc.)
     """
     try:
         db.execute(
@@ -55,6 +55,6 @@ def waudit(
             },
         )
     except Exception as e:
-        # Audit-Fehler dürfen das Hauptrunbook nicht unterbrechen
+        # Audit errors must not interrupt the main runbook
         logger.error("waudit failed (non-critical): entity=%s:%s action=%s error=%s",
                      entity_type, entity_id, action, e)

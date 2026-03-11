@@ -91,7 +91,7 @@ class WebhookPayload(BaseModel):
     user_name: str
     owner_email: EmailStr | None = None
     owner_name: str | None = None
-    asset_type_name: str  # wird zu asset_type_id aufgelöst
+    asset_type_name: str  # resolved to asset_type_id
     rdp_users: list[str] = []
     admin_users: list[str] = []
     requested_from: datetime

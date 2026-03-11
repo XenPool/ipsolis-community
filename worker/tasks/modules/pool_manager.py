@@ -1,4 +1,4 @@
-"""Modul: Pool Manager – VM aus Pool wählen und zurückgeben.
+"""Module: Pool Manager – select VM from pool and return it.
 
 Entspricht dem Ivanti-Modul 'Pool Management'.
 """
@@ -26,7 +26,7 @@ def reserve_asset(
     user_email: str | None = None,
 ) -> dict:
     """
-    Reserviert eine VM passender Ausprägung gemäß personal_provisioning_strategy.
+    Reserves a VM of the appropriate type according to personal_provisioning_strategy.
 
     Strategien:
         assign_existing_free      – erste freie Instanz aus Pool (Standardverhalten)
@@ -40,7 +40,7 @@ def reserve_asset(
     if MOCK_SCRIPTS:
         return _mock_reserve_asset(db, order_id, asset_type_id, expires_at)
 
-    # REUSE_EXISTING_BY_OWNER: User hat bereits eine zugewiesene Instanz
+    # REUSE_EXISTING_BY_OWNER: user already has an assigned instance
     if personal_provisioning_strategy == "reuse_existing_by_owner" and user_email:
         row = db.execute(
             sql_text("""
@@ -55,14 +55,14 @@ def reserve_asset(
         if row:
             logger.info("Reusing existing asset id=%s for user=%s", row[0], user_email)
             return {"success": True, "asset_id": row[0], "asset_name": row[1], "reused": True}
-        # Kein vorhandenes Asset → fallback auf assign_existing_free
+        # No existing asset → fall back to assign_existing_free
         logger.info("No existing asset found for user=%s – falling back to assign_existing_free", user_email)
 
-    # CREATE_NEW: Stub – echte Instanzerstellung über Runbook-Step
+    # CREATE_NEW: stub – actual instance creation via runbook step
     if personal_provisioning_strategy == "create_new":
         logger.info(
-            "[STUB] create_new: Neue Instanz für order_id=%s asset_type_id=%s – "
-            "Echte Erstellung muss über vsphere-Runbook erfolgen", order_id, asset_type_id,
+            "[STUB] create_new: New instance for order_id=%s asset_type_id=%s – "
+            "Actual creation must be performed via vsphere runbook", order_id, asset_type_id,
         )
         return {
             "success": True,
@@ -71,7 +71,7 @@ def reserve_asset(
             "stub": True,
         }
 
-    # ASSIGN_EXISTING_FREE (Default): Erste freie Instanz aus Pool – Race-Condition-safe
+    # ASSIGN_EXISTING_FREE (default): first free instance from pool – race-condition-safe
     row = db.execute(
         sql_text("""
             SELECT id, name, metadata FROM asset_pool
@@ -118,8 +118,8 @@ def reserve_asset(
 
 
 def release_asset(db: Session, asset_id: int) -> dict:
-    """Gibt eine VM zurück in den Pool (Status FREE).
-    Kein Mock: reine DB-Operation, immer ausführen."""
+    """Returns a VM to the pool (status FREE).
+    No mock: pure DB operation, always execute."""
     result = db.execute(
         sql_text("""
             UPDATE asset_pool
@@ -141,7 +141,7 @@ def release_asset(db: Session, asset_id: int) -> dict:
 
 def set_asset_busy(db: Session, asset_id: int, order_id: int, expires_at: datetime) -> dict:
     """Setzt VM auf BUSY nach erfolgreicher Bereitstellung."""
-    # Kein Mock: reine DB-Operation, immer ausführen
+    # No mock: pure DB operation, always execute
     result = db.execute(
         sql_text("""
             UPDATE asset_pool
@@ -159,7 +159,7 @@ def set_asset_busy(db: Session, asset_id: int, order_id: int, expires_at: dateti
 
 
 def check_capacity(db: Session, asset_type_id: int, pool_capacity: int) -> dict:
-    """Prüft ob Pool-Kapazität für pooled Assets noch frei ist.
+    """Checks whether pool capacity for pooled assets is still available.
 
     Returns:
         {"success": True, "current": n, "capacity": m}
@@ -200,7 +200,7 @@ def _mock_reserve_asset(db: Session, order_id: int, asset_type_id: int, expires_
     )
     time.sleep(0.5)  # Simuliert DB-Zugriff
 
-    # Versuche ein echtes freies Asset zu nehmen, damit assigned_asset_id auf der Order stimmt
+    # Try to pick a real free asset so that assigned_asset_id on the order is correct
     row = db.execute(
         sql_text("""
             SELECT id, name FROM asset_pool
@@ -234,7 +234,7 @@ def _mock_reserve_asset(db: Session, order_id: int, asset_type_id: int, expires_
         )
         return {"success": True, "asset_id": asset_id, "asset_name": asset_name}
 
-    # Kein echtes Asset im Pool – Fallback auf Mock-ID (Development ohne befüllten Pool)
+    # No real asset in pool – fallback to mock ID (development without populated pool)
     mock_asset_id = 1000 + order_id
     mock_asset_name = f"VDI-MOCK-{mock_asset_id:04d}"
     logger.info(

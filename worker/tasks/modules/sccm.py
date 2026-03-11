@@ -15,7 +15,7 @@ SCCM_SITE_CODE = os.getenv("SCCM_SITE_CODE", "XP1")
 
 def trigger_reinstall(asset_name: str) -> dict:
     """
-    Löst eine SCCM-Unattended-Reinstall-Tasksequenz für die VM aus.
+    Triggers an SCCM unattended reinstall task sequence for the VM.
 
     Nach dem Trigger: VM wird reinstalliert und ist danach wieder FREE im Pool.
     """
@@ -26,7 +26,7 @@ def trigger_reinstall(asset_name: str) -> dict:
 
 
 def check_reinstall_status(asset_name: str) -> dict:
-    """Prüft ob die SCCM-Reinstallation abgeschlossen ist."""
+    """Checks whether the SCCM reinstallation is complete."""
     if ENVIRONMENT == "development":
         return _mock_check_status(asset_name)
 

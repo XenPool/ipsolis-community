@@ -1,46 +1,46 @@
 {% extends "base.html" %}
 
-{% block title %}{% if asset_type %}Asset-Typ bearbeiten{% else %}Neuer Asset-Typ{% endif %} – XenPool Admin{% endblock %}
+{% block title %}{% if asset_type %}Edit Asset Type{% else %}New Asset Type{% endif %} – XenPool Admin{% endblock %}
 
 {% block content %}
 <div class="mb-6">
-  <a href="/ui/asset-types" class="text-sm text-gray-500 hover:text-gray-800">← Asset-Typen</a>
+  <a href="/ui/asset-types" class="text-sm text-gray-500 hover:text-gray-800">← Asset Types</a>
 </div>
 
 <h1 class="text-lg font-semibold text-gray-900 mb-6">
-  {% if asset_type %}Asset-Typ bearbeiten: {{ asset_type.name }}{% else %}Neuer Asset-Typ{% endif %}
+  {% if asset_type %}Edit Asset Type: {{ asset_type.name }}{% else %}New Asset Type{% endif %}
 </h1>
 
 <div class="bg-white rounded-lg border border-gray-200 p-6 max-w-2xl">
   <form id="at-form" class="space-y-6">
 
-    <!-- Name + Beschreibung -->
+    <!-- Name + Description -->
     <div class="grid grid-cols-1 gap-4">
       <div>
         <label class="block text-xs font-medium text-gray-600 mb-1">Name <span class="text-red-500">*</span></label>
         <input type="text" name="name" required
                value="{{ asset_type.name if asset_type else '' }}"
-               placeholder="z.B. Business VDI"
+               placeholder="e.g. Business VDI"
                class="w-full rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400">
       </div>
       <div>
-        <label class="block text-xs font-medium text-gray-600 mb-1">Beschreibung</label>
+        <label class="block text-xs font-medium text-gray-600 mb-1">Description</label>
         <input type="text" name="description"
                value="{{ asset_type.description if asset_type else '' }}"
-               placeholder="Kurzbeschreibung"
+               placeholder="Short description"
                class="w-full rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400">
       </div>
     </div>
 
-    <!-- Kategorie -->
+    <!-- Category -->
     <div>
-      <label class="block text-xs font-medium text-gray-600 mb-2">Kategorie</label>
+      <label class="block text-xs font-medium text-gray-600 mb-2">Category</label>
       {% set categories = [
         ("platform_access",       "VDI / Server / Cloud",          "VDI, Server, Cloud Workloads"),
-        ("application_access",    "Business- & SaaS-Apps",         "Business- & SaaS-Anwendungen"),
-        ("data_access",           "Daten & Collaboration",          "Files, DBs, Collaboration"),
+        ("application_access",    "Business & SaaS Apps",          "Business & SaaS applications"),
+        ("data_access",           "Data & Collaboration",           "Files, DBs, Collaboration"),
         ("device_access",         "Clients / MDM / WLAN",           "Clients, MDM, WLAN"),
-        ("infrastructure_access", "Netzwerk / Firewall / Admin",    "Netzwerk, Firewall, Admin-Tiering")
+        ("infrastructure_access", "Network / Firewall / Admin",     "Network, firewall, admin-tiering")
       ] %}
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
         {% for cat_val, cat_short, cat_desc in categories %}
@@ -59,9 +59,9 @@
       </div>
     </div>
 
-    <!-- Zuweisungsmodell -->
+    <!-- Assignment Model -->
     <div>
-      <label class="block text-xs font-medium text-gray-600 mb-2">Zuweisungsmodell</label>
+      <label class="block text-xs font-medium text-gray-600 mb-2">Assignment Model</label>
       <div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
 
         <label class="relative flex cursor-pointer rounded-lg border border-gray-200 p-3 hover:border-blue-400 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
@@ -69,8 +69,8 @@
                  {% if not asset_type or asset_type.assignment_model == 'assigned_personal' %}checked{% endif %}
                  class="sr-only">
           <div>
-            <p class="text-sm font-medium text-gray-900">Persönlich</p>
-            <p class="text-xs text-gray-400 mt-0.5">Eindeutige Instanz, 1:1 zugewiesen (Personal VDI, Laptop)</p>
+            <p class="text-sm font-medium text-gray-900">Personal</p>
+            <p class="text-xs text-gray-400 mt-0.5">Unique instance, 1:1 assigned (personal VDI, laptop)</p>
           </div>
         </label>
 
@@ -79,8 +79,8 @@
                  {% if asset_type and asset_type.assignment_model == 'dedicated_shared' %}checked{% endif %}
                  class="sr-only">
           <div>
-            <p class="text-sm font-medium text-gray-900">Gemeinsam</p>
-            <p class="text-xs text-gray-400 mt-0.5">Instanz existiert, kein fester Owner (Jump Host, Shared WS)</p>
+            <p class="text-sm font-medium text-gray-900">Shared</p>
+            <p class="text-xs text-gray-400 mt-0.5">Instance exists, no fixed owner (jump host, shared workstation)</p>
           </div>
         </label>
 
@@ -89,8 +89,8 @@
                  {% if asset_type and asset_type.assignment_model == 'capacity_pooled' %}checked{% endif %}
                  class="sr-only">
           <div>
-            <p class="text-sm font-medium text-gray-900">Kontingent</p>
-            <p class="text-xs text-gray-400 mt-0.5">Pool/Lizenzslot ohne individuelle Instanz (RDS, SaaS)</p>
+            <p class="text-sm font-medium text-gray-900">Pooled</p>
+            <p class="text-xs text-gray-400 mt-0.5">Pool / license slot without dedicated instance (RDS, SaaS)</p>
           </div>
         </label>
 
@@ -99,15 +99,15 @@
 
     <!-- Deprovision Policy -->
     <div>
-      <label class="block text-xs font-medium text-gray-600 mb-2">Deprovision-Strategie
-        <span class="text-gray-400 font-normal ml-1">– was passiert bei Revoke/Abbestellen?</span>
+      <label class="block text-xs font-medium text-gray-600 mb-2">Deprovision Strategy
+        <span class="text-gray-400 font-normal ml-1">– what happens on revoke/cancel?</span>
       </label>
       {% set dp_opts = [
-        ("access_only",          "Nur Zugriff entziehen",    "Gruppenmitgliedschaft entfernen – Instanz bleibt unberührt"),
-        ("return_to_pool",       "Zurück in Pool",            "Zuweisung lösen, Ressource wieder für andere verfügbar"),
-        ("deallocate_instance",  "Instanz anhalten",          "VM stoppen / deallocaten, aber nicht löschen"),
-        ("delete_instance",      "Instanz löschen",           "VM unwiderruflich löschen inkl. Cleanup"),
-        ("custom_runbook",       "Runbook",                   "Revoke-Logik über separates Runbook definieren"),
+        ("access_only",          "Revoke access only",    "Remove group membership – instance remains untouched"),
+        ("return_to_pool",       "Return to pool",            "Release assignment, resource available for others"),
+        ("deallocate_instance",  "Pause instance",          "Stop / deallocate VM, but do not delete"),
+        ("delete_instance",      "Delete instance",           "Permanently delete VM including cleanup"),
+        ("custom_runbook",       "Runbook",                   "Define revoke logic via separate runbook"),
       ] %}
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
         {% for dp_val, dp_short, dp_desc in dp_opts %}
@@ -126,18 +126,18 @@
       <div id="dp-constraint-banner" class="hidden mt-2 text-xs rounded px-3 py-2 bg-amber-50 border border-amber-200 text-amber-700"></div>
     </div>
 
-    <!-- Persönliche Zuweisung (nur bei assigned_personal) -->
+    <!-- Personal assignment (only for assigned_personal) -->
     <div id="personal-provision-section" class="{% if not asset_type or asset_type.assignment_model != 'assigned_personal' %}hidden{% endif %} border border-blue-100 rounded-lg p-4 bg-blue-50/40">
-      <label class="block text-xs font-semibold text-blue-700 mb-3">Persönliche Zuweisung
-        <span class="font-normal text-blue-500 ml-1">– nur bei Zuweisungsmodell "Persönlich"</span>
+      <label class="block text-xs font-semibold text-blue-700 mb-3">Personal Assignment
+        <span class="font-normal text-blue-500 ml-1">– only for assignment model "Personal"</span>
       </label>
 
       <div class="mb-3">
-        <label class="block text-xs font-medium text-gray-600 mb-2">Provisionierungs-Strategie</label>
+        <label class="block text-xs font-medium text-gray-600 mb-2">Provisioning Strategy</label>
         {% set ps_opts = [
-          ("assign_existing_free",     "Freie Instanz zuweisen",    "Erste verfügbare Instanz aus dem Pool reservieren"),
-          ("reuse_existing_by_owner",  "Bestehende wiederverwenden","Falls User bereits eine Instanz hat, diese nutzen"),
-          ("create_new",               "Neue Instanz anlegen",      "Neue VM erzeugen (Stub – über Runbook zu implementieren)"),
+          ("assign_existing_free",     "Assign free instance",    "Reserve the first available instance from the pool"),
+          ("reuse_existing_by_owner",  "Reuse existing",          "Use existing instance if the user already has one"),
+          ("create_new",               "Create new instance",     "Create a new VM (stub – implement via runbook)"),
         ] %}
         <div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
           {% for ps_val, ps_short, ps_desc in ps_opts %}
@@ -157,14 +157,14 @@
 
       <div class="flex flex-wrap gap-4 items-end">
         <div>
-          <label class="block text-xs text-gray-500 mb-1">Naming-Pattern <span class="text-gray-400">(optional)</span></label>
+          <label class="block text-xs text-gray-500 mb-1">Naming Pattern <span class="text-gray-400">(optional)</span></label>
           <input type="text" name="naming_pattern"
                  value="{{ asset_type.naming_pattern if asset_type and asset_type.naming_pattern else '' }}"
-                 placeholder="z.B. VDI-{sam} oder LAP-{employeeId}"
+                 placeholder="e.g. VDI-{sam} or LAP-{employeeId}"
                  class="w-52 rounded border border-gray-300 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400">
         </div>
         <div>
-          <label class="block text-xs text-gray-500 mb-1">Max. Instanzen/User</label>
+          <label class="block text-xs text-gray-500 mb-1">Max. Instances/User</label>
           <input type="number" name="max_per_user" min="1"
                  value="{{ asset_type.max_per_user if asset_type else 1 }}"
                  class="w-20 rounded border border-gray-300 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400">
@@ -172,38 +172,38 @@
       </div>
     </div>
 
-    <!-- Pool-Kapazität (nur für capacity_pooled) -->
+    <!-- Pool capacity (only for capacity_pooled) -->
     <div id="capacity-row" class="{% if not asset_type or asset_type.assignment_model != 'capacity_pooled' %}hidden{% endif %}">
-      <label class="block text-xs font-medium text-gray-600 mb-1">Pool-Kapazität (max. gleichzeitige Zugänge)</label>
+      <label class="block text-xs font-medium text-gray-600 mb-1">Pool Capacity (max. concurrent access slots)</label>
       <input type="number" name="pool_capacity" min="1"
              value="{{ asset_type.pool_capacity if asset_type else '' }}"
-             placeholder="z.B. 20"
+             placeholder="e.g. 20"
              class="w-32 rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400">
     </div>
 
     <!-- Lifecycle -->
     <div>
-      <label class="block text-xs font-medium text-gray-600 mb-2">Laufzeit-Vorgaben (optional)</label>
+      <label class="block text-xs font-medium text-gray-600 mb-2">Lifecycle Settings (optional)</label>
       <div class="flex flex-wrap gap-4 items-end">
         <div>
-          <label class="block text-xs text-gray-500 mb-1">Standard-Laufzeit (Tage)</label>
+          <label class="block text-xs text-gray-500 mb-1">Default Duration (days)</label>
           <input type="number" name="lifecycle_ttl_days" min="1"
                  value="{{ asset_type.lifecycle_ttl_days if asset_type and asset_type.lifecycle_ttl_days else '' }}"
-                 placeholder="z.B. 90"
+                 placeholder="e.g. 90"
                  class="w-28 rounded border border-gray-300 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400">
         </div>
         <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer pb-1">
           <input type="checkbox" name="lifecycle_renewable"
                  {% if not asset_type or asset_type.lifecycle_renewable %}checked{% endif %}
                  class="rounded border-gray-300">
-          Verlängerbar
+          Renewable
         </label>
         <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer pb-1">
           <input type="checkbox" name="allow_user_lists"
                  {% if asset_type and asset_type.allow_user_lists %}checked{% endif %}
                  class="rounded border-gray-300">
-          RDP- und Admin-User-Listen aktivieren
-          <span class="text-xs text-gray-400">(für VDI / Server / Cloud Assets)</span>
+          Enable RDP and admin user lists
+          <span class="text-xs text-gray-400">(for VDI / Server / Cloud assets)</span>
         </label>
       </div>
     </div>
@@ -211,7 +211,7 @@
     <!-- Automation Strategy -->
     {% set strat = asset_type.automation_strategy if asset_type and asset_type.automation_strategy else ('group_only' if asset_type and asset_type.automation_mode == 'targets_only' else 'runbook_only') %}
     <div class="border-t border-gray-100 pt-5">
-      <label class="block text-xs font-medium text-gray-600 mb-2">Automations-Modus</label>
+      <label class="block text-xs font-medium text-gray-600 mb-2">Automation Mode</label>
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
 
         <label class="relative flex cursor-pointer rounded-lg border border-gray-200 p-4 hover:border-green-400 has-[:checked]:border-green-500 has-[:checked]:bg-green-50">
@@ -219,8 +219,8 @@
                  {% if strat == 'group_only' %}checked{% endif %}
                  class="sr-only" onchange="updateAutomationUI()">
           <div>
-            <p class="text-sm font-medium text-gray-900">Gruppen-Zugriff</p>
-            <p class="text-xs text-gray-500 mt-0.5">Zugriff per AD/Entra-Gruppenmitgliedschaft – kein Script nötig</p>
+            <p class="text-sm font-medium text-gray-900">Group Access</p>
+            <p class="text-xs text-gray-500 mt-0.5">Access via AD/Entra group membership – no script required</p>
           </div>
         </label>
 
@@ -230,7 +230,7 @@
                  class="sr-only" onchange="updateAutomationUI()">
           <div>
             <p class="text-sm font-medium text-gray-900">Runbook</p>
-            <p class="text-xs text-gray-500 mt-0.5">Benutzerdefiniertes Runbook mit PowerShell-Scripts</p>
+            <p class="text-xs text-gray-500 mt-0.5">Custom runbook with PowerShell scripts</p>
           </div>
         </label>
 
@@ -239,45 +239,45 @@
                  {% if strat == 'composite' %}checked{% endif %}
                  class="sr-only" onchange="updateAutomationUI()">
           <div>
-            <p class="text-sm font-medium text-gray-900">Kombiniert</p>
-            <p class="text-xs text-gray-500 mt-0.5">Gruppen-Targets und Runbook in konfigurierbarer Reihenfolge</p>
+            <p class="text-sm font-medium text-gray-900">Combined</p>
+            <p class="text-xs text-gray-500 mt-0.5">Group targets and runbook in configurable order</p>
           </div>
         </label>
 
       </div>
     </div>
 
-    <!-- COMPOSITE: Reihenfolge -->
+    <!-- COMPOSITE: Order -->
     {% set cs0type = asset_type.composite_steps[0].type if asset_type and asset_type.composite_steps else 'GROUP_TARGETS' %}
     <div id="composite-order-section" class="{% if strat != 'composite' %}hidden{% endif %} rounded-lg bg-indigo-50 border border-indigo-100 px-4 py-3">
-      <label class="block text-xs font-semibold text-indigo-700 mb-2">Reihenfolge
-        <span class="font-normal text-indigo-500 ml-1">– welcher Schritt wird zuerst ausgeführt?</span>
+      <label class="block text-xs font-semibold text-indigo-700 mb-2">Order
+        <span class="font-normal text-indigo-500 ml-1">– which step is executed first?</span>
       </label>
       <div class="flex gap-6">
         <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
           <input type="radio" name="composite_order" value="groups_first"
                  {% if cs0type != 'RUNBOOK' %}checked{% endif %}>
-          <span>Gruppen-Zugriff zuerst</span>
+          <span>Group access first</span>
         </label>
         <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
           <input type="radio" name="composite_order" value="runbook_first"
                  {% if cs0type == 'RUNBOOK' %}checked{% endif %}>
-          <span>Runbook zuerst</span>
+          <span>Runbook first</span>
         </label>
       </div>
-      <p class="mt-2 text-xs text-indigo-400">Beide Schritte werden ausgeführt – bei kritischem Fehler bricht die Sequenz ab.</p>
+      <p class="mt-2 text-xs text-indigo-400">Both steps are executed – a critical error aborts the sequence.</p>
     </div>
 
-    <!-- Targets-Editor (bei group_only und composite) -->
+    <!-- Targets editor (for group_only and composite) -->
     <div id="targets-section" class="{% if strat not in ('group_only', 'composite') %}hidden{% endif %}">
       <label class="block text-xs font-medium text-gray-600 mb-1">
-        Zugriffs-Targets
-        <span class="text-gray-400 font-normal ml-1">– welche Gruppen erhält der Nutzer</span>
+        Access Targets
+        <span class="text-gray-400 font-normal ml-1">– which groups the user receives</span>
       </label>
       <div class="grid grid-cols-12 gap-2 mb-1 text-xs text-gray-400 px-0.5">
-        <span class="col-span-3">Typ</span>
+        <span class="col-span-3">Type</span>
         <span class="col-span-5">Identifier (DN / ObjectId)</span>
-        <span class="col-span-3">Zugewiesen an</span>
+        <span class="col-span-3">Assigned to</span>
       </div>
       <div id="target-rows" class="space-y-2">
         {% if asset_type and asset_type.targets %}
@@ -285,19 +285,19 @@
           <div class="grid grid-cols-12 gap-2 items-center target-row">
             <select name="target_type[]"
                     class="col-span-3 rounded border border-gray-300 text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-green-400">
-              <option value="ad_group" {% if tgt.type == 'ad_group' %}selected{% endif %}>AD-Gruppe</option>
-              <option value="entra_group" {% if tgt.type == 'entra_group' %}selected{% endif %}>Entra-Gruppe</option>
+              <option value="ad_group" {% if tgt.type == 'ad_group' %}selected{% endif %}>AD Group</option>
+              <option value="entra_group" {% if tgt.type == 'entra_group' %}selected{% endif %}>Entra Group</option>
               <option value="rds_collection" {% if tgt.type == 'rds_collection' %}selected{% endif %}>RDS Collection</option>
-              <option value="other" {% if tgt.type == 'other' %}selected{% endif %}>Sonstiges</option>
+              <option value="other" {% if tgt.type == 'other' %}selected{% endif %}>Other</option>
             </select>
-            <input type="text" name="target_identifier[]" value="{{ tgt.identifier }}" placeholder="CN=Gruppe,OU=..."
+            <input type="text" name="target_identifier[]" value="{{ tgt.identifier }}" placeholder="CN=Group,OU=..."
                    class="col-span-5 rounded border border-gray-300 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-green-400">
             <select name="target_principal_source[]"
                     class="col-span-3 rounded border border-gray-300 text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-green-400">
-              <option value="requester" {% if tgt.principal_source == 'requester' %}selected{% endif %}>Antragsteller</option>
-              <option value="rdp_users" {% if tgt.principal_source == 'rdp_users' %}selected{% endif %}>RDP-User</option>
-              <option value="admin_users" {% if tgt.principal_source == 'admin_users' %}selected{% endif %}>Admin-User</option>
-              <option value="all_users" {% if tgt.principal_source == 'all_users' %}selected{% endif %}>Alle User</option>
+              <option value="requester" {% if tgt.principal_source == 'requester' %}selected{% endif %}>Requester</option>
+              <option value="rdp_users" {% if tgt.principal_source == 'rdp_users' %}selected{% endif %}>RDP users</option>
+              <option value="admin_users" {% if tgt.principal_source == 'admin_users' %}selected{% endif %}>Admin users</option>
+              <option value="all_users" {% if tgt.principal_source == 'all_users' %}selected{% endif %}>All users</option>
             </select>
             <button type="button" onclick="this.closest('.target-row').remove()"
                     class="col-span-1 text-red-400 hover:text-red-600 text-lg leading-none text-center">×</button>
@@ -307,19 +307,19 @@
           <div class="grid grid-cols-12 gap-2 items-center target-row">
             <select name="target_type[]"
                     class="col-span-3 rounded border border-gray-300 text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-green-400">
-              <option value="ad_group">AD-Gruppe</option>
-              <option value="entra_group">Entra-Gruppe</option>
+              <option value="ad_group">AD Group</option>
+              <option value="entra_group">Entra Group</option>
               <option value="rds_collection">RDS Collection</option>
-              <option value="other">Sonstiges</option>
+              <option value="other">Other</option>
             </select>
-            <input type="text" name="target_identifier[]" placeholder="CN=Gruppe,OU=..."
+            <input type="text" name="target_identifier[]" placeholder="CN=Group,OU=..."
                    class="col-span-5 rounded border border-gray-300 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-green-400">
             <select name="target_principal_source[]"
                     class="col-span-3 rounded border border-gray-300 text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-green-400">
-              <option value="requester">Antragsteller</option>
-              <option value="rdp_users">RDP-User</option>
-              <option value="admin_users">Admin-User</option>
-              <option value="all_users">Alle User</option>
+              <option value="requester">Requester</option>
+              <option value="rdp_users">RDP users</option>
+              <option value="admin_users">Admin users</option>
+              <option value="all_users">All users</option>
             </select>
             <button type="button" onclick="this.closest('.target-row').remove()"
                     class="col-span-1 text-red-400 hover:text-red-600 text-lg leading-none text-center">×</button>
@@ -327,33 +327,33 @@
         {% endif %}
       </div>
       <button type="button" onclick="addTargetRow()"
-              class="mt-2 text-xs text-green-600 hover:underline">+ Target hinzufügen</button>
+              class="mt-2 text-xs text-green-600 hover:underline">+ Add Target</button>
       <p class="mt-2 text-xs text-gray-400">
-        Provision/Revoke läuft automatisch über diese Targets – kein Runbook-Editor nötig.
+        Provision/revoke runs automatically via these targets – no runbook editor needed.
       </p>
     </div>
 
-    <!-- Runbook-Hinweis (bei runbook_only und composite) -->
+    <!-- Runbook hint (for runbook_only and composite) -->
     <div id="runbook-hint" class="{% if strat == 'group_only' %}hidden{% endif %} rounded-lg bg-purple-50 border border-purple-100 px-4 py-3">
       <p class="text-xs text-purple-700">
-        Runbook-Modus: Nach dem Anlegen das Runbook im
-        <a href="/ui/runbooks" class="underline hover:text-purple-900">Runbook-Editor</a>
-        konfigurieren (Provision, Modify, Delete).
+        Runbook mode: After saving, configure the runbook in the
+        <a href="/ui/runbooks" class="underline hover:text-purple-900">Runbook Editor</a>
+        (Provision, Modify, Delete).
       </p>
     </div>
 
-    <!-- Attribute -->
+    <!-- Attributes -->
     <div class="border-t border-gray-100 pt-5">
       <label class="block text-xs font-medium text-gray-600 mb-1">
-        Attribute
-        <span class="text-gray-400 font-normal ml-1">– optional, z.B. CPU-Optionen, Lizenztypen</span>
+        Attributes
+        <span class="text-gray-400 font-normal ml-1">– optional, e.g. CPU options, license types</span>
       </label>
       <div class="grid grid-cols-12 gap-2 mb-1 text-xs text-gray-400 px-0.5">
-        <span class="col-span-3">Schlüssel</span>
-        <span class="col-span-3">Anzeigename</span>
-        <span class="col-span-2">Typ</span>
-        <span class="col-span-1 text-center" title="Pflichtfeld">Pfl.</span>
-        <span class="col-span-2">Standardwert</span>
+        <span class="col-span-3">Key</span>
+        <span class="col-span-3">Label</span>
+        <span class="col-span-2">Type</span>
+        <span class="col-span-1 text-center" title="Required">Req.</span>
+        <span class="col-span-2">Default</span>
         <span class="col-span-1"></span>
       </div>
       <div id="attr-rows" class="space-y-2">
@@ -362,17 +362,17 @@
           {% set attr_type = attr.type if attr.type else ('ENUM' if attr.options else 'STRING') %}
           <div class="attr-row">
             <div class="grid grid-cols-12 gap-2 items-center">
-              <input type="text" name="attr_key[]" value="{{ attr.key }}" placeholder="z.B. cpu"
+              <input type="text" name="attr_key[]" value="{{ attr.key }}" placeholder="e.g. cpu"
                      class="col-span-3 rounded border border-gray-300 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400">
-              <input type="text" name="attr_label[]" value="{{ attr.label }}" placeholder="z.B. Anzahl CPU"
+              <input type="text" name="attr_label[]" value="{{ attr.label }}" placeholder="e.g. CPU count"
                      class="col-span-3 rounded border border-gray-300 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400">
               <select name="attr_type[]" onchange="updateAttrTypeUI(this.closest('.attr-row'))"
                       class="col-span-2 rounded border border-gray-300 text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400">
                 <option value="STRING"     {% if attr_type == 'STRING' %}selected{% endif %}>Text</option>
-                <option value="INT"        {% if attr_type == 'INT' %}selected{% endif %}>Zahl</option>
-                <option value="BOOL"       {% if attr_type == 'BOOL' %}selected{% endif %}>Ja/Nein</option>
-                <option value="ENUM"       {% if attr_type == 'ENUM' %}selected{% endif %}>Auswahl</option>
-                <option value="MULTI_ENUM" {% if attr_type == 'MULTI_ENUM' %}selected{% endif %}>Mehrfach</option>
+                <option value="INT"        {% if attr_type == 'INT' %}selected{% endif %}>Number</option>
+                <option value="BOOL"       {% if attr_type == 'BOOL' %}selected{% endif %}>Yes/No</option>
+                <option value="ENUM"       {% if attr_type == 'ENUM' %}selected{% endif %}>Select</option>
+                <option value="MULTI_ENUM" {% if attr_type == 'MULTI_ENUM' %}selected{% endif %}>Multi</option>
               </select>
               <div class="col-span-1 flex justify-center">
                 <input type="checkbox" name="attr_required[]" value="1"
@@ -381,16 +381,16 @@
               </div>
               <input type="text" name="attr_default[]"
                      value="{{ attr.default_value or '' }}"
-                     placeholder="Standard"
+                     placeholder="Default"
                      class="col-span-2 rounded border border-gray-300 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400">
               <button type="button" onclick="this.closest('.attr-row').remove()"
                       class="col-span-1 text-red-400 hover:text-red-600 text-lg leading-none text-center">×</button>
             </div>
             <div class="attr-options-row grid grid-cols-12 gap-2 items-center mt-1 {% if attr_type not in ('ENUM', 'MULTI_ENUM') %}hidden{% endif %}">
-              <span class="col-span-2 text-xs text-gray-400 text-right pr-1">Optionen:</span>
+              <span class="col-span-2 text-xs text-gray-400 text-right pr-1">Options:</span>
               <input type="text" name="attr_options[]"
                      value="{{ attr.options | default([]) | join(', ') }}"
-                     placeholder="z.B. 2, 4, 8"
+                     placeholder="e.g. 2, 4, 8"
                      class="col-span-9 rounded border border-gray-300 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400">
               <span class="col-span-1"></span>
             </div>
@@ -399,29 +399,29 @@
         {% else %}
           <div class="attr-row">
             <div class="grid grid-cols-12 gap-2 items-center">
-              <input type="text" name="attr_key[]" placeholder="z.B. cpu"
+              <input type="text" name="attr_key[]" placeholder="e.g. cpu"
                      class="col-span-3 rounded border border-gray-300 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400">
-              <input type="text" name="attr_label[]" placeholder="z.B. Anzahl CPU"
+              <input type="text" name="attr_label[]" placeholder="e.g. CPU count"
                      class="col-span-3 rounded border border-gray-300 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400">
               <select name="attr_type[]" onchange="updateAttrTypeUI(this.closest('.attr-row'))"
                       class="col-span-2 rounded border border-gray-300 text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400">
                 <option value="STRING">Text</option>
-                <option value="INT">Zahl</option>
-                <option value="BOOL">Ja/Nein</option>
-                <option value="ENUM">Auswahl</option>
-                <option value="MULTI_ENUM">Mehrfach</option>
+                <option value="INT">Number</option>
+                <option value="BOOL">Yes/No</option>
+                <option value="ENUM">Select</option>
+                <option value="MULTI_ENUM">Multi</option>
               </select>
               <div class="col-span-1 flex justify-center">
                 <input type="checkbox" name="attr_required[]" value="1" class="rounded border-gray-300 mt-0.5">
               </div>
-              <input type="text" name="attr_default[]" placeholder="Standard"
+              <input type="text" name="attr_default[]" placeholder="Default"
                      class="col-span-2 rounded border border-gray-300 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400">
               <button type="button" onclick="this.closest('.attr-row').remove()"
                       class="col-span-1 text-red-400 hover:text-red-600 text-lg leading-none text-center">×</button>
             </div>
             <div class="attr-options-row grid grid-cols-12 gap-2 items-center mt-1 hidden">
-              <span class="col-span-2 text-xs text-gray-400 text-right pr-1">Optionen:</span>
-              <input type="text" name="attr_options[]" placeholder="z.B. 2, 4, 8"
+              <span class="col-span-2 text-xs text-gray-400 text-right pr-1">Options:</span>
+              <input type="text" name="attr_options[]" placeholder="e.g. 2, 4, 8"
                      class="col-span-9 rounded border border-gray-300 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400">
               <span class="col-span-1"></span>
             </div>
@@ -429,15 +429,15 @@
         {% endif %}
       </div>
       <button type="button" onclick="addAttrRow()"
-              class="mt-2 text-xs text-blue-600 hover:underline">+ Attribut hinzufügen</button>
+              class="mt-2 text-xs text-blue-600 hover:underline">+ Add Attribute</button>
     </div>
 
     <!-- Buttons -->
     <div class="flex items-center justify-between pt-2 border-t border-gray-100">
-      <a href="/ui/asset-types" class="text-sm text-gray-500 hover:text-gray-800">Abbrechen</a>
+      <a href="/ui/asset-types" class="text-sm text-gray-500 hover:text-gray-800">Cancel</a>
       <button type="button" onclick="submitForm()"
               class="px-6 py-2.5 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700">
-        {% if asset_type %}Speichern{% else %}Anlegen{% endif %} →
+        {% if asset_type %}Save{% else %}Create{% endif %} →
       </button>
     </div>
 
@@ -459,10 +459,10 @@ function updateAutomationUI() {
   enforceConstraints();
 }
 
-// Compat-Alias (wird von älteren onchange-Attributen gerufen)
+// Compat alias (called by older onchange attributes)
 function showTargetsEditor(show) { updateAutomationUI(); }
 
-// Mapping: assignment_model → sinnvoller deprovision_policy Default
+// Mapping: assignment_model → sensible deprovision_policy default
 var _dpDefaults = {
   'capacity_pooled':   'return_to_pool',
   'dedicated_shared':  'access_only',
@@ -473,20 +473,20 @@ function toggleAssignmentDependents() {
   var sel = document.querySelector('[name="assignment_model"]:checked');
   var val = sel ? sel.value : 'assigned_personal';
 
-  // Pool-Kapazität nur bei capacity_pooled
+  // Pool capacity only for capacity_pooled
   document.getElementById('capacity-row').classList.toggle('hidden', val !== 'capacity_pooled');
 
-  // Persönliche Zuweisung nur bei assigned_personal
+  // Personal assignment only for assigned_personal
   document.getElementById('personal-provision-section').classList.toggle('hidden', val !== 'assigned_personal');
 
-  // Deprovision-Policy Default setzen
+  // Set default deprovision policy
   var dp = _dpDefaults[val] || 'access_only';
   var dpRadio = document.querySelector('[name="deprovision_policy"][value="' + dp + '"]');
   if (dpRadio) dpRadio.checked = true;
   enforceConstraints();
 }
 
-// Compat-Alias (wird auch von bestehenden Listeners gerufen)
+// Compat alias (also called by existing listeners)
 function toggleCapacity() { toggleAssignmentDependents(); }
 
 // ── Asset-Type Constraint Enforcement (Rules 1–4) ─────────────────────────────
@@ -541,11 +541,11 @@ function enforceConstraints() {
     hintEl.classList.toggle('hidden', !showHint);
     if (showHint) {
       var msgs = [];
-      if (isRunbookMode)    msgs.push('Provision-Runbook konfigurieren (Automations-Modus: Runbook).');
-      if (hasRunbookPolicy) msgs.push('Revoke-Runbook konfigurieren (Deprovision-Strategie: Runbook).');
+      if (isRunbookMode)    msgs.push('Configure provision runbook (Automation Mode: Runbook).');
+      if (hasRunbookPolicy) msgs.push('Configure revoke runbook (Deprovision Strategy: Runbook).');
       hintEl.innerHTML =
-        '<p class="text-xs text-purple-700">Runbook-Abhängigkeiten \u2013 bitte nach dem Speichern im '
-        + '<a href="/ui/runbooks" class="underline hover:text-purple-900">Runbook-Editor</a> einrichten:</p>'
+        '<p class="text-xs text-purple-700">Runbook dependencies \u2013 please configure after saving in the '
+        + '<a href="/ui/runbooks" class="underline hover:text-purple-900">Runbook Editor</a>:</p>'
         + '<ul class="mt-1 list-disc list-inside text-xs text-purple-600">'
         + msgs.map(function(m) { return '<li>' + m + '</li>'; }).join('')
         + '</ul>';
@@ -556,9 +556,9 @@ function enforceConstraints() {
   var banner = document.getElementById('dp-constraint-banner');
   if (banner) {
     var notes = [];
-    if (isGroupOnly) notes.push('Gruppen-Zugriff: Instanz-Aktionen (Anhalten / L\u00f6schen) nicht verf\u00fcgbar.');
-    if (isShared)    notes.push('Gemeinsames Modell: "Instanz l\u00f6schen" nicht verf\u00fcgbar.');
-    if (!isPersonal) notes.push('"Zur\u00fcck in Pool" nur bei pers\u00f6nlicher Zuweisung m\u00f6glich.');
+    if (isGroupOnly) notes.push('Group access: instance actions (pause / delete) not available.');
+    if (isShared)    notes.push('Shared model: "delete instance" not available.');
+    if (!isPersonal) notes.push('"Return to pool" only available for personal assignment.');
     if (notes.length) {
       banner.textContent = notes.join(' \u2022 ');
       banner.classList.remove('hidden');
@@ -584,19 +584,19 @@ function addTargetRow() {
   row.innerHTML =
     '<select name="target_type[]"'
     + ' class="col-span-3 rounded border border-gray-300 text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-green-400">'
-    + '<option value="ad_group">AD-Gruppe</option>'
-    + '<option value="entra_group">Entra-Gruppe</option>'
+    + '<option value="ad_group">AD Group</option>'
+    + '<option value="entra_group">Entra Group</option>'
     + '<option value="rds_collection">RDS Collection</option>'
-    + '<option value="other">Sonstiges</option>'
+    + '<option value="other">Other</option>'
     + '</select>'
-    + '<input type="text" name="target_identifier[]" placeholder="CN=Gruppe,OU=..."'
+    + '<input type="text" name="target_identifier[]" placeholder="CN=Group,OU=..."'
     + ' class="col-span-5 rounded border border-gray-300 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-green-400">'
     + '<select name="target_principal_source[]"'
     + ' class="col-span-3 rounded border border-gray-300 text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-green-400">'
-    + '<option value="requester">Antragsteller</option>'
-    + '<option value="rdp_users">RDP-User</option>'
-    + '<option value="admin_users">Admin-User</option>'
-    + '<option value="all_users">Alle User</option>'
+    + '<option value="requester">Requester</option>'
+    + '<option value="rdp_users">RDP users</option>'
+    + '<option value="admin_users">Admin users</option>'
+    + '<option value="all_users">All users</option>'
     + '</select>'
     + '<button type="button" onclick="this.closest(\'.target-row\').remove()"'
     + ' class="col-span-1 text-red-400 hover:text-red-600 text-lg leading-none text-center">\xd7</button>';
@@ -615,29 +615,29 @@ function addAttrRow() {
   row.className = 'attr-row';
   row.innerHTML =
     '<div class="grid grid-cols-12 gap-2 items-center">'
-    + '<input type="text" name="attr_key[]" placeholder="z.B. cpu"'
+    + '<input type="text" name="attr_key[]" placeholder="e.g. cpu"'
     + ' class="col-span-3 rounded border border-gray-300 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400">'
-    + '<input type="text" name="attr_label[]" placeholder="z.B. Anzahl CPU"'
+    + '<input type="text" name="attr_label[]" placeholder="e.g. CPU count"'
     + ' class="col-span-3 rounded border border-gray-300 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400">'
     + '<select name="attr_type[]" onchange="updateAttrTypeUI(this.closest(\'.attr-row\'))"'
     + ' class="col-span-2 rounded border border-gray-300 text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400">'
     + '<option value="STRING">Text</option>'
-    + '<option value="INT">Zahl</option>'
-    + '<option value="BOOL">Ja/Nein</option>'
-    + '<option value="ENUM">Auswahl</option>'
-    + '<option value="MULTI_ENUM">Mehrfach</option>'
+    + '<option value="INT">Number</option>'
+    + '<option value="BOOL">Yes/No</option>'
+    + '<option value="ENUM">Select</option>'
+    + '<option value="MULTI_ENUM">Multi</option>'
     + '</select>'
     + '<div class="col-span-1 flex justify-center">'
     + '<input type="checkbox" name="attr_required[]" value="1" class="rounded border-gray-300 mt-0.5">'
     + '</div>'
-    + '<input type="text" name="attr_default[]" placeholder="Standard"'
+    + '<input type="text" name="attr_default[]" placeholder="Default"'
     + ' class="col-span-2 rounded border border-gray-300 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400">'
     + '<button type="button" onclick="this.closest(\'.attr-row\').remove()"'
     + ' class="col-span-1 text-red-400 hover:text-red-600 text-lg leading-none text-center">\xd7</button>'
     + '</div>'
     + '<div class="attr-options-row grid grid-cols-12 gap-2 items-center mt-1 hidden">'
-    + '<span class="col-span-2 text-xs text-gray-400 text-right pr-1">Optionen:</span>'
-    + '<input type="text" name="attr_options[]" placeholder="z.B. 2, 4, 8"'
+    + '<span class="col-span-2 text-xs text-gray-400 text-right pr-1">Options:</span>'
+    + '<input type="text" name="attr_options[]" placeholder="e.g. 2, 4, 8"'
     + ' class="col-span-9 rounded border border-gray-300 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400">'
     + '<span class="col-span-1"></span>'
     + '</div>';
@@ -647,7 +647,7 @@ function addAttrRow() {
 async function submitForm() {
   var form = document.getElementById('at-form');
   var name = form.querySelector('[name="name"]').value.trim();
-  if (!name) { alert('Name ist erforderlich'); return; }
+  if (!name) { alert('Name is required'); return; }
 
   // Targets
   var tTypes   = Array.from(form.querySelectorAll('[name="target_type[]"]')).map(function(s) { return s.value; });
@@ -659,7 +659,7 @@ async function submitForm() {
     targets.push({ type: t, identifier: tIdents[i], principal_source: tSources[i] || 'requester' });
   });
 
-  // Attribute
+  // Attributes
   var config = [];
   Array.from(form.querySelectorAll('.attr-row')).forEach(function(rowEl) {
     var k = rowEl.querySelector('[name="attr_key[]"]').value.trim();
@@ -690,11 +690,11 @@ async function submitForm() {
   var dpPolicyEl = form.querySelector('[name="deprovision_policy"]:checked');
   var psStratEl = form.querySelector('[name="personal_provisioning_strategy"]:checked');
 
-  // Legacy automation_mode (deprecated fallback für bestehende Records)
+  // Legacy automation_mode (deprecated fallback for existing records)
   var legacyModeMap = { 'group_only': 'targets_only', 'runbook_only': 'runbook', 'composite': 'runbook' };
   var automationMode = legacyModeMap[automationStrategy] || 'runbook';
 
-  // composite_steps aus Reihenfolge-Radio ableiten
+  // Derive composite_steps from order radio
   var compositeSteps = null;
   if (automationStrategy === 'composite') {
     var compositeOrderEl = form.querySelector('[name="composite_order"]:checked');
@@ -715,22 +715,22 @@ async function submitForm() {
   var constraintErrors = [];
   if (automationStrategy === 'group_only' &&
       (dpPolicy === 'deallocate_instance' || dpPolicy === 'delete_instance')) {
-    constraintErrors.push('Gruppen-Zugriff unterst\u00fctzt keine Instanz-Aktionen (Anhalten/L\u00f6schen). W\u00e4hle eine andere Deprovision-Strategie.');
+    constraintErrors.push('Group access does not support instance actions (pause/delete). Choose a different deprovision strategy.');
   }
   if (dpPolicy === 'return_to_pool' && assignmentModel !== 'assigned_personal') {
-    constraintErrors.push('"Zur\u00fcck in Pool" erfordert das Zuweisungsmodell "Pers\u00f6nlich".');
+    constraintErrors.push('"Return to pool" requires assignment model "Personal".');
   }
   if (dpPolicy === 'return_to_pool' && assignmentModel === 'assigned_personal' &&
       psStrategy && psStrategy !== 'assign_existing_free') {
-    constraintErrors.push('"Zur\u00fcck in Pool" erfordert die Provisionierungs-Strategie "Freie Instanz zuweisen".');
+    constraintErrors.push('"Return to pool" requires provisioning strategy "Assign free instance".');
   }
   if (assignmentModel === 'dedicated_shared' && dpPolicy === 'delete_instance') {
-    constraintErrors.push('Gemeinsame Assets d\u00fcrfen nicht automatisch gel\u00f6scht werden ("Instanz l\u00f6schen" verboten).');
+    constraintErrors.push('Shared assets cannot be automatically deleted ("delete instance" is not allowed).');
   }
   if (constraintErrors.length) {
     document.getElementById('form-result').innerHTML =
       '<div class="text-sm text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">'
-      + '<strong>Konfigurationsfehler:</strong><ul class="mt-1 list-disc list-inside">'
+      + '<strong>Configuration errors:</strong><ul class="mt-1 list-disc list-inside">'
       + constraintErrors.map(function(e) { return '<li>' + e + '</li>'; }).join('')
       + '</ul></div>';
     return;

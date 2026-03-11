@@ -33,7 +33,7 @@ def send_order_confirmation(
     snow_ritm: str | None,
 ) -> dict:
     """
-    Sendet zweisprachige Bestellbestätigung (DE/EN) an Besteller und ggf. Owner.
+    Sends bilingual order confirmation (DE/EN) to requester and optionally owner.
 
     Konfiguration wird aus der app_config-Tabelle gelesen:
       email.from, email.bcc, email.smtp_server, email.smtp_port,
@@ -45,11 +45,11 @@ def send_order_confirmation(
     mail_from = get_config(db, "email.from", MAIL_FROM)
     bcc = get_config(db, "email.bcc")
 
-    # Owner = Besteller wenn kein Owner angegeben
+    # Owner defaults to requester if no owner specified
     effective_owner_email = owner_email or user_email
     effective_owner_name = owner_name or user_name
 
-    # Empfänger: Besteller + Owner (falls unterschiedlich)
+    # Recipients: requester + owner (if different)
     recipients = [user_email]
     if owner_email and owner_email.lower() != user_email.lower():
         recipients.append(owner_email)
@@ -200,7 +200,7 @@ def _send_html_email_multi(
     subject: str,
     html_body: str,
 ) -> dict:
-    """Sendet HTML-Mail an mehrere Empfänger (mit optionalem BCC)."""
+    """Sends HTML email to multiple recipients (with optional BCC)."""
     if ENVIRONMENT == "development":
         return _mock_send_html_email(recipients, bcc, subject, html_body)
 
@@ -271,7 +271,7 @@ def send_provision_confirmation(
     rdp_users: list[str],
     expires_at: datetime,
 ) -> dict:
-    """Sendet Bereitstellungsbestätigung an den User."""
+    """Sends provisioning confirmation to the user."""
     subject = f"Ihre VDI '{asset_name}' wurde bereitgestellt"
     body = f"""
 Hallo {user_name},
@@ -280,11 +280,11 @@ Ihre virtuelle Maschine wurde erfolgreich bereitgestellt:
 
   VM-Name:     {asset_name}
   RDP-Zugang:  {', '.join(rdp_users) if rdp_users else '(keiner)'}
-  Verfügbar bis: {expires_at.strftime('%d.%m.%Y %H:%M')} Uhr
+  Available until: {expires_at.strftime('%d.%m.%Y %H:%M')}
 
 Bitte verwenden Sie die Remote-Desktop-Verbindung mit dem Servernamen '{asset_name}'.
 
-Mit freundlichen Grüßen
+Kind regards
 XenPool IT Selfservice
     """.strip()
 
@@ -299,20 +299,20 @@ def send_expiry_reminder(
     hours_remaining: float,
 ) -> dict:
     """Sendet Ablauf-Erinnerungsmail."""
-    subject = f"Erinnerung: Ihre VDI '{asset_name}' läuft in {int(hours_remaining)}h ab"
+    subject = f"Reminder: Your VDI '{asset_name}' expires in {int(hours_remaining)}h"
     body = f"""
 Hallo {user_name},
 
-Ihre virtuelle Maschine läuft bald ab:
+Your virtual machine is expiring soon:
 
   VM-Name:     {asset_name}
   Ablauf:      {expires_at.strftime('%d.%m.%Y %H:%M')} Uhr
   Verbleibend: ca. {int(hours_remaining)} Stunden
 
-Falls Sie die VM länger benötigen, verlängern Sie die Laufzeit bitte
+If you need the VM for longer, please extend the duration
 im IT Self-Service-Portal vor dem Ablauftermin.
 
-Mit freundlichen Grüßen
+Kind regards
 XenPool IT Selfservice
     """.strip()
 
@@ -324,18 +324,18 @@ def send_reclaim_notification(
     user_name: str,
     asset_name: str,
 ) -> dict:
-    """Benachrichtigt User über Rückführung der VM in den Pool."""
-    subject = f"Ihre VDI '{asset_name}' wurde zurückgegeben"
+    """Notifies user about VM being returned to the pool."""
+    subject = f"Your VDI '{asset_name}' has been returned"
     body = f"""
 Hallo {user_name},
 
-Ihre virtuelle Maschine '{asset_name}' wurde in den Pool zurückgegeben
+Your virtual machine '{asset_name}' has been returned to the pool
 und wird jetzt neu aufgesetzt.
 
-Falls Sie eine neue VM benötigen, bestellen Sie diese gerne erneut
+If you need a new VM, feel free to order again
 im IT Self-Service-Portal.
 
-Mit freundlichen Grüßen
+Kind regards
 XenPool IT Selfservice
     """.strip()
 
@@ -344,7 +344,7 @@ XenPool IT Selfservice
 
 def send_expiry_reminders() -> dict:
     """
-    Celery Beat Task: Sendet Erinnerungsmails für bald ablaufende Assets.
+    Celery Beat task: sends reminder emails for expiring assets.
     Wird von Celery Beat periodisch aufgerufen.
     """
     if ENVIRONMENT == "development":
@@ -352,8 +352,8 @@ def send_expiry_reminders() -> dict:
         logger.info("[MOCK] No expiring assets found (mock mode)")
         return {"sent": 0, "mock": True}
 
-    # Production: DB-Abfrage und Mail-Versand
-    # (wird im nächsten Sprint implementiert)
+    # Production: DB query and email dispatch
+    # (to be implemented in the next sprint)
     return {"sent": 0}
 
 

@@ -28,29 +28,29 @@ class AssetCategory(str, enum.Enum):
 
 
 class AssignmentModel(str, enum.Enum):
-    CAPACITY_POOLED = "capacity_pooled"       # Pool/Kontingent, keine Instanz (RDS, SaaS-Lizenz)
-    DEDICATED_SHARED = "dedicated_shared"     # Instanz existiert, kein fester Owner (Jump Host)
-    ASSIGNED_PERSONAL = "assigned_personal"   # Instanz 1:1 User-owned (Personal VDI, Laptop)
+    CAPACITY_POOLED = "capacity_pooled"       # Pool/quota, no dedicated instance (RDS, SaaS license)
+    DEDICATED_SHARED = "dedicated_shared"     # Instance exists, no fixed owner (jump host)
+    ASSIGNED_PERSONAL = "assigned_personal"   # Instance 1:1 user-owned (personal VDI, laptop)
 
 
 class DeprovisionPolicy(str, enum.Enum):
-    ACCESS_ONLY = "access_only"                   # Nur Gruppenmitgliedschaft entfernen
-    RETURN_TO_POOL = "return_to_pool"             # Pool-Reservierung lösen, Instanz bleibt frei
-    DEALLOCATE_INSTANCE = "deallocate_instance"   # VM stoppen / deallocaten
-    DELETE_INSTANCE = "delete_instance"           # VM löschen inkl. Cleanup
-    CUSTOM_RUNBOOK = "custom_runbook"             # Revoke per separatem Runbook
+    ACCESS_ONLY = "access_only"                   # Remove group membership only
+    RETURN_TO_POOL = "return_to_pool"             # Release pool reservation, instance remains free
+    DEALLOCATE_INSTANCE = "deallocate_instance"   # Stop / deallocate VM
+    DELETE_INSTANCE = "delete_instance"           # Delete VM including cleanup
+    CUSTOM_RUNBOOK = "custom_runbook"             # Revoke via separate runbook
 
 
 class PersonalProvisioningStrategy(str, enum.Enum):
-    ASSIGN_EXISTING_FREE = "assign_existing_free"       # Freie Instanz aus Pool zuweisen
-    CREATE_NEW = "create_new"                            # Neue Instanz erzeugen (Stub MVP)
-    REUSE_EXISTING_BY_OWNER = "reuse_existing_by_owner" # User hat bereits eine → wiederverwenden
+    ASSIGN_EXISTING_FREE = "assign_existing_free"       # Assign free instance from pool
+    CREATE_NEW = "create_new"                            # Create new instance (stub MVP)
+    REUSE_EXISTING_BY_OWNER = "reuse_existing_by_owner" # User already has an instance → reuse it
 
 
 class AutomationStrategy(str, enum.Enum):
-    GROUP_ONLY = "group_only"       # Nur Gruppen-Targets (ehemals targets_only)
-    RUNBOOK_ONLY = "runbook_only"   # Nur Runbook (ehemals runbook)
-    COMPOSITE = "composite"         # Gruppen-Targets + Runbook in konfigurierbarer Reihenfolge
+    GROUP_ONLY = "group_only"       # Group targets only (formerly targets_only)
+    RUNBOOK_ONLY = "runbook_only"   # Runbook only (formerly runbook)
+    COMPOSITE = "composite"         # Group targets + runbook in configurable order
 
 
 class AssetStatus(str, enum.Enum):
@@ -62,7 +62,7 @@ class AssetStatus(str, enum.Enum):
 
 
 class AssetType(Base):
-    """Typdefinitionen – z.B. 'Test VDI', 'Business VDI'."""
+    """Type definitions – e.g. 'Test VDI', 'Business VDI'."""
 
     __tablename__ = "asset_types"
 
@@ -74,34 +74,34 @@ class AssetType(Base):
         nullable=False,
         default=AssetCategory.PLATFORM_ACCESS,
     )
-    # Strukturierte Attribute: [{"key": "cpu", "label": "Anzahl CPU", "options": ["2", "4", "8"]}]
+    # Structured attributes: [{"key": "cpu", "label": "CPU count", "options": ["2", "4", "8"]}]
     config: Mapped[list[dict[str, Any]] | None] = mapped_column(JSON, nullable=True)
-    # Zuweisungsmodell: capacity_pooled / dedicated_shared / assigned_personal
+    # Assignment model: capacity_pooled / dedicated_shared / assigned_personal
     assignment_model: Mapped[str] = mapped_column(
         String(30), nullable=False, default="assigned_personal", server_default="assigned_personal"
     )
     pool_capacity: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    # Automation: targets_only (config-driven group membership) oder runbook
+    # Automation: targets_only (config-driven group membership) or runbook
     automation_mode: Mapped[str] = mapped_column(
         String(20), nullable=False, default="runbook", server_default="runbook"
     )
     # Targets: [{"type": "ad_group", "identifier": "CN=...", "principal_source": "requester"}]
     targets: Mapped[list[dict[str, Any]] | None] = mapped_column(JSON, nullable=True)
-    # Neue Automation Strategy (ersetzt automation_mode langfristig)
+    # New automation strategy (replaces automation_mode long-term)
     automation_strategy: Mapped[str] = mapped_column(
         String(20), nullable=False, default="runbook_only", server_default="runbook_only"
     )
     # composite_steps: [{"type": "GROUP_TARGETS", "order": 1}, {"type": "RUNBOOK", "order": 2}]
     composite_steps: Mapped[list[dict[str, Any]] | None] = mapped_column(JSON, nullable=True)
-    # Deprovision-Verhalten beim Revoke
+    # Deprovision behavior on revoke
     deprovision_policy: Mapped[str] = mapped_column(
         String(30), nullable=False, default="access_only", server_default="access_only"
     )
-    # Persönliche Zuweisung: wie wird die Instanz provisioniert?
+    # Personal assignment: how is the instance provisioned?
     personal_provisioning_strategy: Mapped[str | None] = mapped_column(
         String(30), nullable=True
     )
-    # Naming-Pattern für neue Instanzen, z.B. "VDI-{sam}"
+    # Naming pattern for new instances, e.g. "VDI-{sam}"
     naming_pattern: Mapped[str | None] = mapped_column(String(100), nullable=True)
     # Max. gleichzeitige Instanzen pro User
     max_per_user: Mapped[int] = mapped_column(

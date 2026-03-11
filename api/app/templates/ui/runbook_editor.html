@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Runbook bearbeiten – XenPool Admin{% endblock %}
+{% block title %}Edit Runbook – XenPool Admin{% endblock %}
 
 {% block content %}
 <div class="mb-6">
@@ -11,7 +11,7 @@
   <div>
     <h1 class="text-lg font-semibold text-gray-900">{{ runbook.name }}</h1>
     <p class="text-xs text-gray-500 mt-1">
-      Asset-Typ: <strong>{{ asset_type.name if asset_type else runbook.asset_type_id }}</strong> ·
+      Asset type: <strong>{{ asset_type.name if asset_type else runbook.asset_type_id }}</strong> ·
       Action: <strong class="font-mono">{{ runbook.action }}</strong>
     </p>
   </div>
@@ -77,49 +77,49 @@
     {% endfor %}
     {% else %}
     <div id="no-steps" class="px-4 py-8 text-center text-gray-400 text-sm">
-      Noch keine Steps definiert. Füge unten den ersten Step hinzu.
+      No steps defined yet. Add the first step below.
     </div>
     {% endif %}
   </div>
 </div>
 
-<!-- Step hinzufügen / bearbeiten -->
+<!-- Add / edit step -->
 <div class="bg-white rounded-lg border border-gray-200 p-5" id="step-form">
-  <h2 class="text-sm font-semibold text-gray-700 mb-4" id="step-form-title">+ Step hinzufügen</h2>
+  <h2 class="text-sm font-semibold text-gray-700 mb-4" id="step-form-title">+ Add step</h2>
 
   <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
     <div>
-      <label class="block text-xs font-medium text-gray-600 mb-1">Step-Name <span class="text-red-500">*</span></label>
-      <input type="text" id="new-step-name" placeholder="z.B. RDP-Gruppe konfigurieren"
+      <label class="block text-xs font-medium text-gray-600 mb-1">Step name <span class="text-red-500">*</span></label>
+      <input type="text" id="new-step-name" placeholder="e.g. Configure RDP group"
              class="w-full rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400">
     </div>
     <div>
-      <label class="block text-xs font-medium text-gray-600 mb-1">Modul <span class="text-red-500">*</span></label>
+      <label class="block text-xs font-medium text-gray-600 mb-1">Module <span class="text-red-500">*</span></label>
       <select id="new-step-module" onchange="updateModuleInfo()"
               class="w-full rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400">
-        <option value="">– Modul wählen –</option>
+        <option value="">– Select module –</option>
         {% for m in script_modules %}
         <option value="{{ m.id }}"
                 data-params='{{ (m.param_schema | tojson) if m.param_schema else "[]" }}'>
           {{ m.name }}{% if m.description %} – {{ m.description }}{% endif %}
         </option>
         {% else %}
-        <option disabled>Keine Module vorhanden</option>
+        <option disabled>No modules available</option>
         {% endfor %}
       </select>
       {% if not script_modules %}
       <p class="text-xs text-amber-600 mt-1">
-        Noch keine Module erstellt.
-        <a href="/ui/modules/neu" class="underline hover:text-amber-800">Modul anlegen →</a>
+        No modules created yet.
+        <a href="/ui/modules/new" class="underline hover:text-amber-800">Create module →</a>
       </p>
       {% endif %}
     </div>
   </div>
 
-  <!-- Modul-Param-Hints -->
+  <!-- Module param hints -->
   <div id="module-info" class="mb-4 hidden">
     <div class="rounded bg-gray-50 border border-gray-200 px-3 py-2">
-      <p class="text-xs font-medium text-gray-600 mb-1">Erwartete Parameter dieses Moduls:</p>
+      <p class="text-xs font-medium text-gray-600 mb-1">Expected parameters for this module:</p>
       <div id="module-param-list" class="text-xs font-mono text-gray-500"></div>
     </div>
   </div>
@@ -129,7 +129,7 @@
       <label class="block text-xs font-medium text-gray-600 mb-1">Kritisch</label>
       <label class="flex items-center gap-2 text-sm cursor-pointer">
         <input type="checkbox" id="new-step-critical" checked class="w-4 h-4">
-        Ja (Abbruch bei Fehler)
+        Yes (abort on error)
       </label>
     </div>
     <div>
@@ -148,25 +148,25 @@
   <div class="mb-4">
     <label class="block text-xs font-medium text-gray-600 mb-1">
       Params Template (JSON)
-      <span class="font-normal text-gray-400 ml-1">– Verwende {{key}} für Kontext-Variablen</span>
+      <span class="font-normal text-gray-400 ml-1">– Use {{key}} for context variables</span>
     </label>
     <textarea id="new-step-params" rows="4"
               placeholder='{"asset_name": "{{asset_name}}", "rdp_users": "{{rdp_users}}"}'
               class="w-full rounded border border-gray-300 text-xs font-mono px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400"></textarea>
     <p class="text-xs text-gray-400 mt-1">
-      Verfügbare Kontext-Variablen: order_id, asset_type_id, asset_name, asset_id,
-      rdp_users, admin_users, user_email, user_name, expires_at, requested_from, u.v.m.
+      Available context variables: order_id, asset_type_id, asset_name, asset_id,
+      rdp_users, admin_users, user_email, user_name, expires_at, requested_from, and more.
     </p>
   </div>
 
   <div class="flex items-center justify-between">
     <button type="button" id="cancel-edit-btn" onclick="cancelEdit()"
             class="hidden px-4 py-2 text-sm text-gray-500 border border-gray-300 rounded hover:bg-gray-50">
-      Abbrechen
+      Cancel
     </button>
     <button type="button" id="submit-step-btn" onclick="submitStep()"
             class="ml-auto px-5 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700">
-      Step hinzufügen
+      Add step
     </button>
   </div>
   <div id="step-result" class="mt-2"></div>
@@ -217,7 +217,7 @@ function _getFormData() {
   var params_template = null;
   if (paramsRaw) {
     try { params_template = JSON.parse(paramsRaw); }
-    catch(e) { alert('Params Template ist kein gültiges JSON'); return null; }
+    catch(e) { alert('Params template is not valid JSON'); return null; }
   }
   return {
     step_name: name,
@@ -274,7 +274,7 @@ async function _updateStep(stepId) {
 }
 
 async function deleteStep(stepId) {
-  if (!confirm('Step wirklich entfernen?')) return;
+  if (!confirm('Really remove this step?')) return;
   var resp = await fetch('/admin/runbooks/' + RUNBOOK_ID + '/steps/' + stepId, {method: 'DELETE'});
   if (resp.ok) location.reload();
 }
@@ -309,8 +309,8 @@ function editStep(stepId, step) {
   document.getElementById('new-step-timeout').value = step.timeout_seconds;
   document.getElementById('new-step-params').value =
     step.params_template ? JSON.stringify(step.params_template, null, 2) : '';
-  document.getElementById('step-form-title').textContent = 'Step bearbeiten';
-  document.getElementById('submit-step-btn').textContent = 'Änderungen speichern';
+  document.getElementById('step-form-title').textContent = 'Edit step';
+  document.getElementById('submit-step-btn').textContent = 'Save changes';
   document.getElementById('cancel-edit-btn').classList.remove('hidden');
   document.getElementById('step-result').innerHTML = '';
   document.getElementById('step-form').scrollIntoView({behavior: 'smooth', block: 'start'});
@@ -326,8 +326,8 @@ function cancelEdit() {
   document.getElementById('new-step-timeout').value = '120';
   document.getElementById('new-step-params').value = '';
   document.getElementById('module-info').classList.add('hidden');
-  document.getElementById('step-form-title').textContent = '+ Step hinzufügen';
-  document.getElementById('submit-step-btn').textContent = 'Step hinzufügen';
+  document.getElementById('step-form-title').textContent = '+ Add step';
+  document.getElementById('submit-step-btn').textContent = 'Add step';
   document.getElementById('cancel-edit-btn').classList.add('hidden');
   document.getElementById('step-result').innerHTML = '';
 }

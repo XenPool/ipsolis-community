@@ -277,7 +277,7 @@ async def admin_change_order(
     rdp_users: list[str] = Form(default=[]),
     admin_users: list[str] = Form(default=[]),
 ):
-    """Admin: Bestellung im Namen des Users ändern (Laufzeit + User-Listen)."""
+    """Admin: change order on behalf of user (duration + user lists)."""
     result = await db.execute(select(Order).where(Order.id == order_id))
     original = result.scalar_one_or_none()
     if not original:
@@ -286,14 +286,14 @@ async def admin_change_order(
     if original.status not in (OrderStatus.DELIVERED, OrderStatus.PROVISIONED):
         raise HTTPException(
             status_code=422,
-            detail="Nur aktive Bestellungen (DELIVERED/PROVISIONED) können geändert werden",
+            detail="Only active orders (DELIVERED/PROVISIONED) can be modified",
         )
 
     if new_until:
         try:
             requested_until = datetime.fromisoformat(new_until).replace(tzinfo=timezone.utc)
         except ValueError:
-            raise HTTPException(status_code=422, detail="Ungültiges Datumsformat")
+            raise HTTPException(status_code=422, detail="Invalid date format")
     else:
         requested_until = original.requested_until
 
@@ -346,7 +346,7 @@ async def admin_cancel_order(
     if original.status not in (OrderStatus.DELIVERED, OrderStatus.PROVISIONED):
         raise HTTPException(
             status_code=422,
-            detail="Nur aktive Bestellungen (DELIVERED/PROVISIONED) können abbestellt werden",
+            detail="Only active orders (DELIVERED/PROVISIONED) can be cancelled",
         )
 
     cancel_order = Order(
@@ -442,7 +442,7 @@ async def asset_pool_page(
     )
 
 
-@router.get("/asset-types/neu", response_class=HTMLResponse)
+@router.get("/asset-types/new", response_class=HTMLResponse)
 async def asset_type_new_form(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(
         request, "ui/asset_type_form.html",
@@ -450,7 +450,7 @@ async def asset_type_new_form(request: Request) -> HTMLResponse:
     )
 
 
-@router.get("/asset-types/{type_id}/bearbeiten", response_class=HTMLResponse)
+@router.get("/asset-types/{type_id}/edit", response_class=HTMLResponse)
 async def asset_type_edit_form(
     request: Request,
     type_id: int,
@@ -485,7 +485,7 @@ async def runbooks_list(
     )
     runbooks = rb_result.scalars().all()
 
-    # Gruppiert: {asset_type_id: {action: runbook}}
+    # Grouped: {asset_type_id: {action: runbook}}
     rb_by_type: dict[int, dict] = {t.id: {} for t in asset_types}
     for rb in runbooks:
         rb_by_type.setdefault(rb.asset_type_id, {})[rb.action] = rb
@@ -501,7 +501,7 @@ async def runbooks_list(
     )
 
 
-@router.get("/runbooks/{runbook_id}/bearbeiten", response_class=HTMLResponse)
+@router.get("/runbooks/{runbook_id}/edit", response_class=HTMLResponse)
 async def runbook_editor(
     request: Request,
     runbook_id: int,
@@ -558,7 +558,7 @@ async def module_params_fragment(
     module_id: int | None = None,
     db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
-    """HTMX-Fragment: Param-Felder für das gewählte Script-Modul."""
+    """HTMX fragment: param fields for the selected script module."""
     module = await db.get(ScriptModule, module_id) if module_id else None
     return templates.TemplateResponse(
         request, "ui/fragments/module_params.html",
@@ -591,7 +591,7 @@ async def modules_list(
     )
 
 
-@router.get("/modules/neu", response_class=HTMLResponse)
+@router.get("/modules/new", response_class=HTMLResponse)
 async def module_new_form(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(
         request, "ui/module_editor.html",
@@ -599,7 +599,7 @@ async def module_new_form(request: Request) -> HTMLResponse:
     )
 
 
-@router.get("/modules/{module_id}/bearbeiten", response_class=HTMLResponse)
+@router.get("/modules/{module_id}/edit", response_class=HTMLResponse)
 async def module_edit_form(
     request: Request,
     module_id: int,

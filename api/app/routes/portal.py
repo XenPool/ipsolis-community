@@ -1,7 +1,7 @@
-"""User Self-Service Portal – HTML-Routen.
+"""User Self-Service Portal – HTML routes.
 
-Kein Admin-Key erforderlich (internes Tool, kein Login für MVP).
-Aktionen: Neue VDI bestellen, Verlängern, RDP-/Admin-User ändern.
+No admin key required (internal tool, no login for MVP).
+Actions: Order new access, extend, change RDP/admin users.
 """
 import logging
 from datetime import date, datetime, timezone
@@ -44,7 +44,7 @@ _STEP_COLORS = {
 }
 
 
-# ── Übersicht ──────────────────────────────────────────────────────────────────
+# ── Overview ───────────────────────────────────────────────────────────────────
 
 @router.get("/", response_class=HTMLResponse)
 async def portal_index(request: Request, db: AsyncSession = Depends(get_db)):
@@ -87,13 +87,13 @@ async def portal_index(request: Request, db: AsyncSession = Depends(get_db)):
     })
 
 
-# ── Neue Bestellung ────────────────────────────────────────────────────────────
+# ── New Order ──────────────────────────────────────────────────────────────────
 
-@router.get("/bestellung/neu", response_class=HTMLResponse)
+@router.get("/orders/new", response_class=HTMLResponse)
 async def portal_new_order_form(request: Request, db: AsyncSession = Depends(get_db)):
     types_result = await db.execute(select(AssetType).order_by(AssetType.name))
     asset_types = list(types_result.scalars().all())
-    return templates.TemplateResponse("portal/bestellung_neu.html", {
+    return templates.TemplateResponse("portal/order_new.html", {
         "request": request,
         "active_page": "new",
         "asset_types": asset_types,
@@ -106,17 +106,17 @@ def _validate_order_attrs(
     form_data,
     attr_defs: list[dict],
 ) -> tuple[dict | None, str | None]:
-    """Validiert attr_*-Felder gegen AttributeDefinitions aus AssetType.config.
+    """Validates attr_* fields against AttributeDefinitions from AssetType.config.
 
-    Gibt (collected_config, None) bei Erfolg oder (None, error_msg) bei Fehler zurück.
-    Nicht-sichtbare Felder (visibleWhen nicht erfüllt) werden ignoriert.
+    Returns (collected_config, None) on success or (None, error_msg) on error.
+    Non-visible fields (visibleWhen not satisfied) are ignored.
     """
     from app.schemas.admin import AttributeDefinition, AttributeType
 
     if not attr_defs:
         return None, None
 
-    # Konvertiere raw dicts → AttributeDefinition (ignoriert ungültige Einträge)
+    # Convert raw dicts → AttributeDefinition (ignores invalid entries)
     defs: list[AttributeDefinition] = []
     for raw in attr_defs:
         try:
@@ -126,48 +126,48 @@ def _validate_order_attrs(
                 raw["type"] = "ENUM" if raw.get("options") else "STRING"
             defs.append(AttributeDefinition.model_validate(raw))
         except Exception:
-            pass  # Ungültige Definitionen überspringen
+            pass  # Skip invalid definitions
 
     collected: dict[str, object] = {}
     for attr in defs:
-        # visibleWhen prüfen: falls Bedingung nicht erfüllt → Feld überspringen
+        # Check visibleWhen: if condition not met → skip field
         if attr.visible_when:
             cond_field = attr.visible_when.get("field", "")
             cond_value = attr.visible_when.get("value", "")
             form_val = form_data.get(cond_field, "")
             if str(form_val) != str(cond_value):
-                continue  # nicht sichtbar → nicht validieren
+                continue  # not visible → skip validation
 
         raw_val = form_data.getlist("attr_" + attr.key) if attr.type == AttributeType.MULTI_ENUM else form_data.get("attr_" + attr.key, "")
 
-        # Pflichtfeld prüfen
+        # Validate required field
         empty = (raw_val == "" or raw_val == [] or raw_val is None)
         if attr.required and empty:
-            return None, f"Pflichtfeld '{attr.label}' wurde nicht ausgefüllt."
+            return None, f"Required field '{attr.label}' was not filled in."
 
         if empty:
             if attr.default_value is not None:
                 collected[attr.key] = attr.default_value
             continue
 
-        # Typ-Konvertierung und Werteprüfung
+        # Type conversion and value validation
         if attr.type == AttributeType.INT:
             try:
                 collected[attr.key] = int(raw_val)
             except (ValueError, TypeError):
-                return None, f"Feld '{attr.label}' muss eine ganze Zahl sein."
+                return None, f"Field '{attr.label}' must be an integer."
         elif attr.type == AttributeType.BOOL:
             collected[attr.key] = raw_val in ("true", "True", "1", "on", True)
         elif attr.type == AttributeType.ENUM:
             if attr.options and str(raw_val) not in attr.options:
-                return None, f"Ungültiger Wert für '{attr.label}'."
+                return None, f"Invalid value for '{attr.label}'."
             collected[attr.key] = str(raw_val)
         elif attr.type == AttributeType.MULTI_ENUM:
             vals = raw_val if isinstance(raw_val, list) else [raw_val]
             if attr.options:
                 invalid = [v for v in vals if v not in attr.options]
                 if invalid:
-                    return None, f"Ungültige Werte für '{attr.label}': {', '.join(invalid)}"
+                    return None, f"Invalid values for '{attr.label}': {', '.join(invalid)}"
             collected[attr.key] = vals
         else:
             collected[attr.key] = str(raw_val)
@@ -175,7 +175,7 @@ def _validate_order_attrs(
     return (collected if collected else None), None
 
 
-@router.post("/bestellung/neu")
+@router.post("/orders/new")
 async def portal_create_order(
     request: Request,
     db: AsyncSession = Depends(get_db),
@@ -189,18 +189,18 @@ async def portal_create_order(
     rdp_users: list[str] = Form(default=[]),
     admin_users: list[str] = Form(default=[]),
 ):
-    # Alle Formular-Felder lesen (für attr_*-Felder)
+    # Read all form fields (for attr_* fields)
     form_data = await request.form()
 
     async def _render_error(msg: str):
         types_result = await db.execute(select(AssetType).order_by(AssetType.name))
-        return templates.TemplateResponse("portal/bestellung_neu.html", {
+        return templates.TemplateResponse("portal/order_new.html", {
             "request": request,
             "active_page": "new",
             "asset_types": list(types_result.scalars().all()),
             "today": date.today().isoformat(),
             "error": msg,
-            # Formular-Werte zurückgeben
+            # Return form values
             "form": {
                 "user_name": user_name, "user_email": user_email,
                 "owner_name": owner_name, "owner_email": owner_email,
@@ -215,16 +215,16 @@ async def portal_create_order(
         from_dt = datetime.fromisoformat(requested_from).replace(tzinfo=timezone.utc)
         until_dt = datetime.fromisoformat(requested_until).replace(tzinfo=timezone.utc)
     except ValueError:
-        return await _render_error("Ungültiges Datumsformat.")
+        return await _render_error("Invalid date format.")
 
     if until_dt <= from_dt:
-        return await _render_error("Das Enddatum muss nach dem Startdatum liegen.")
+        return await _render_error("The end date must be after the start date.")
 
-    # Asset-Typ laden für Attribut-Validierung
+    # Load asset type for attribute validation
     at_result = await db.execute(select(AssetType).where(AssetType.id == asset_type_id))
     asset_type = at_result.scalar_one_or_none()
     if not asset_type:
-        return await _render_error("Unbekannter Asset-Typ.")
+        return await _render_error("Unknown asset type.")
 
     order_config, attr_error = _validate_order_attrs(form_data, asset_type.config or [])
     if attr_error:
@@ -257,12 +257,12 @@ async def portal_create_order(
     await db.commit()
 
     logger.info("Portal: Order created id=%s user=%s", order.id, order.user_email)
-    return RedirectResponse(url=f"/portal/bestellungen/{order.id}", status_code=303)
+    return RedirectResponse(url=f"/portal/orders/{order.id}", status_code=303)
 
 
-# ── Bestelldetail ──────────────────────────────────────────────────────────────
+# ── Order Detail ───────────────────────────────────────────────────────────────
 
-@router.get("/bestellungen/{order_id}", response_class=HTMLResponse)
+@router.get("/orders/{order_id}", response_class=HTMLResponse)
 async def portal_order_detail(
     request: Request,
     order_id: int,
@@ -273,7 +273,7 @@ async def portal_order_detail(
     )
     order = result.scalar_one_or_none()
     if not order:
-        raise HTTPException(status_code=404, detail="Bestellung nicht gefunden")
+        raise HTTPException(status_code=404, detail="Order not found")
 
     asset_type_name = None
     asset_type = None
@@ -296,7 +296,7 @@ async def portal_order_detail(
             duration = f"{secs:.1f}s"
         steps_with_duration.append({"step": step, "duration": duration})
 
-    return templates.TemplateResponse("portal/bestellung_detail.html", {
+    return templates.TemplateResponse("portal/order_detail.html", {
         "request": request,
         "active_page": "overview",
         "order": order,
@@ -310,9 +310,9 @@ async def portal_order_detail(
     })
 
 
-# ── Verlängern ─────────────────────────────────────────────────────────────────
+# ── Extend ─────────────────────────────────────────────────────────────────────
 
-@router.post("/bestellungen/{order_id}/extend")
+@router.post("/orders/{order_id}/extend")
 async def portal_extend_order(
     order_id: int,
     db: AsyncSession = Depends(get_db),
@@ -321,12 +321,12 @@ async def portal_extend_order(
     result = await db.execute(select(Order).where(Order.id == order_id))
     original = result.scalar_one_or_none()
     if not original:
-        raise HTTPException(status_code=404, detail="Bestellung nicht gefunden")
+        raise HTTPException(status_code=404, detail="Order not found")
 
     try:
         until_dt = datetime.fromisoformat(new_until).replace(tzinfo=timezone.utc)
     except ValueError:
-        raise HTTPException(status_code=422, detail="Ungültiges Datumsformat")
+        raise HTTPException(status_code=422, detail="Invalid date format")
 
     new_order = Order(
         user_email=original.user_email,
@@ -351,12 +351,12 @@ async def portal_extend_order(
     await db.commit()
 
     logger.info("Portal: Extend order id=%s from order=%s", new_order.id, order_id)
-    return RedirectResponse(url=f"/portal/bestellungen/{new_order.id}", status_code=303)
+    return RedirectResponse(url=f"/portal/orders/{new_order.id}", status_code=303)
 
 
-# ── Zugang ändern ──────────────────────────────────────────────────────────────
+# ── Modify Access ──────────────────────────────────────────────────────────────
 
-@router.post("/bestellungen/{order_id}/modify")
+@router.post("/orders/{order_id}/modify")
 async def portal_modify_order(
     order_id: int,
     db: AsyncSession = Depends(get_db),
@@ -366,7 +366,7 @@ async def portal_modify_order(
     result = await db.execute(select(Order).where(Order.id == order_id))
     original = result.scalar_one_or_none()
     if not original:
-        raise HTTPException(status_code=404, detail="Bestellung nicht gefunden")
+        raise HTTPException(status_code=404, detail="Order not found")
 
     rdp_clean = [u.strip() for u in rdp_users if u.strip()]
     admin_clean = [u.strip() for u in admin_users if u.strip()]
@@ -394,12 +394,12 @@ async def portal_modify_order(
     await db.commit()
 
     logger.info("Portal: Modify order id=%s from order=%s", new_order.id, order_id)
-    return RedirectResponse(url=f"/portal/bestellungen/{new_order.id}", status_code=303)
+    return RedirectResponse(url=f"/portal/orders/{new_order.id}", status_code=303)
 
 
-# ── Asset ändern (kombiniert: Laufzeit + User-Listen) ──────────────────────────
+# ── Modify Asset (combined: duration + user lists) ─────────────────────────────
 
-@router.post("/bestellungen/{order_id}/change")
+@router.post("/orders/{order_id}/change")
 async def portal_change_order(
     order_id: int,
     db: AsyncSession = Depends(get_db),
@@ -410,7 +410,7 @@ async def portal_change_order(
     result = await db.execute(select(Order).where(Order.id == order_id))
     original = result.scalar_one_or_none()
     if not original:
-        raise HTTPException(status_code=404, detail="Bestellung nicht gefunden")
+        raise HTTPException(status_code=404, detail="Order not found")
 
     is_active = original.status in (OrderStatus.DELIVERED, OrderStatus.PROVISIONED)
     is_failed_change = (
@@ -420,7 +420,7 @@ async def portal_change_order(
     if not (is_active or is_failed_change):
         raise HTTPException(
             status_code=422,
-            detail="Nur aktive Bestellungen (DELIVERED/PROVISIONED) können geändert werden",
+            detail="Only active orders (DELIVERED/PROVISIONED) can be modified",
         )
 
     # Resolve requested_until
@@ -428,7 +428,7 @@ async def portal_change_order(
         try:
             requested_until = datetime.fromisoformat(new_until).replace(tzinfo=timezone.utc)
         except ValueError:
-            raise HTTPException(status_code=422, detail="Ungültiges Datumsformat")
+            raise HTTPException(status_code=422, detail="Invalid date format")
     else:
         requested_until = original.requested_until
 
@@ -465,12 +465,12 @@ async def portal_change_order(
     await db.commit()
 
     logger.info("Portal: Change order id=%s from order=%s", new_order.id, order_id)
-    return RedirectResponse(url=f"/portal/bestellungen/{new_order.id}", status_code=303)
+    return RedirectResponse(url=f"/portal/orders/{new_order.id}", status_code=303)
 
 
-# ── Abbestellen ────────────────────────────────────────────────────────────────
+# ── Cancel ─────────────────────────────────────────────────────────────────────
 
-@router.post("/bestellungen/{order_id}/cancel")
+@router.post("/orders/{order_id}/cancel")
 async def portal_cancel_order(
     order_id: int,
     db: AsyncSession = Depends(get_db),
@@ -478,12 +478,12 @@ async def portal_cancel_order(
     result = await db.execute(select(Order).where(Order.id == order_id))
     original = result.scalar_one_or_none()
     if not original:
-        raise HTTPException(status_code=404, detail="Bestellung nicht gefunden")
+        raise HTTPException(status_code=404, detail="Order not found")
 
     if original.status not in (OrderStatus.DELIVERED, OrderStatus.PROVISIONED):
         raise HTTPException(
             status_code=422,
-            detail="Nur aktive Bestellungen (DELIVERED/PROVISIONED) können abbestellt werden",
+            detail="Only active orders (DELIVERED/PROVISIONED) can be cancelled",
         )
 
     cancel_order = Order(
@@ -499,7 +499,7 @@ async def portal_cancel_order(
         requested_until=original.requested_until,
         action=OrderAction.DELETE,
         status=OrderStatus.PENDING,
-        # Snapshot aus der Provision-Order übernehmen → deterministischer Revoke
+        # Copy snapshot from provision order → deterministic revoke
         provisioned_state=original.provisioned_state,
     )
     db.add(cancel_order)
@@ -511,13 +511,13 @@ async def portal_cancel_order(
     await db.commit()
 
     logger.info("Portal: Cancel order id=%s from order=%s", cancel_order.id, order_id)
-    return RedirectResponse(url=f"/portal/bestellungen/{cancel_order.id}", status_code=303)
+    return RedirectResponse(url=f"/portal/orders/{cancel_order.id}", status_code=303)
 
 
-# ── Meine IT – Übersicht aktiver Assets ────────────────────────────────────────
+# ── My IT – Active Assets Overview ────────────────────────────────────────────
 
-@router.get("/meine-it", response_class=HTMLResponse)
-async def portal_meine_it(request: Request, db: AsyncSession = Depends(get_db)):
+@router.get("/my-it", response_class=HTMLResponse)
+async def portal_my_it(request: Request, db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(Order)
         .options(selectinload(Order.steps))
@@ -546,9 +546,9 @@ async def portal_meine_it(request: Request, db: AsyncSession = Depends(get_db)):
         )
         asset_names = {row.id: row.name for row in asset_rows}
 
-    return templates.TemplateResponse("portal/meine_it.html", {
+    return templates.TemplateResponse("portal/my_it.html", {
         "request": request,
-        "active_page": "meine-it",
+        "active_page": "my-it",
         "orders": orders,
         "asset_type_names": asset_type_names,
         "asset_type_categories": asset_type_categories,
@@ -558,8 +558,8 @@ async def portal_meine_it(request: Request, db: AsyncSession = Depends(get_db)):
     })
 
 
-@router.get("/meine-it/{order_id}", response_class=HTMLResponse)
-async def portal_meine_it_detail(
+@router.get("/my-it/{order_id}", response_class=HTMLResponse)
+async def portal_my_it_detail(
     request: Request,
     order_id: int,
     db: AsyncSession = Depends(get_db),
@@ -567,10 +567,10 @@ async def portal_meine_it_detail(
     result = await db.execute(select(Order).where(Order.id == order_id))
     order = result.scalar_one_or_none()
     if not order:
-        raise HTTPException(status_code=404, detail="Bestellung nicht gefunden")
+        raise HTTPException(status_code=404, detail="Order not found")
 
     if order.status not in (OrderStatus.DELIVERED, OrderStatus.PROVISIONED):
-        raise HTTPException(status_code=422, detail="Nur aktive Assets können hier verwaltet werden")
+        raise HTTPException(status_code=422, detail="Only active assets can be managed here")
 
     asset_type = None
     asset_type_name = None
@@ -585,9 +585,9 @@ async def portal_meine_it_detail(
         )
         asset_name = asset_row.scalar_one_or_none()
 
-    return templates.TemplateResponse("portal/meine_it_detail.html", {
+    return templates.TemplateResponse("portal/my_it_detail.html", {
         "request": request,
-        "active_page": "meine-it",
+        "active_page": "my-it",
         "order": order,
         "asset_type": asset_type,
         "asset_type_name": asset_type_name,
@@ -597,7 +597,7 @@ async def portal_meine_it_detail(
     })
 
 
-# ── HTMX: User-Validierung ─────────────────────────────────────────────────────
+# ── HTMX: User Validation ──────────────────────────────────────────────────────
 
 @router.get("/_validate-user", response_class=HTMLResponse)
 async def portal_validate_user(request: Request, q: str = ""):

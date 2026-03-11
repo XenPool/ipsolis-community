@@ -23,7 +23,7 @@ async def list_orders(
     offset: int = 0,
     db: AsyncSession = Depends(get_db),
 ) -> list[Order]:
-    """Gibt alle Bestellungen zurück (optional gefiltert)."""
+    """Returns all orders (optionally filtered)."""
     query = select(Order).options(selectinload(Order.steps))
 
     if user_email:
@@ -41,7 +41,7 @@ async def get_order(
     order_id: int,
     db: AsyncSession = Depends(get_db),
 ) -> Order:
-    """Gibt eine einzelne Bestellung mit allen Schritten zurück."""
+    """Returns a single order with all steps."""
     result = await db.execute(
         select(Order)
         .options(selectinload(Order.steps))
@@ -63,7 +63,7 @@ async def create_order(
 ) -> Order:
     """
     Erstellt eine neue Bestellung via Self-Service-Portal.
-    (Für ServiceNow-Webhooks: POST /webhook/servicenow)
+    (For ServiceNow webhooks: POST /webhook/servicenow)
     """
     order = Order(
         user_email=str(payload.user_email),
@@ -108,7 +108,7 @@ async def update_order(
     payload: OrderUpdate,
     db: AsyncSession = Depends(get_db),
 ) -> Order:
-    """Aktualisiert eine bestehende Bestellung (z.B. User-Änderung, Verlängerung)."""
+    """Updates an existing order (e.g. user change, extension)."""
     result = await db.execute(
         select(Order).options(selectinload(Order.steps)).where(Order.id == order_id)
     )
@@ -143,7 +143,7 @@ async def cancel_order(
     order_id: int,
     db: AsyncSession = Depends(get_db),
 ) -> None:
-    """Markiert eine Bestellung als cancelled (kein physisches Löschen)."""
+    """Marks an order as cancelled (no physical deletion)."""
     result = await db.execute(select(Order).where(Order.id == order_id))
     order = result.scalar_one_or_none()
     if not order:

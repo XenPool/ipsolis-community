@@ -13,7 +13,7 @@ router = APIRouter(prefix="/assets", tags=["assets"])
 
 @router.get("/types", response_model=list[AssetTypeRead])
 async def list_asset_types(db: AsyncSession = Depends(get_db)) -> list[AssetType]:
-    """Gibt alle verfügbaren Asset-Typen zurück."""
+    """Returns all available asset types."""
     result = await db.execute(select(AssetType).order_by(AssetType.name))
     return list(result.scalars().all())
 
@@ -37,7 +37,7 @@ async def list_pool(
     status_filter: AssetStatus | None = None,
     db: AsyncSession = Depends(get_db),
 ) -> list[AssetPool]:
-    """Gibt alle Assets im Pool zurück (optional nach Typ/Status gefiltert)."""
+    """Returns all assets in the pool (optionally filtered by type/status)."""
     query = select(AssetPool)
     if asset_type_id:
         query = query.where(AssetPool.asset_type_id == asset_type_id)

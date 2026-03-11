@@ -1,16 +1,16 @@
 {% extends "portal/base_portal.html" %}
 
-{% block title %}Bestellungen – XenPool Self-Service{% endblock %}
+{% block title %}Orders – XenPool Self-Service{% endblock %}
 
 {% block content %}
 <div class="mb-6 flex items-center justify-between">
   <h1 class="text-lg font-semibold text-gray-900">
-    Bestellungen
-    <span class="ml-2 text-sm font-normal text-gray-500">({{ orders | length }} gesamt)</span>
+    Orders
+    <span class="ml-2 text-sm font-normal text-gray-500">({{ orders | length }} total)</span>
   </h1>
-  <a href="/portal/bestellung/neu"
+  <a href="/portal/orders/new"
      class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700">
-    + Neuen Zugang beantragen
+    + Request New Access
   </a>
 </div>
 
@@ -19,13 +19,13 @@
     <thead class="bg-gray-50">
       <tr>
         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">ID</th>
-        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Antragsteller</th>
-        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Asset-Typ</th>
-        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Aktion</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Requester</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Asset Type</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Action</th>
         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Status</th>
         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Hostname</th>
-        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Laufzeit bis</th>
-        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Erstellt</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Valid until</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Created</th>
         <th class="px-4 py-3"></th>
       </tr>
     </thead>
@@ -62,16 +62,16 @@
           {{ order.created_at.strftime("%d.%m.%Y %H:%M") }}
         </td>
         <td class="px-4 py-3 text-right">
-          <a href="/portal/bestellungen/{{ order.id }}" class="text-blue-600 hover:underline text-xs">
-            Detail →
+          <a href="/portal/orders/{{ order.id }}" class="text-blue-600 hover:underline text-xs">
+            Details →
           </a>
         </td>
       </tr>
       {% else %}
       <tr>
         <td colspan="9" class="px-4 py-12 text-center text-gray-400 text-sm">
-          Noch keine Bestellungen vorhanden.
-          <a href="/portal/bestellung/neu" class="ml-1 text-blue-600 hover:underline">Jetzt Zugang beantragen →</a>
+          No orders yet.
+          <a href="/portal/orders/new" class="ml-1 text-blue-600 hover:underline">Request access now →</a>
         </td>
       </tr>
       {% endfor %}

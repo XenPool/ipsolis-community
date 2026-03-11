@@ -1,7 +1,7 @@
-"""Async Audit-Helper für FastAPI-Routen.
+"""Async audit helper for FastAPI routes.
 
-Alle Schreibvorgänge landen in derselben Transaktion wie die Haupt-Änderung —
-kein separates Commit nötig. Einträge im audit_log sind unveränderlich (kein UPDATE/DELETE).
+All writes land in the same transaction as the main change –
+no separate commit needed. Entries in audit_log are immutable (no UPDATE/DELETE).
 """
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,11 +25,11 @@ async def aaudit(
     Args:
         db:          Aktive AsyncSession (wird vom Caller committed)
         entity_type: "order" | "asset" | "asset_type" | "app_config"
-        entity_id:   PK des geänderten Datensatzes
+        entity_id:   PK of the changed record
         action:      "created" | "updated" | "status_changed" | "deleted"
-        old:         Snapshot vor der Änderung (None bei created)
-        new:         Snapshot nach der Änderung (None bei deleted)
-        by:          Auslöser, z.B. "api:create_order" | "api:servicenow_webhook"
+        old:         Snapshot before the change (None on created)
+        new:         Snapshot after the change (None on deleted)
+        by:          Trigger, e.g. "api:create_order" | "api:servicenow_webhook"
         ctx:         Optionaler Kontext (servicenow_ref, celery_task_id, ...)
     """
     db.add(AuditLog(

@@ -7,11 +7,11 @@ from app.database import Base
 
 
 class AppConfig(Base):
-    """Zentrale Variablenverwaltung – Ivanti-Äquivalent.
+    """Central variable management – Ivanti equivalent.
 
-    Konfigurationswerte die zur Laufzeit geändert werden können,
+    Configuration values that can be changed at runtime,
     ohne den Container neu zu starten.
-    Secrets werden verschlüsselt gespeichert (is_secret=True).
+    Secrets are stored encrypted (is_secret=True).
     """
 
     __tablename__ = "app_config"
@@ -22,7 +22,7 @@ class AppConfig(Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_secret: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False
-    )  # Wenn True → Wert wird in der UI maskiert
+    )  # If True → value is masked in the UI
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

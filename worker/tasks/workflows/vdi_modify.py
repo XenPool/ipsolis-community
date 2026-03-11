@@ -1,12 +1,12 @@
-"""Runbook: VDI Modify – Benutzer ändern oder Laufzeit verlängern.
+"""Runbook: VDI Modify – update users or extend duration.
 
-Entspricht dem Ivanti-Runbook 'VDI Ändern / Verlängern'.
+Corresponds to the Ivanti runbook 'VDI Modify / Extend'.
 
-Ablauf:
-  1. Active Roles: RDP-Gruppe aktualisieren  (SKIPPED bei action=extend)
-  2. Active Roles: Admin-Gruppe aktualisieren (SKIPPED bei action=extend)
-  3. Pool: Ablaufzeit aktualisieren           (SKIPPED wenn kein requested_until)
-  4. Notification: Änderungsbestätigung senden
+Flow:
+  1. Active Roles: update RDP group   (SKIPPED for action=extend)
+  2. Active Roles: update admin group  (SKIPPED for action=extend)
+  3. Pool: update expiry time          (SKIPPED if no requested_until)
+  4. Notification: send change confirmation
 """
 
 import logging
@@ -38,7 +38,7 @@ DATABASE_URL = os.getenv(
 )
 def run(self: Task, order_id: int) -> dict:
     """
-    Runbook: VDI-Einstellungen ändern (User, Laufzeit).
+    Runbook: Modify VDI settings (users, duration).
     """
     logger.info("=== vdi_modify START: order_id=%s ===", order_id)
 
@@ -70,7 +70,7 @@ def run(self: Task, order_id: int) -> dict:
         if isinstance(expires_at, str):
             expires_at = datetime.fromisoformat(expires_at)
 
-        # ── Schritt 1/4: Active Roles – RDP-Gruppe ────────────────────────────
+        # ── Step 1/4: Active Roles – RDP group ────────────────────────────
         step = "active_roles.set_rdp_group"
         logger.info("[Step 1/4] %s (action=%s)", step, action)
         update_order_step(db, order_id, step, "running", started_at=datetime.now(timezone.utc))
@@ -91,7 +91,7 @@ def run(self: Task, order_id: int) -> dict:
                               finished_at=datetime.now(timezone.utc))
             logger.warning("[Step 1/4] %s failed (non-critical): %s", step, e)
 
-        # ── Schritt 2/4: Active Roles – Admin-Gruppe ──────────────────────────
+        # ── Step 2/4: Active Roles – admin group ──────────────────────────
         step = "active_roles.set_admin_group"
         logger.info("[Step 2/4] %s (action=%s)", step, action)
         update_order_step(db, order_id, step, "running", started_at=datetime.now(timezone.utc))
@@ -112,7 +112,7 @@ def run(self: Task, order_id: int) -> dict:
                               finished_at=datetime.now(timezone.utc))
             logger.warning("[Step 2/4] %s failed (non-critical): %s", step, e)
 
-        # ── Schritt 3/4: Pool – Ablaufzeit aktualisieren ──────────────────────
+        # ── Step 3/4: Pool – update expiry time ──────────────────────────
         step = "pool.update_expires_at"
         logger.info("[Step 3/4] %s expires_at=%s", step, expires_at)
         update_order_step(db, order_id, step, "running", started_at=datetime.now(timezone.utc))
@@ -147,7 +147,7 @@ def run(self: Task, order_id: int) -> dict:
             logger.error("[Step 3/4] FAILED: %s", e)
             raise self.retry(exc=e)
 
-        # ── Schritt 4/4: Benachrichtigung ─────────────────────────────────────
+        # ── Step 4/4: Notification ─────────────────────────────────────
         step = "notifications.send_modify_confirmation"
         logger.info("[Step 4/4] %s to %s", step, order["user_email"])
         update_order_step(db, order_id, step, "running", started_at=datetime.now(timezone.utc))
@@ -167,7 +167,7 @@ def run(self: Task, order_id: int) -> dict:
             update_order_step(db, order_id, step, "failed", error=str(e),
                               finished_at=datetime.now(timezone.utc))
 
-        # ── Order auf DELIVERED setzen ─────────────────────────────────────────
+        # ── Set order to DELIVERED ─────────────────────────────────────────
         update_order_status(db, order_id, "delivered")
         audit_helper.waudit(
             db, "order", order_id, "status_changed",

@@ -1,8 +1,8 @@
-"""AD-Lookup Helper für die API.
+"""AD lookup helper for the API.
 
-Leichtgewichtige Version des Worker-Moduls active_directory.py.
-Verwendet denselben Mock (alle Identifier akzeptiert) im Dev-Modus.
-In Produktion: ldap3 (muss in requirements.txt ergänzt werden).
+Lightweight version of the worker module active_directory.py.
+Uses the same mock (all identifiers accepted) in dev mode.
+In production: ldap3 (must be added to requirements.txt).
 """
 import logging
 import os
@@ -29,7 +29,7 @@ _MOCK_USERS: dict[str, dict] = {
 
 def lookup_user(identifier: str) -> dict:
     """
-    Schlägt einen Benutzer im Active Directory nach.
+    Looks up a user in Active Directory.
 
     Args:
         identifier: sAMAccountName (z.B. "s.muster") oder E-Mail
@@ -56,7 +56,7 @@ def _mock_lookup(identifier: str) -> dict:
         logger.info("[MOCK] AD found: %s (%s)", result["display_name"], result["email"])
         return result
 
-    # Generischer Fallback: Identifier als validen User akzeptieren
+    # Generic fallback: accept identifier as valid user
     display = identifier.replace("\\", " ").replace(".", " ").replace("@", " ").title().strip()
     email = identifier if "@" in identifier else f"{sam}@xenpool.de"
     logger.info("[MOCK] AD fallback for '%s'", identifier)
@@ -73,9 +73,9 @@ def _ldap_lookup(identifier: str) -> dict:
         import ldap3
         import ldap3.utils.conv
     except ImportError:
-        return {"success": False, "error": "ldap3 nicht installiert (requirements.txt ergänzen)"}
+        return {"success": False, "error": "ldap3 not installed (add to requirements.txt)"}
 
-    # Config aus Umgebungsvariablen (Fallback auf Defaults)
+    # Config from environment variables (fallback to defaults)
     server_host = os.getenv("AD_SERVER", "dc.example.com")
     server_port = int(os.getenv("AD_PORT", "389"))
     base_dn = os.getenv("AD_BASE_DN", "DC=example,DC=com")

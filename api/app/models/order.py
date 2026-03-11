@@ -27,11 +27,11 @@ class OrderAction(str, enum.Enum):
 class OrderStatus(str, enum.Enum):
     PENDING      = "pending"
     PROCESSING   = "processing"
-    PROVISIONING = "provisioning"   # Worker hat Provision gestartet
-    PROVISIONED  = "provisioned"    # Provision abgeschlossen (aktiv)
-    DELIVERED    = "delivered"      # Legacy-Alias für PROVISIONED
-    REVOKING     = "revoking"       # Worker hat Revoke gestartet
-    REVOKED      = "revoked"        # Revoke abgeschlossen
+    PROVISIONING = "provisioning"   # Worker started provision
+    PROVISIONED  = "provisioned"    # Provision completed (active)
+    DELIVERED    = "delivered"      # Legacy alias for PROVISIONED
+    REVOKING     = "revoking"       # Worker started revoke
+    REVOKED      = "revoked"        # Revoke completed
     FAILED       = "failed"
     EXPIRED      = "expired"
     CANCELLED    = "cancelled"
@@ -46,7 +46,7 @@ class StepStatus(str, enum.Enum):
 
 
 class Order(Base):
-    """Bestellungen und Änderungsaufträge."""
+    """Orders and change requests."""
 
     __tablename__ = "orders"
 
@@ -65,10 +65,10 @@ class Order(Base):
     owner_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     owner_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
-    # ServiceNow REQ-Nummer (servicenow_ref enthält die RITM-Nummer)
+    # ServiceNow REQ number (servicenow_ref contains the RITM number)
     snow_req: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
 
-    # Asset-Typ und zugewiesene Maschine
+    # Asset type and assigned machine
     asset_type_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("asset_types.id"), nullable=False
     )
@@ -76,7 +76,7 @@ class Order(Base):
         Integer, ForeignKey("asset_pool.id"), nullable=True
     )
 
-    # RDP- und Admin-Benutzer (Array von E-Mail-Adressen / Benutzernamen)
+    # RDP and admin users (array of email addresses / usernames)
     rdp_users: Mapped[list[str]] = mapped_column(
         ARRAY(String), nullable=False, default=list
     )
@@ -92,7 +92,7 @@ class Order(Base):
         DateTime(timezone=True), nullable=False, index=True
     )
 
-    # Aktion und Status
+    # Action and status
     action: Mapped[OrderAction] = mapped_column(
         Enum(OrderAction, name="order_action", values_callable=lambda x: [e.value for e in x]),
         nullable=False,
@@ -105,13 +105,13 @@ class Order(Base):
         index=True,
     )
 
-    # Celery Task-ID für Statusverfolgung
+    # Celery task ID for status tracking
     celery_task_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
-    # Zusätzliche Parameter als JSON (flexible Erweiterung)
+    # Additional parameters as JSON (flexible extension)
     config: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
 
-    # Snapshot nach erfolgreicher Provision (deterministisches Revoke)
+    # Snapshot after successful provision (deterministic revoke)
     provisioned_state: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
 
     # Fehlermeldung bei Status FAILED

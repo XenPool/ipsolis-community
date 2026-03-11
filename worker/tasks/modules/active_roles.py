@@ -1,7 +1,7 @@
-"""Modul: Active Roles – AD-Gruppenverwaltung via WinRM/pypsrp.
+"""Module: Active Roles – AD group management via WinRM/pypsrp.
 
-Ruft PowerShell-Scripts auf dem Active-Roles-Host auf.
-Entspricht den Ivanti-Modulen 'Set-ARGroups' und 'Remove-ARGroups'.
+Calls PowerShell scripts on the Active Roles host.
+Corresponds to the Ivanti modules 'Set-ARGroups' and 'Remove-ARGroups'.
 """
 
 import json
@@ -17,7 +17,7 @@ SCRIPTS_DIR = Path("/app/scripts/active_roles")
 
 
 def set_rdp_group(asset_name: str, rdp_users: list[str]) -> dict:
-    """Befüllt die RDP-AD-Gruppe der VM mit den angegebenen Benutzern."""
+    """Populates the RDP AD group of the VM with the specified users."""
     if ENVIRONMENT == "development":
         return _mock_set_group("RDP", asset_name, rdp_users)
 
@@ -29,7 +29,7 @@ def set_rdp_group(asset_name: str, rdp_users: list[str]) -> dict:
 
 
 def set_admin_group(asset_name: str, admin_users: list[str]) -> dict:
-    """Befüllt die Admin-AD-Gruppe der VM mit den angegebenen Benutzern."""
+    """Populates the Admin AD group of the VM with the specified users."""
     if ENVIRONMENT == "development":
         return _mock_set_group("Admin", asset_name, admin_users)
 
@@ -41,7 +41,7 @@ def set_admin_group(asset_name: str, admin_users: list[str]) -> dict:
 
 
 def remove_all_groups(asset_name: str) -> dict:
-    """Leert alle AD-Gruppen der VM (bei Rückgabe)."""
+    """Clears all AD groups of the VM (on return)."""
     if ENVIRONMENT == "development":
         return _mock_remove_groups(asset_name)
 
@@ -49,12 +49,12 @@ def remove_all_groups(asset_name: str) -> dict:
 
 
 def _run_ps_script(script_name: str, params: dict) -> dict:
-    """Führt ein PowerShell-Script via pwsh aus und gibt JSON-Output zurück."""
+    """Executes a PowerShell script via pwsh and returns JSON output."""
     script_path = SCRIPTS_DIR / script_name
     if not script_path.exists():
         return {"success": False, "error": f"Script not found: {script_path}"}
 
-    # Parameter als JSON-String übergeben
+    # Pass parameters as JSON string
     params_json = json.dumps(params)
     cmd = ["pwsh", "-File", str(script_path), "-ParamsJson", params_json]
 

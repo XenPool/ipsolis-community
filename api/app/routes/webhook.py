@@ -19,7 +19,7 @@ router = APIRouter(prefix="/webhook", tags=["webhook"])
 
 
 def _verify_hmac(body: bytes, signature: str) -> bool:
-    """Verifiziert HMAC-SHA256-Signatur von ServiceNow."""
+    """Verifies HMAC-SHA256 signature from ServiceNow."""
     expected = hmac.new(
         settings.WEBHOOK_SECRET_TOKEN.encode(),
         body,
@@ -36,13 +36,13 @@ async def receive_servicenow_webhook(
     x_hub_signature_256: str | None = Header(default=None),
 ) -> Order:
     """
-    Empfängt JSON-Webhooks von ServiceNow.
+    Receives JSON webhooks from ServiceNow.
 
-    ServiceNow schickt:
-    - X-Hub-Signature-256: sha256=<hmac>  (optional, aber empfohlen)
-    - JSON-Body gemäß WebhookPayload-Schema
+    ServiceNow sends:
+    - X-Hub-Signature-256: sha256=<hmac>  (optional, but recommended)
+    - JSON body according to WebhookPayload schema
     """
-    # HMAC-Validierung (in Production erzwingen)
+    # HMAC validation (enforce in production)
     if not settings.is_development:
         if not x_hub_signature_256:
             raise HTTPException(
@@ -56,7 +56,7 @@ async def receive_servicenow_webhook(
                 detail="Invalid webhook signature",
             )
 
-    # Asset-Typ nach Name auflösen
+    # Resolve asset type by name
     result = await db.execute(
         select(AssetType).where(AssetType.name == payload.asset_type_name)
     )
@@ -67,7 +67,7 @@ async def receive_servicenow_webhook(
             detail=f"Unknown asset_type_name: {payload.asset_type_name!r}",
         )
 
-    # Doppelte ServiceNow-Referenz prüfen (Idempotenz)
+    # Check for duplicate ServiceNow reference (idempotency)
     existing = await db.execute(
         select(Order).where(Order.servicenow_ref == payload.servicenow_ref)
     )
@@ -77,7 +77,7 @@ async def receive_servicenow_webhook(
             detail=f"Order with servicenow_ref {payload.servicenow_ref!r} already exists",
         )
 
-    # Order anlegen
+    # Create order
     order = Order(
         servicenow_ref=payload.servicenow_ref,
         snow_req=payload.snow_req,
@@ -95,9 +95,9 @@ async def receive_servicenow_webhook(
         config=payload.config,
     )
     db.add(order)
-    await db.flush()  # ID generieren ohne commit
+    await db.flush()  # generate ID without commit
 
-    # Celery-Task dispatchen
+    # Dispatch Celery task
     task_id = _dispatch_runbook(order)
     order.celery_task_id = task_id
     order.status = OrderStatus.PROCESSING
@@ -127,16 +127,16 @@ async def receive_servicenow_webhook(
 
 
 def _dispatch_runbook(order: Order) -> str:
-    """Dispatcht den dynamischen Runbook-Task für die Order.
+    """Dispatches the dynamic runbook task for the order.
 
-    Alle Actions laufen über dynamic_runner.run, der das passende
-    Runbook aus der DB lädt. Queue bleibt action-abhängig.
+    All actions run via dynamic_runner.run, which loads the appropriate
+    runbook from the DB. Queue remains action-dependent.
     """
     from celery import Celery
 
     celery_app = Celery(broker=settings.CELERY_BROKER_URL)
 
-    # DELETE/reclaim auf separate Queue für Priorität
+    # DELETE/reclaim on separate queue for priority
     queue = "reclaim" if order.action == OrderAction.DELETE else "provision"
     result = celery_app.send_task(
         "tasks.workflows.dynamic_runner.run",

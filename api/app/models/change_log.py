@@ -1,7 +1,7 @@
-"""OrderChangeLog – unveränderliches Protokoll aller durch Provisioning vorgenommenen Änderungen.
+"""OrderChangeLog – immutable record of all changes made during provisioning.
 
-Ermöglicht deterministisches Revoke: Der Revoke-Runner liest die Einträge
-dieses Logs und invertiert exakt die Aktionen, die beim Provisioning ausgeführt wurden.
+Enables deterministic revoke: the revoke runner reads the entries
+from this log and inverts exactly the actions performed during provisioning.
 """
 
 from datetime import datetime

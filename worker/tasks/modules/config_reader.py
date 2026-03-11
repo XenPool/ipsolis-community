@@ -1,6 +1,6 @@
 """Modul: Config Reader – Liest Konfigurationswerte aus der app_config-Tabelle.
 
-Ersetzt Env-Var-basierte Config für SMTP, AD und andere Laufzeiteinstellungen.
+Replaces env-var-based config for SMTP, AD and other runtime settings.
 """
 
 import logging
@@ -17,8 +17,8 @@ def get_config(db: Session, key: str, default: str | None = None) -> str | None:
 
     Args:
         db:      Sync SQLAlchemy Session
-        key:     Konfigurationsschlüssel (z.B. "ad.server")
-        default: Rückgabewert wenn Schlüssel nicht existiert
+        key:     Configuration key (e.g. "ad.server")
+        default: Return value if key does not exist
 
     Returns:
         Der Wert als str, oder default wenn nicht gefunden.

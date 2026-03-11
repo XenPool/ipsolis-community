@@ -1,7 +1,7 @@
 """Modul: vSphere – VMware-Operationen via PowerCLI.
 
-Führt PowerShell-Scripts mit PowerCLI aus.
-Entspricht den Ivanti-Modulen 'Update-VMwareTools' und 'Restart-VM'.
+Executes PowerShell scripts via PowerCLI.
+Corresponds to Ivanti modules 'Update-VMwareTools' and 'Restart-VM'.
 """
 
 import json
@@ -25,7 +25,7 @@ def update_vmware_tools(asset_name: str) -> dict:
 
 
 def restart_vm(asset_name: str) -> dict:
-    """Führt einen Reboot der VM durch und wartet auf Verfügbarkeit."""
+    """Reboots the VM and waits for availability."""
     if ENVIRONMENT == "development":
         return _mock_restart_vm(asset_name)
 
@@ -33,7 +33,7 @@ def restart_vm(asset_name: str) -> dict:
 
 
 def get_vm_status(asset_name: str) -> dict:
-    """Gibt den aktuellen Status der VM zurück."""
+    """Returns the current status of the VM."""
     if ENVIRONMENT == "development":
         return _mock_get_status(asset_name)
 
@@ -41,7 +41,7 @@ def get_vm_status(asset_name: str) -> dict:
 
 
 def _run_ps_script(script_name: str, params: dict) -> dict:
-    """Führt ein PowerCLI-Script via pwsh aus."""
+    """Executes a PowerCLI script via pwsh."""
     script_path = SCRIPTS_DIR / script_name
     if not script_path.exists():
         return {"success": False, "error": f"Script not found: {script_path}"}

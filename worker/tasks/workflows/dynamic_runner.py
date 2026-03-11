@@ -1,8 +1,8 @@
-"""Dynamischer Runbook-Executor – liest Runbook-Definitionen aus der DB.
+"""Dynamic runbook executor – reads runbook definitions from the DB.
 
-Ersetzt die hardcodierten vdi_provision/modify/reclaim-Tasks als zentralen
-Dispatcher. Runbooks und Steps werden DB-seitig verwaltet und können ohne
-Python-Änderungen oder Redeploy angepasst werden.
+Replaces the hardcoded vdi_provision/modify/reclaim tasks as the central
+dispatcher. Runbooks and steps are managed in the DB and can be adjusted
+without Python changes or redeployment.
 """
 
 import json
@@ -47,7 +47,7 @@ def _run_step_inline(
     fn,
     critical: bool,
 ) -> dict | None:
-    """Führt einen synthetischen Step aus und tracked order_steps.
+    """Executes a synthetic step and tracks order_steps.
 
     Returns result dict on success, None if a critical step failed.
     """
@@ -88,7 +88,7 @@ def _run_step_inline(
 
 
 def _final_status(action: str) -> str:
-    """Gibt den finalen Order-Status nach erfolgreicher Ausführung zurück."""
+    """Returns the final order status after successful execution."""
     if action == "provision":
         return "provisioned"
     if action == "delete":
@@ -105,7 +105,7 @@ def _write_provisioned_state(
     asset_id=None,
     asset_name=None,
 ) -> None:
-    """Schreibt provisioned_state nach erfolgreicher Provision (deterministisches Revoke)."""
+    """Writes provisioned_state after successful provision (deterministic revoke)."""
     state: dict = {
         "snapshot_at": datetime.now(timezone.utc).isoformat(),
         "assignment_model": assignment_model,
@@ -126,15 +126,15 @@ def _write_provisioned_state(
 
 
 def _stub_deallocate(order_id: int) -> dict:
-    """Stub: VM anhalten / deallocaten. Echte Implementierung über vsphere-Runbook."""
-    logger.info("[STUB] Instanz anhalten für order_id=%s – Echte Implementierung über Runbook", order_id)
-    return {"success": True, "stub": True, "message": "VM-Deallocate gemockt (Runbook-Implementierung ausstehend)"}
+    """Stub: Halt/deallocate VM. Real implementation via vsphere runbook."""
+    logger.info("[STUB] Halt instance for order_id=%s – real implementation via runbook", order_id)
+    return {"success": True, "stub": True, "message": "VM-Deallocate mocked (runbook implementation pending)"}
 
 
 def _stub_delete_instance(order_id: int) -> dict:
-    """Stub: VM löschen. Echte Implementierung über vsphere-Runbook."""
-    logger.info("[STUB] Instanz löschen für order_id=%s – Echte Implementierung über Runbook", order_id)
-    return {"success": True, "stub": True, "message": "VM-Delete gemockt (Runbook-Implementierung ausstehend)"}
+    """Stub: Delete VM. Real implementation via vsphere runbook."""
+    logger.info("[STUB] Delete instance for order_id=%s – real implementation via runbook", order_id)
+    return {"success": True, "stub": True, "message": "VM-Delete mocked (runbook implementation pending)"}
 
 
 def _run_targets_mode(
@@ -150,12 +150,12 @@ def _run_targets_mode(
     automation_strategy: str = "group_only",
     _set_delivered: bool = True,
 ) -> dict:
-    """Führt eine Order im group_only/targets_only Automationsmodus aus.
+    """Executes an order in group_only/targets_only automation mode.
 
-    Provision: Bestellbestätigung → Zugriff gewähren → [Asset reservieren]
-    Delete:    Zugriff entziehen → deprovision_policy-Routing
-    Extend:    keine Gruppenänderung, direkt DELIVERED
-    _set_delivered=False: DELIVERED-Status wird nicht gesetzt (Composite-Modus).
+    Provision: order confirmation → grant access → [reserve asset]
+    Delete:    revoke access → deprovision_policy routing
+    Extend:    no group changes, directly DELIVERED
+    _set_delivered=False: DELIVERED status is not set (composite mode).
     """
     from tasks.modules import notifications as notif, pool_manager, target_executor
 
@@ -175,9 +175,9 @@ def _run_targets_mode(
     needs_asset = assignment_model in ("assigned_personal", "dedicated_shared")
 
     if action == "provision":
-        # Step 1: Bestellbestätigung (non-critical)
+        # Step 1: Order confirmation (non-critical)
         _run_step_inline(
-            db, order_id, "Bestellbestätigung",
+            db, order_id, "Order confirmation",
             lambda: notif.send_order_confirmation(
                 db=db,
                 user_email=order.get("user_email") or "",
@@ -194,9 +194,9 @@ def _run_targets_mode(
             critical=False,
         )
 
-        # Step 2: Zugriff gewähren (critical)
+        # Step 2: Grant access (critical)
         result = _run_step_inline(
-            db, order_id, "Zugriff gewähren",
+            db, order_id, "Grant access",
             lambda: target_executor.grant(
                 db=db,
                 order_id=order_id,
@@ -211,19 +211,19 @@ def _run_targets_mode(
             audit_helper.waudit(
                 db, "order", order_id, "status_changed",
                 old={"status": "processing"},
-                new={"status": "failed", "step": "Zugriff gewähren"},
+                new={"status": "failed", "step": "Grant access"},
                 by="celery:dynamic_runner[targets_only]",
                 ctx=str(celery_task.request.id),
             )
             db.commit()
-            return {"success": False, "order_id": order_id, "failed_step": "Zugriff gewähren"}
+            return {"success": False, "order_id": order_id, "failed_step": "Grant access"}
 
         # Step 3: Asset reservieren (critical, nur bei assigned_personal/dedicated_shared)
         reserved_asset_id = None
         reserved_asset_name = None
         if needs_asset:
             result = _run_step_inline(
-                db, order_id, "Asset reservieren",
+                db, order_id, "Reserve asset",
                 lambda: pool_manager.reserve_asset(
                     db=db,
                     order_id=order_id,
@@ -237,20 +237,20 @@ def _run_targets_mode(
                 audit_helper.waudit(
                     db, "order", order_id, "status_changed",
                     old={"status": "processing"},
-                    new={"status": "failed", "step": "Asset reservieren"},
+                    new={"status": "failed", "step": "Reserve asset"},
                     by="celery:dynamic_runner[targets_only]",
                     ctx=str(celery_task.request.id),
                 )
                 db.commit()
-                return {"success": False, "order_id": order_id, "failed_step": "Asset reservieren"}
+                return {"success": False, "order_id": order_id, "failed_step": "Reserve asset"}
             reserved_asset_id = result.get("asset_id")
             reserved_asset_name = result.get("asset_name")
 
-        # Asset auf BUSY setzen (reine DB-Op, kein Mock)
+        # Set asset to BUSY (pure DB op, no mock)
         if reserved_asset_id:
             pool_manager.set_asset_busy(db, reserved_asset_id, order_id, expires_at)
 
-        # provisioned_state nach erfolgreicher Provision schreiben
+        # Write provisioned_state after successful provision
         _write_provisioned_state(
             db, order_id,
             assignment_model=assignment_model,
@@ -261,10 +261,10 @@ def _run_targets_mode(
         )
 
     elif action == "delete":
-        # Step 1: Zugriff entziehen (critical) – bei return_to_pool keine Gruppen-Targets
+        # Step 1: Revoke access (critical) – no group targets for return_to_pool
         if deprovision_policy != "return_to_pool":
             result = _run_step_inline(
-                db, order_id, "Zugriff entziehen",
+                db, order_id, "Revoke access",
                 lambda: target_executor.revoke(
                     db=db,
                     user_email=order.get("user_email") or "",
@@ -276,74 +276,74 @@ def _run_targets_mode(
                 audit_helper.waudit(
                     db, "order", order_id, "status_changed",
                     old={"status": "processing"},
-                    new={"status": "failed", "step": "Zugriff entziehen"},
+                    new={"status": "failed", "step": "Revoke access"},
                     by="celery:dynamic_runner[targets_only]",
                     ctx=str(celery_task.request.id),
                 )
                 db.commit()
-                return {"success": False, "order_id": order_id, "failed_step": "Zugriff entziehen"}
+                return {"success": False, "order_id": order_id, "failed_step": "Revoke access"}
 
         # Step 2+: Policy-Routing
         asset_id = order.get("assigned_asset_id")
 
         if deprovision_policy == "access_only":
-            # Nur Targets entziehen – fertig (oben erledigt)
+            # Targets revoked only – done (already handled above)
             pass
 
         elif deprovision_policy == "return_to_pool":
-            # Nur Pool-Reservierung lösen, keine Gruppen-Targets
+            # Only release pool reservation, no group targets
             if needs_asset and asset_id:
                 _run_step_inline(
-                    db, order_id, "Zuordnung lösen",
+                    db, order_id, "Release assignment",
                     lambda: pool_manager.release_asset(db=db, asset_id=asset_id),
                     critical=False,
                 )
 
         elif deprovision_policy == "deallocate_instance":
-            # Targets entziehen (oben) + Pool freigeben + VM anhalten
+            # Revoke targets (above) + release pool + halt VM
             if needs_asset and asset_id:
                 _run_step_inline(
-                    db, order_id, "Zuordnung lösen",
+                    db, order_id, "Release assignment",
                     lambda: pool_manager.release_asset(db=db, asset_id=asset_id),
                     critical=False,
                 )
             _run_step_inline(
-                db, order_id, "Instanz anhalten",
+                db, order_id, "Pause instance",
                 lambda: _stub_deallocate(order_id),
                 critical=False,
             )
 
         elif deprovision_policy == "delete_instance":
-            # Targets entziehen (oben) + Pool freigeben + VM löschen
+            # Revoke targets (above) + release pool + delete VM
             if needs_asset and asset_id:
                 _run_step_inline(
-                    db, order_id, "Zuordnung lösen",
+                    db, order_id, "Release assignment",
                     lambda: pool_manager.release_asset(db=db, asset_id=asset_id),
                     critical=False,
                 )
             _run_step_inline(
-                db, order_id, "Instanz löschen",
+                db, order_id, "Delete instance",
                 lambda: _stub_delete_instance(order_id),
                 critical=False,
             )
 
         elif deprovision_policy == "custom_runbook":
-            # Targets wurden entzogen; VM-Cleanup über separates Runbook
+            # Targets revoked; VM cleanup via separate runbook
             logger.info(
                 "[targets_only] deprovision_policy=custom_runbook: targets revoked, "
-                "VM-Cleanup muss über Runbook ausgeführt werden (order_id=%s)", order_id,
+                "VM cleanup must be performed via runbook (order_id=%s)", order_id,
             )
         else:
-            # Unbekannte Policy: fallback auf access_only (nur Targets entziehen)
+            # Unknown policy: fallback to access_only (revoke targets only)
             logger.warning(
-                "[targets_only] Unbekannte deprovision_policy=%r – fallback: access_only", deprovision_policy,
+                "[targets_only] Unknown deprovision_policy=%r – fallback: access_only", deprovision_policy,
             )
 
     elif action == "extend":
-        # Nur TTL-Update – keine Gruppenänderung erforderlich
+        # TTL update only – no group change required
         logger.info("[targets_only] extend order_id=%s – no group changes needed", order_id)
 
-    # Finalen Status setzen (optional – im Composite-Modus übernimmt _run_composite_mode)
+    # Set final status (optional – in composite mode _run_composite_mode handles this)
     if _set_delivered:
         final = _final_status(action)
         update_order_status(db, order_id, final)
@@ -498,12 +498,12 @@ def _run_runbook_path(
     personal_provisioning_strategy: str = "assign_existing_free",
     _set_delivered: bool = True,
 ) -> dict:
-    """Führt das konfigurierte Runbook für den Asset-Typ und die Action aus.
+    """Executes the configured runbook for the asset type and action.
 
-    Wird von run() direkt und von _run_composite_mode() gerufen.
-    _set_delivered=False: DELIVERED-Status wird nicht gesetzt (Composite-Modus).
+    Called directly by run() and by _run_composite_mode().
+    _set_delivered=False: DELIVERED status is not set (composite mode).
     """
-    # 1. Runbook laden
+    # 1. Load runbook
     runbook_row = db.execute(
         text("""
             SELECT id, name, is_active
@@ -530,12 +530,12 @@ def _run_runbook_path(
 
     runbook_id, runbook_name, is_active = runbook_row
     if not is_active:
-        err = f"Runbook '{runbook_name}' ist deaktiviert (is_active=False)"
+        err = f"Runbook '{runbook_name}' is disabled (is_active=False)"
         logger.error(err)
         update_order_status(db, order_id, "failed", err)
         return {"success": False, "error": err}
 
-    # 2. Steps laden
+    # 2. Load steps
     step_rows = db.execute(
         text("""
             SELECT id, position, step_name, module_key, script_module_id,
@@ -548,7 +548,7 @@ def _run_runbook_path(
     ).fetchall()
 
     if not step_rows:
-        logger.warning("Runbook '%s' hat keine Steps – Order wird als delivered markiert", runbook_name)
+        logger.warning("Runbook '%s' has no steps – order will be marked as delivered", runbook_name)
         if _set_delivered:
             update_order_status(db, order_id, _final_status(action))
         return {"success": True, "order_id": order_id}
@@ -572,7 +572,7 @@ def _run_runbook_path(
         if ar:
             pre_asset_name = ar[0]
 
-    # Auto-Reserve aus Pool für provision + pool-basierte Asset-Typen
+    # Auto-reserve from pool for provision + pool-based asset types
     if (
         action == "provision"
         and assignment_model in ("assigned_personal", "dedicated_shared")
@@ -595,7 +595,7 @@ def _run_runbook_path(
                 pre_asset_id, pre_asset_name,
             )
         else:
-            err = res.get("error", "Kein freier Asset im Pool verfügbar")
+            err = res.get("error", "No free asset available in pool")
             logger.error("[runbook_path] Auto-reserve failed: %s", err)
             update_order_status(db, order_id, "failed", err)
             return {"success": False, "error": err}
@@ -619,7 +619,7 @@ def _run_runbook_path(
         "snow_ritm": order.get("servicenow_ref"),
     }
 
-    # 4. Steps ausführen
+    # 4. Execute steps
     for step_row in step_rows:
         step = step_row._asdict()
         step_name = step["step_name"]
@@ -652,7 +652,7 @@ def _run_runbook_path(
                 # Legacy path: Python module registry
                 from tasks.modules.registry import MODULE_REGISTRY
                 if module_key not in MODULE_REGISTRY:
-                    raise RuntimeError(f"Unbekanntes Modul: {module_key!r}")
+                    raise RuntimeError(f"Unknown module: {module_key!r}")
                 reg = MODULE_REGISTRY[module_key]
                 fn = reg["fn"]
                 needs_db = reg.get("needs_db", False)
@@ -667,7 +667,7 @@ def _run_runbook_path(
                 log_json = make_log_json(module_key, rendered, result, duration_ms, mock)
 
             if not result.get("success", True):
-                raise RuntimeError(result.get("error", f"Modul {step_ref} gab success=False zurück"))
+                raise RuntimeError(result.get("error", f"Module {step_ref} returned success=False"))
 
             update_order_step(
                 db, order_id, step_name, "success",
@@ -720,7 +720,7 @@ def _run_runbook_path(
             asset_name=ctx.get("asset_name"),
         )
 
-    # Finalen Status setzen (optional – im Composite-Modus übernimmt _run_composite_mode)
+    # Set final status (optional – in composite mode _run_composite_mode handles this)
     if _set_delivered:
         final = _final_status(action)
         update_order_status(db, order_id, final)
@@ -753,13 +753,13 @@ def _run_composite_mode(
     deprovision_policy: str = "access_only",
     composite_steps: list | None = None,
 ) -> dict:
-    """Führt eine Order im COMPOSITE-Modus aus.
+    """Executes an order in COMPOSITE mode.
 
-    Führt GROUP_TARGETS und RUNBOOK in der über composite_steps konfigurierten
-    Reihenfolge aus. Bei Fehler eines kritischen Schritts bricht die Sequenz ab.
+    Runs GROUP_TARGETS and RUNBOOK in the order configured via composite_steps.
+    If a critical step fails, the sequence is aborted.
 
-    composite_steps Format: [{"type": "GROUP_TARGETS", "order": 1}, {"type": "RUNBOOK", "order": 2}]
-    Default: Gruppen zuerst (order 1), Runbook danach (order 2).
+    composite_steps format: [{"type": "GROUP_TARGETS", "order": 1}, {"type": "RUNBOOK", "order": 2}]
+    Default: groups first (order 1), runbook second (order 2).
     """
     steps = sorted(
         composite_steps or [
@@ -801,7 +801,7 @@ def _run_composite_mode(
                 return result
 
         else:
-            logger.warning("[composite] Unbekannter step_type=%r – übersprungen", step_type)
+            logger.warning("[composite] Unknown step_type=%r – skipped", step_type)
 
     # Alle Schritte erfolgreich – Status setzen
     final = _final_status(action)
@@ -826,16 +826,16 @@ def _run_composite_mode(
 )
 def run(self: Task, order_id: int) -> dict:
     """
-    Dynamischer Runbook-Executor.
+    Dynamic runbook executor.
 
-    Liest das passende Runbook (asset_type_id + action) aus der DB,
-    rendert die Step-Params und führt die Module aus dem Registry aus.
+    Reads the matching runbook (asset_type_id + action) from the DB,
+    renders the step params, and executes the modules from the registry.
     """
     logger.info("=== dynamic_runner START: order_id=%s ===", order_id)
     db = _get_db_session()
 
     try:
-        # 1. Order laden
+        # 1. Load order
         order_row = db.execute(
             text("""
                 SELECT o.id, o.user_email, o.user_name, o.owner_email, o.owner_name,
@@ -859,10 +859,10 @@ def run(self: Task, order_id: int) -> dict:
             action = action.value
         action = str(action).lower()
 
-        # provisioned_state für deterministischen Revoke
+        # provisioned_state for deterministic revoke
         provisioned_state = order.get("provisioned_state") or {}
 
-        # 1.5. Asset-Typ laden – Automation-Strategy + Deprovision-Policy bestimmen
+        # 1.5. Load asset type – determine automation strategy + deprovision policy
         at_row = db.execute(
             text("""
                 SELECT name, description, automation_mode, assignment_model,
@@ -881,12 +881,12 @@ def run(self: Task, order_id: int) -> dict:
         composite_steps = at_row[6] if at_row else None
         personal_provisioning_strategy = at_row[7] if at_row else "assign_existing_free"
 
-        # Fallback: automation_strategy aus automation_mode ableiten (Legacy-Records)
+        # Fallback: derive automation_strategy from automation_mode (legacy records)
         if not automation_strategy:
             automation_strategy = "group_only" if automation_mode == "targets_only" else "runbook_only"
 
-        # Bei Delete/Revoke: deprovision_policy + automation_strategy aus provisioned_state lesen
-        # (deterministisch – auch wenn Asset-Typ nachträglich geändert wurde)
+        # For delete/revoke: read deprovision_policy + automation_strategy from provisioned_state
+        # (deterministic – even if asset type was changed afterwards)
         if action == "delete" and provisioned_state:
             snap_policy = provisioned_state.get("deprovision_policy")
             snap_strategy = provisioned_state.get("automation_strategy")
@@ -908,7 +908,7 @@ def run(self: Task, order_id: int) -> dict:
             automation_strategy, assignment_model, deprovision_policy,
         )
 
-        # 2. Dispatch nach automation_strategy
+        # 2. Dispatch by automation_strategy
         if automation_strategy == "group_only":
             result = _run_targets_mode(
                 self, db, order_id, order, action,
@@ -924,7 +924,7 @@ def run(self: Task, order_id: int) -> dict:
                 composite_steps=composite_steps,
             )
         else:
-            # runbook_only: Runbook ausführen
+            # runbook_only: execute runbook
             result = _run_runbook_path(
                 self, db, order_id, order, action,
                 asset_type_name, asset_type_description,
@@ -934,11 +934,11 @@ def run(self: Task, order_id: int) -> dict:
                 personal_provisioning_strategy=personal_provisioning_strategy,
             )
 
-        # Post-DELETE: Asset zurück in Pool + originale PROVISION-Order revoken
+        # Post-DELETE: return asset to pool + revoke original PROVISION order
         if action == "delete" and result.get("success"):
             asset_id = order.get("assigned_asset_id")
             if asset_id:
-                # Asset freigeben (idempotent – _run_targets_mode hat es evtl. schon getan)
+                # Release asset (idempotent – _run_targets_mode may have already done it)
                 try:
                     from tasks.modules.pool_manager import release_asset as _release_asset
                     _release_asset(db, asset_id)
@@ -946,7 +946,7 @@ def run(self: Task, order_id: int) -> dict:
                 except Exception as _e:
                     logger.warning("[dynamic_runner] release_asset failed (non-critical): %s", _e)
 
-                # Originale PROVISION-Order(s) auf revoked setzen
+                # Set original PROVISION order(s) to revoked
                 try:
                     db.execute(
                         text("""

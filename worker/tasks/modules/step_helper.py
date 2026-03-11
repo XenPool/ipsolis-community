@@ -17,7 +17,7 @@ def make_log_json(
     duration_ms: float,
     mock: bool = False,
 ) -> str:
-    """Erstellt einen strukturierten JSON-Log-Eintrag für einen Step.
+    """Creates a structured JSON log entry for a step.
 
     Format: {"module": key, "input": {...}, "output": {...}, "duration_ms": n, "mock": bool}
     """

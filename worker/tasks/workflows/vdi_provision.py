@@ -1,15 +1,15 @@
-"""Runbook: VDI Provision – Vollständige VDI-Bereitstellung.
+"""Runbook: VDI Provision – Complete VDI provisioning.
 
-Entspricht dem Ivanti-Runbook 'VDI Bereitstellen'.
+Corresponds to the Ivanti runbook 'VDI Bereitstellen'.
 
-Ablauf (sequenziell):
-  1. Pool: Freie VM reservieren
-  2. Active Roles: RDP-Gruppe befüllen
-  3. Active Roles: Admin-Gruppe befüllen
-  4. vSphere: VMware Tools aktualisieren
-  5. vSphere: VM rebooten
-  6. Notification: Bereitstellungsmail senden
-  7. Pool: Status auf BUSY setzen, Ablaufzeit eintragen
+Sequence (sequential):
+  1. Pool: Reserve free VM
+  2. Active Roles: populate RDP group
+  3. Active Roles: populate admin group
+  4. vSphere: update VMware Tools
+  5. vSphere: reboot VM
+  6. Notification: send provisioning email
+  7. Pool: set status to BUSY, record expiry time
 """
 
 import logging
@@ -38,7 +38,7 @@ def _get_db_session() -> Session:
 
 
 def _get_order(db: Session, order_id: int) -> dict:
-    """Lädt Order-Daten aus DB."""
+    """Loads order data from DB."""
     from sqlalchemy import text
     row = db.execute(
         text("""
@@ -56,7 +56,7 @@ def _get_order(db: Session, order_id: int) -> dict:
 
 
 def _get_asset_type_info(db: Session, asset_type_id: int) -> dict:
-    """Liest Asset-Typ-Name und Beschreibung aus DB."""
+    """Reads asset type name and description from DB."""
     from sqlalchemy import text
     row = db.execute(
         text("SELECT name, description FROM asset_types WHERE id = :id"),
@@ -76,10 +76,10 @@ def _get_asset_type_info(db: Session, asset_type_id: int) -> dict:
 )
 def run(self: Task, order_id: int) -> dict:
     """
-    Hauptrunbook: VDI bereitstellen.
+    Main runbook: provision VDI.
 
     Args:
-        order_id: ID der Order in der Datenbank
+        order_id: ID of the order in the database
 
     Returns:
         {"success": True, "asset_name": str, "order_id": int}
@@ -100,14 +100,14 @@ def run(self: Task, order_id: int) -> dict:
     asset_name = None
     asset_id = None
 
-    # ── Schritt 0: Bestellbestätigung senden (non-critical) ───────────────────
+    # ── Step 0: Send order confirmation (non-critical) ────────────────────────
     step = "order.confirmation"
     logger.info("[Step 0/7] %s", step)
     update_order_step(db, order_id, step, "running", started_at=datetime.now(timezone.utc))
     try:
         asset_type_info = _get_asset_type_info(db, order["asset_type_id"])
 
-        # Owner-Daten via AD vervollständigen falls nötig
+        # Complete owner data via AD if needed
         owner_email = order.get("owner_email")
         owner_name = order.get("owner_name")
         if not owner_name and owner_email:
@@ -139,7 +139,7 @@ def run(self: Task, order_id: int) -> dict:
             finished_at=datetime.now(timezone.utc),
         )
     except Exception as e:
-        # Bestätigungsmail ist nicht kritisch – Runbook weiter ausführen
+        # Confirmation email is not critical – continue runbook
         logger.warning("[Step 0/7] order.confirmation failed (non-critical): %s", e)
         update_order_step(
             db, order_id, step, "failed",
@@ -147,7 +147,7 @@ def run(self: Task, order_id: int) -> dict:
             finished_at=datetime.now(timezone.utc),
         )
 
-    # ── Schritt 1: VM aus Pool reservieren ────────────────────────────────────
+    # ── Step 1: Reserve VM from pool ──────────────────────────────────────────
     step = "pool.reserve_asset"
     logger.info("[Step 1/7] %s", step)
     update_order_step(db, order_id, step, "running", started_at=datetime.now(timezone.utc))
@@ -162,7 +162,7 @@ def run(self: Task, order_id: int) -> dict:
             log_output=f"Reserved: {asset_name} (id={asset_id})",
             finished_at=datetime.now(timezone.utc),
         )
-        # assigned_asset_id in Order eintragen (nur wenn Asset in DB existiert)
+        # Write assigned_asset_id to order (only if asset exists in DB)
         from sqlalchemy import text
         import os as _os
         if _os.getenv("ENVIRONMENT", "development") != "development":
@@ -183,7 +183,7 @@ def run(self: Task, order_id: int) -> dict:
         logger.error("[Step 1/7] FAILED: %s", e)
         raise self.retry(exc=e)
 
-    # ── Schritt 2: Active Roles – RDP-Gruppe ──────────────────────────────────
+    # ── Step 2: Active Roles – RDP group ──────────────────────────────────────
     step = "active_roles.set_rdp_group"
     logger.info("[Step 2/7] %s – users: %s", step, order["rdp_users"])
     update_order_step(db, order_id, step, "running", started_at=datetime.now(timezone.utc))
@@ -202,7 +202,7 @@ def run(self: Task, order_id: int) -> dict:
         logger.error("[Step 2/7] FAILED: %s", e)
         raise self.retry(exc=e)
 
-    # ── Schritt 3: Active Roles – Admin-Gruppe ────────────────────────────────
+    # ── Step 3: Active Roles – Admin group ────────────────────────────────────
     step = "active_roles.set_admin_group"
     logger.info("[Step 3/7] %s – users: %s", step, order["admin_users"])
     update_order_step(db, order_id, step, "running", started_at=datetime.now(timezone.utc))
@@ -221,7 +221,7 @@ def run(self: Task, order_id: int) -> dict:
         logger.error("[Step 3/7] FAILED: %s", e)
         raise self.retry(exc=e)
 
-    # ── Schritt 4: VMware Tools aktualisieren ─────────────────────────────────
+    # ── Step 4: Update VMware Tools ───────────────────────────────────────────
     step = "vsphere.update_vmware_tools"
     logger.info("[Step 4/7] %s on '%s'", step, asset_name)
     update_order_step(db, order_id, step, "running", started_at=datetime.now(timezone.utc))
@@ -240,7 +240,7 @@ def run(self: Task, order_id: int) -> dict:
         logger.error("[Step 4/7] FAILED: %s", e)
         raise self.retry(exc=e)
 
-    # ── Schritt 5: VM rebooten ────────────────────────────────────────────────
+    # ── Step 5: Reboot VM ─────────────────────────────────────────────────────
     step = "vsphere.restart_vm"
     logger.info("[Step 5/7] %s on '%s'", step, asset_name)
     update_order_step(db, order_id, step, "running", started_at=datetime.now(timezone.utc))
@@ -259,7 +259,7 @@ def run(self: Task, order_id: int) -> dict:
         logger.error("[Step 5/7] FAILED: %s", e)
         raise self.retry(exc=e)
 
-    # ── Schritt 6: Bereitstellungsmail senden ─────────────────────────────────
+    # ── Step 6: Send provisioning email ───────────────────────────────────────
     step = "notifications.send_provision_confirmation"
     logger.info("[Step 6/7] %s to %s", step, order["user_email"])
     update_order_step(db, order_id, step, "running", started_at=datetime.now(timezone.utc))
@@ -277,7 +277,7 @@ def run(self: Task, order_id: int) -> dict:
             finished_at=datetime.now(timezone.utc),
         )
     except Exception as e:
-        # Notification-Fehler sind nicht kritisch – weiter mit Schritt 7
+        # Notification errors are not critical – continue with step 7
         logger.warning("[Step 6/7] Notification failed (non-critical): %s", e)
         update_order_step(
             db, order_id, step, "failed",
@@ -285,7 +285,7 @@ def run(self: Task, order_id: int) -> dict:
             finished_at=datetime.now(timezone.utc),
         )
 
-    # ── Schritt 7: Asset auf BUSY setzen ──────────────────────────────────────
+    # ── Step 7: Set asset to BUSY ─────────────────────────────────────────────
     step = "pool.set_asset_busy"
     logger.info("[Step 7/7] %s", step)
     update_order_step(db, order_id, step, "running", started_at=datetime.now(timezone.utc))
@@ -302,7 +302,7 @@ def run(self: Task, order_id: int) -> dict:
         update_order_step(db, order_id, step, "failed", error=str(e), finished_at=datetime.now(timezone.utc))
         logger.error("[Step 7/7] FAILED: %s", e)
 
-    # ── Order auf DELIVERED setzen ────────────────────────────────────────────
+    # ── Set order to DELIVERED ────────────────────────────────────────────────
     update_order_status(db, order_id, "delivered")
     audit_helper.waudit(
         db, "order", order_id, "status_changed",

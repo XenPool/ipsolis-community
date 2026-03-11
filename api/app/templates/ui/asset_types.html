@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 
-{% block title %}Asset-Typen – XenPool Admin{% endblock %}
+{% block title %}Asset Types – XenPool Admin{% endblock %}
 
 {% block content %}
 <div class="mb-6 flex items-center justify-between">
-  <h1 class="text-lg font-semibold text-gray-900">Asset-Typen</h1>
-  <a href="/ui/asset-types/neu"
+  <h1 class="text-lg font-semibold text-gray-900">Asset Types</h1>
+  <a href="/ui/asset-types/new"
      class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700">
-    + Neuer Asset-Typ
+    + New Asset Type
   </a>
 </div>
 
@@ -16,10 +16,10 @@
     <thead class="bg-gray-50">
       <tr>
         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Name</th>
-        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Kategorie</th>
-        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Zuweisungsmodell</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Category</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Assignment Model</th>
         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Automation</th>
-        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Kapazität</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Capacity</th>
         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Runbooks</th>
         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Pool</th>
         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Attribute</th>
@@ -39,9 +39,9 @@
           {% set cat_labels = {
             "platform_access":       "VDI / Server / Cloud",
             "application_access":    "Business- & SaaS-Apps",
-            "data_access":           "Daten & Collaboration",
+            "data_access":           "Data & Collaboration",
             "device_access":         "Clients / MDM / WLAN",
-            "infrastructure_access": "Netz / Firewall / Admin"
+            "infrastructure_access": "Network / Firewall / Admin"
           } %}
           {% set cat_val = t.category.value if t.category else '' %}
           <span class="inline-block px-2 py-0.5 rounded text-xs font-medium bg-indigo-50 text-indigo-700"
@@ -51,16 +51,16 @@
         </td>
         <td class="px-4 py-3">
           {% if t.assignment_model == 'capacity_pooled' %}
-          <span class="inline-block px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700" title="capacity_pooled">Kontingent</span>
+          <span class="inline-block px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700" title="capacity_pooled">Pooled</span>
           {% elif t.assignment_model == 'dedicated_shared' %}
-          <span class="inline-block px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700" title="dedicated_shared">Gemeinsam</span>
+          <span class="inline-block px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700" title="dedicated_shared">Shared</span>
           {% else %}
-          <span class="inline-block px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700" title="assigned_personal">Persönlich</span>
+          <span class="inline-block px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700" title="assigned_personal">Personal</span>
           {% endif %}
         </td>
         <td class="px-4 py-3">
           {% if t.automation_mode == 'targets_only' %}
-          <span class="inline-block px-2 py-0.5 rounded text-xs font-medium bg-teal-100 text-teal-700">Gruppen-Zugriff</span>
+          <span class="inline-block px-2 py-0.5 rounded text-xs font-medium bg-teal-100 text-teal-700">Group Access</span>
           {% elif t.automation_mode == 'runbook' %}
           <span class="inline-block px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">Runbook</span>
           {% else %}
@@ -80,7 +80,7 @@
             {% set pc = pool_counts.get(t.id, {'free': 0, 'total': 0}) %}
             <a href="/ui/asset-pool?asset_type_id={{ t.id }}"
                class="text-blue-600 hover:underline whitespace-nowrap">
-              {{ pc.get('free', 0) }} / {{ pc.get('total', 0) }} frei →
+              {{ pc.get('free', 0) }} / {{ pc.get('total', 0) }} free →
             </a>
           {% else %}
             <span class="text-gray-400">–</span>
@@ -98,17 +98,17 @@
           {% else %}–{% endif %}
         </td>
         <td class="px-4 py-3 text-right text-xs">
-          <a href="/ui/asset-types/{{ t.id }}/bearbeiten"
-             class="text-gray-500 hover:text-blue-600 mr-3">Bearbeiten</a>
+          <a href="/ui/asset-types/{{ t.id }}/edit"
+             class="text-gray-500 hover:text-blue-600 mr-3">Edit</a>
           <button onclick="deleteAssetType({{ t.id }}, '{{ t.name | replace("'", "\\'") }}')"
-                  class="text-red-400 hover:text-red-600">Löschen</button>
+                  class="text-red-400 hover:text-red-600">Delete</button>
         </td>
       </tr>
       {% else %}
       <tr>
         <td colspan="9" class="px-4 py-12 text-center text-gray-400 text-sm">
-          Keine Asset-Typen vorhanden.
-          <a href="/ui/asset-types/neu" class="ml-1 text-blue-600 hover:underline">Jetzt anlegen →</a>
+          No asset types defined.
+          <a href="/ui/asset-types/new" class="ml-1 text-blue-600 hover:underline">Create one →</a>
         </td>
       </tr>
       {% endfor %}
@@ -118,7 +118,7 @@
 
 <script>
 async function deleteAssetType(id, name) {
-  if (!confirm("Asset-Typ '" + name + "' wirklich löschen? Alle zugehörigen Runbooks werden ebenfalls gelöscht.")) return;
+  if (!confirm("Really delete asset type '" + name + "'? All associated runbooks will also be deleted.")) return;
   const resp = await fetch('/admin/asset-types/' + id, {method: 'DELETE'});
   if (resp.status === 204) {
     var row = document.querySelector('[data-type-id="' + id + '"]');
@@ -126,7 +126,7 @@ async function deleteAssetType(id, name) {
   } else {
     var err = {};
     try { err = await resp.json(); } catch(e) {}
-    alert(err.detail || 'Fehler beim Löschen (Status ' + resp.status + ')');
+    alert(err.detail || 'Error deleting (status ' + resp.status + ')');
   }
 }
 </script>

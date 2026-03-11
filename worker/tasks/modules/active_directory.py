@@ -1,9 +1,9 @@
-"""Modul: Active Directory – LDAP-Benutzersuche via ldap3.
+"""Module: Active Directory – LDAP user lookup via ldap3.
 
-Liest AD-Konfiguration (Server, Base-DN, Credentials) aus der app_config-Tabelle.
-Gibt Benutzerinformationen (Name, E-Mail, Abteilung) zurück.
+Reads AD configuration (server, base DN, credentials) from the app_config table.
+Returns user information (name, email, department).
 
-Entspricht dem Ivanti-Modul 'QAD Lookup' (Standard-LDAP statt Quest AD).
+Corresponds to the Ivanti module 'QAD Lookup' (standard LDAP instead of Quest AD).
 """
 
 import logging
@@ -20,16 +20,16 @@ ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 
 def lookup_user(identifier: str, db: Session) -> dict:
     """
-    Schlägt einen Benutzer im Active Directory nach.
+    Looks up a user in Active Directory.
 
     Args:
-        identifier: E-Mail-Adresse oder sAMAccountName (z.B. "s.muster" oder "s.muster@example.com")
-        db:         Sync SQLAlchemy Session (für app_config-Lesezugriff)
+        identifier: Email address or sAMAccountName (e.g. "s.muster" or "s.muster@example.com")
+        db:         Sync SQLAlchemy Session (for app_config read access)
 
     Returns:
-        Erfolg:   {"success": True,  "email": str, "display_name": str,
-                   "first_name": str, "last_name": str, "department": str | None}
-        Fehler:   {"success": False, "error": str}
+        Success: {"success": True,  "email": str, "display_name": str,
+                  "first_name": str, "last_name": str, "department": str | None}
+        Error:   {"success": False, "error": str}
     """
     if ENVIRONMENT == "development":
         return _mock_lookup_user(identifier)
@@ -38,7 +38,7 @@ def lookup_user(identifier: str, db: Session) -> dict:
 
 
 def _ldap_lookup_user(identifier: str, db: Session) -> dict:
-    """Echter LDAP-Lookup via ldap3."""
+    """Real LDAP lookup via ldap3."""
     try:
         import ldap3
     except ImportError:
@@ -51,7 +51,7 @@ def _ldap_lookup_user(identifier: str, db: Session) -> dict:
     bind_password = get_config(db, "ad.password", "")
     domain = get_config(db, "ad.domain", "")
 
-    # sAMAccountName oder mail-Filter je nach Identifier-Typ
+    # sAMAccountName or mail filter depending on identifier type
     if "@" in identifier:
         ldap_filter = f"(mail={ldap3.utils.conv.escape_filter_chars(identifier)})"
     else:
@@ -122,7 +122,7 @@ _MOCK_USERS: dict[str, dict] = {
 def _mock_lookup_user(identifier: str) -> dict:
     logger.info("[MOCK] AD lookup for '%s'", identifier)
 
-    # Normalisieren: Domain-Prefix und @ entfernen für Mock-Suche
+    # Normalize: remove domain prefix and @ for mock lookup
     sam = identifier.split("\\")[-1] if "\\" in identifier else identifier
     sam = sam.split("@")[0].lower()
 
@@ -131,7 +131,7 @@ def _mock_lookup_user(identifier: str) -> dict:
         logger.info("[MOCK] AD found: %s (%s)", result["display_name"], result["email"])
         return result
 
-    # Generischer Fallback: Identifier als Mock-Benutzer zurückgeben
+    # Generic fallback: return identifier as mock user
     display = identifier.replace("\\", " ").replace(".", " ").replace("@", " ").title()
     logger.info("[MOCK] AD not found, generating fallback for '%s'", identifier)
     return {

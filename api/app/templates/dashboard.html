@@ -7,9 +7,9 @@
 <!-- Pool Summary -->
 <div class="mb-8">
   <div class="flex items-center justify-between mb-3">
-    <h1 class="text-lg font-semibold text-gray-900">VM-Pool Status</h1>
+    <h1 class="text-lg font-semibold text-gray-900">VM Pool Status</h1>
     <span class="text-xs text-gray-400" id="pool-last-updated">
-      Aktualisiert: {{ now.strftime("%H:%M:%S") }} UTC
+      Updated: {{ now.strftime("%H:%M:%S") }} UTC
     </span>
   </div>
 
@@ -26,8 +26,8 @@
 <!-- Recent Orders -->
 <div>
   <div class="flex items-center justify-between mb-3">
-    <h2 class="text-lg font-semibold text-gray-900">Letzte Bestellungen</h2>
-    <a href="/ui/orders" class="text-sm text-blue-600 hover:underline">Alle anzeigen →</a>
+    <h2 class="text-lg font-semibold text-gray-900">Recent Orders</h2>
+    <a href="/ui/orders" class="text-sm text-blue-600 hover:underline">Show all →</a>
   </div>
 
   <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
@@ -37,9 +37,9 @@
           <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">ID</th>
           <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">User</th>
           <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Asset</th>
-          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Aktion</th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Action</th>
           <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Status</th>
-          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Erstellt</th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Created</th>
           <th class="px-4 py-3"></th>
         </tr>
       </thead>
@@ -55,9 +55,9 @@
             {% if order.assigned_asset_id %}
               {{ asset_names.get(order.assigned_asset_id, "–") }}
             {% elif asset_type_models.get(order.asset_type_id) == "dedicated_shared" %}
-              <span class="text-xs text-gray-500">Gemeinsam</span>
+              <span class="text-xs text-gray-500">Shared</span>
             {% elif asset_type_models.get(order.asset_type_id) == "capacity_pooled" %}
-              <span class="text-xs text-gray-500">Kontingent</span>
+              <span class="text-xs text-gray-500">Pooled</span>
             {% else %}–{% endif %}
           </td>
           <td class="px-4 py-3">
@@ -79,7 +79,7 @@
         </tr>
         {% else %}
         <tr>
-          <td colspan="7" class="px-4 py-8 text-center text-gray-400 text-sm">Keine Bestellungen vorhanden.</td>
+          <td colspan="7" class="px-4 py-8 text-center text-gray-400 text-sm">No orders found.</td>
         </tr>
         {% endfor %}
       </tbody>

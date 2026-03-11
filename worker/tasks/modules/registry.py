@@ -1,20 +1,20 @@
-"""Module Registry – Zentrale Liste aller verfügbaren Module für den Dynamic Runner.
+"""Module Registry – central list of all available modules for the dynamic runner.
 
 Jedes Modul hat:
 - fn:          Aufrufbare Funktion
 - needs_db:    True wenn die Funktion eine DB-Session als erstes Argument erwartet
-- description: Kurzbeschreibung für die Admin-UI
+- description: short description for the admin UI
 - params:      Liste der erwarteten Parameter-Namen (aus params_template)
-- output_keys: Schlüssel im Result-Dict die in den Execution-Kontext übernommen werden
-- group:       Gruppierung für Admin-UI-Dropdowns
+- output_keys: keys in the result dict that are carried into the execution context
+- group:       grouping for admin UI dropdowns
 """
 
 from tasks.modules import active_roles, notifications, pool_manager, sccm, target_executor, vsphere
 
 
-# ── Adapter-Funktionen für Notifications ──────────────────────────────────────
-# Die Original-Funktionen haben komplexe Signaturen; diese Adapter nehmen
-# flache kwargs und delegieren korrekt.
+# ── Notification adapter functions ───────────────────────────────────────────
+# The original functions have complex signatures; these adapters take
+# flat kwargs and delegate correctly.
 
 def _notify_send_confirmation(
     db,
@@ -88,7 +88,7 @@ MODULE_REGISTRY: dict[str, dict] = {
     "pool.reserve_asset": {
         "fn": pool_manager.reserve_asset,
         "needs_db": True,
-        "description": "Reserviert ein freies Asset aus dem Pool für die Bestellung",
+        "description": "Reserves a free asset from the pool for the order",
         "params": ["order_id", "asset_type_id", "expires_at"],
         "output_keys": ["asset_id", "asset_name"],
         "group": "pool",
@@ -96,7 +96,7 @@ MODULE_REGISTRY: dict[str, dict] = {
     "pool.check_capacity": {
         "fn": pool_manager.check_capacity,
         "needs_db": True,
-        "description": "Prüft ob Pool-Kapazität für pooled Assets noch frei ist",
+        "description": "Checks whether pool capacity for pooled assets is still available",
         "params": ["asset_type_id", "pool_capacity"],
         "output_keys": [],
         "group": "pool",
@@ -104,7 +104,7 @@ MODULE_REGISTRY: dict[str, dict] = {
     "pool.set_asset_busy": {
         "fn": pool_manager.set_asset_busy,
         "needs_db": True,
-        "description": "Setzt ein Asset auf BUSY (nach Bereitstellung oder Verlängerung)",
+        "description": "Sets an asset to BUSY (after provisioning or extension)",
         "params": ["asset_id", "order_id", "expires_at"],
         "output_keys": [],
         "group": "pool",
@@ -112,7 +112,7 @@ MODULE_REGISTRY: dict[str, dict] = {
     "pool.release_asset": {
         "fn": pool_manager.release_asset,
         "needs_db": True,
-        "description": "Gibt ein Asset zurück in den Pool (Status: FREE)",
+        "description": "Returns an asset to the pool (status: FREE)",
         "params": ["asset_id"],
         "output_keys": [],
         "group": "pool",
@@ -122,7 +122,7 @@ MODULE_REGISTRY: dict[str, dict] = {
     "active_roles.set_rdp_group": {
         "fn": active_roles.set_rdp_group,
         "needs_db": False,
-        "description": "Befüllt die RDP-AD-Gruppe der VM mit den angegebenen Benutzern",
+        "description": "Populates the RDP AD group of the VM with the specified users",
         "params": ["asset_name", "rdp_users"],
         "output_keys": [],
         "group": "active_roles",
@@ -130,7 +130,7 @@ MODULE_REGISTRY: dict[str, dict] = {
     "active_roles.set_admin_group": {
         "fn": active_roles.set_admin_group,
         "needs_db": False,
-        "description": "Befüllt die Admin-AD-Gruppe der VM mit den angegebenen Benutzern",
+        "description": "Populates the admin AD group of the VM with the specified users",
         "params": ["asset_name", "admin_users"],
         "output_keys": [],
         "group": "active_roles",
@@ -138,7 +138,7 @@ MODULE_REGISTRY: dict[str, dict] = {
     "active_roles.remove_all_groups": {
         "fn": active_roles.remove_all_groups,
         "needs_db": False,
-        "description": "Entfernt alle AD-Gruppen der VM (bei Rückgabe)",
+        "description": "Removes all AD groups of the VM (on return)",
         "params": ["asset_name"],
         "output_keys": [],
         "group": "active_roles",
@@ -166,7 +166,7 @@ MODULE_REGISTRY: dict[str, dict] = {
     "sccm.trigger_reinstall": {
         "fn": sccm.trigger_reinstall,
         "needs_db": False,
-        "description": "Löst SCCM-Tasksequenz für unattended VM-Neuinstallation aus",
+        "description": "Triggers SCCM task sequence for unattended VM reinstallation",
         "params": ["asset_name"],
         "output_keys": [],
         "group": "sccm",
@@ -176,7 +176,7 @@ MODULE_REGISTRY: dict[str, dict] = {
     "notifications.send_confirmation": {
         "fn": _notify_send_confirmation,
         "needs_db": True,
-        "description": "Sendet zweisprachige Bestellbestätigung an Besteller und Owner",
+        "description": "Sends bilingual order confirmation to requester and owner",
         "params": [
             "user_email", "user_name", "owner_email", "owner_name",
             "asset_type_name", "asset_type_description",
@@ -188,7 +188,7 @@ MODULE_REGISTRY: dict[str, dict] = {
     "notifications.send_provision_confirmation": {
         "fn": _notify_send_provision,
         "needs_db": False,
-        "description": "Sendet Bereitstellungsbestätigung mit VM-Name und RDP-Zugang",
+        "description": "Sends provisioning confirmation with VM name and RDP access",
         "params": ["user_email", "user_name", "asset_name", "rdp_users", "expires_at"],
         "output_keys": [],
         "group": "notifications",
@@ -196,7 +196,7 @@ MODULE_REGISTRY: dict[str, dict] = {
     "notifications.send_reclaim": {
         "fn": _notify_send_reclaim,
         "needs_db": False,
-        "description": "Benachrichtigt den User über die Rückführung seiner VM in den Pool",
+        "description": "Notifies user about their VM being returned to the pool",
         "params": ["user_email", "user_name", "asset_name"],
         "output_keys": [],
         "group": "notifications",
@@ -206,7 +206,7 @@ MODULE_REGISTRY: dict[str, dict] = {
     "target_executor.grant": {
         "fn": target_executor.grant,
         "needs_db": True,
-        "description": "Liest targets aus asset_types und fügt Principals zu Gruppen hinzu (AD/Entra)",
+        "description": "Reads targets from asset_types and adds principals to groups (AD/Entra)",
         "params": ["order_id", "asset_type_id", "user_email", "rdp_users", "admin_users"],
         "output_keys": [],
         "group": "target_executor",
@@ -214,7 +214,7 @@ MODULE_REGISTRY: dict[str, dict] = {
     "target_executor.revoke": {
         "fn": target_executor.revoke,
         "needs_db": True,
-        "description": "Invertiert alle grant-Einträge aus dem Change-Log (deterministisches Revoke)",
+        "description": "Inverts all grant entries from the change log (deterministic revoke)",
         "params": ["user_email", "asset_type_id"],
         "output_keys": [],
         "group": "target_executor",

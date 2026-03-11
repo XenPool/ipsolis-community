@@ -9,22 +9,22 @@ from app.database import Base
 
 
 class AuditLog(Base):
-    """Unveränderliches Log aller Statusänderungen.
+    """Immutable log of all status changes.
 
-    Einträge werden nur INSERTed, nie UPDATEd oder DELETEd.
+    Entries are only INSERTed, never UPDATEd or DELETEd.
     """
 
     __tablename__ = "audit_log"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
 
-    # Welches Objekt wurde geändert?
+    # Which object was changed?
     entity_type: Mapped[str] = mapped_column(
         String(50), nullable=False, index=True
-    )  # z.B. "order", "asset", "order_step"
+    )  # e.g. "order", "asset", "order_step"
     entity_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
 
-    # Was wurde getan?
+    # What was done?
     action: Mapped[str] = mapped_column(
         String(100), nullable=False
     )  # z.B. "status_changed", "created", "assigned"
@@ -33,12 +33,12 @@ class AuditLog(Base):
     old_value: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     new_value: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
 
-    # Wer/was hat die Änderung ausgelöst?
+    # Who/what triggered the change?
     triggered_by: Mapped[str] = mapped_column(
         String(255), nullable=False
     )  # z.B. "user:max@example.com", "celery:vdi_provision", "system:beat"
 
-    # Zusätzlicher Kontext (z.B. Request-ID, Celery-Task-ID)
+    # Additional context (e.g. request ID, Celery task ID)
     context: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     timestamp: Mapped[datetime] = mapped_column(

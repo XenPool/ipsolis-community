@@ -1,21 +1,21 @@
 {% extends "base.html" %}
 {% set active_page = "orders" %}
 
-{% block title %}Bestellung #{{ order.id }} – XenPool IT Selfservice{% endblock %}
+{% block title %}Order #{{ order.id }} – XenPool IT Selfservice{% endblock %}
 
 {% block content %}
 <!-- Back link -->
 <div class="mb-5">
-  <a href="/ui/orders" class="text-sm text-gray-500 hover:text-gray-800">← Bestellungen</a>
+  <a href="/ui/orders" class="text-sm text-gray-500 hover:text-gray-800">← Orders</a>
 </div>
 
 <!-- Header -->
 <div class="flex items-start justify-between mb-6">
   <div>
-    <h1 class="text-xl font-semibold text-gray-900">Bestellung #{{ order.id }}</h1>
+    <h1 class="text-xl font-semibold text-gray-900">Order #{{ order.id }}</h1>
     <p class="text-sm text-gray-500 mt-0.5">
       {{ order.action.value | upper }} ·
-      Erstellt: {{ order.created_at.strftime("%d.%m.%Y %H:%M") }} UTC
+      Created: {{ order.created_at.strftime("%d.%m.%Y %H:%M") }} UTC
     </p>
   </div>
   <span class="inline-block px-3 py-1 rounded-full text-sm font-semibold {{ status_colors.get(order.status.value, 'bg-gray-100 text-gray-700') }}">
@@ -23,7 +23,7 @@
   </span>
 </div>
 
-<!-- Auto-Refresh während Bearbeitung -->
+<!-- Auto-refresh while processing -->
 {% if order.status.value in ["pending", "processing"] %}
 <script>setTimeout(function(){ window.location.reload(); }, 4000);</script>
 <div class="mb-4 rounded-lg bg-blue-50 border border-blue-200 px-4 py-3 flex items-center gap-2">
@@ -31,14 +31,14 @@
     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
   </svg>
-  <span class="text-sm text-blue-700">Bestellung wird verarbeitet – Seite aktualisiert automatisch …</span>
+  <span class="text-sm text-blue-700">Order is being processed – page refreshes automatically …</span>
 </div>
 {% endif %}
 
 <!-- Error Banner -->
 {% if order.error_message %}
 <div class="mb-6 rounded-lg bg-red-50 border border-red-200 px-4 py-3">
-  <p class="text-sm font-medium text-red-800">Fehler</p>
+  <p class="text-sm font-medium text-red-800">Error</p>
   <p class="text-sm text-red-700 mt-1 font-mono break-all">{{ order.error_message }}</p>
 </div>
 {% endif %}
@@ -46,7 +46,7 @@
 <!-- Metadata Grid -->
 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
   <div class="bg-white rounded-lg border border-gray-200 p-4">
-    <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Benutzer</h2>
+    <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">User</h2>
     <dl class="space-y-2 text-sm">
       <div class="flex justify-between">
         <dt class="text-gray-500">Name</dt>
@@ -72,22 +72,22 @@
   </div>
 
   <div class="bg-white rounded-lg border border-gray-200 p-4">
-    <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Asset &amp; Laufzeit</h2>
+    <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Asset &amp; Duration</h2>
     <dl class="space-y-2 text-sm">
       <div class="flex justify-between">
         <dt class="text-gray-500">VM</dt>
         <dd class="font-medium text-gray-900">{{ asset_name or "–" }}</dd>
       </div>
       <div class="flex justify-between">
-        <dt class="text-gray-500">Asset-ID</dt>
+        <dt class="text-gray-500">Asset ID</dt>
         <dd class="text-gray-900">{{ order.assigned_asset_id or "–" }}</dd>
       </div>
       <div class="flex justify-between">
-        <dt class="text-gray-500">Von</dt>
+        <dt class="text-gray-500">From</dt>
         <dd class="text-gray-900">{{ order.requested_from.strftime("%d.%m.%Y") }}</dd>
       </div>
       <div class="flex justify-between">
-        <dt class="text-gray-500">Bis</dt>
+        <dt class="text-gray-500">Until</dt>
         <dd class="text-gray-900">{{ order.requested_until.strftime("%d.%m.%Y") }}</dd>
       </div>
       {% if order.servicenow_ref %}
@@ -109,7 +109,7 @@
 <!-- Steps Timeline -->
 <div>
   <h2 class="text-sm font-semibold text-gray-700 mb-3">
-    Ausführungsschritte
+    Execution Steps
     <span class="font-normal text-gray-400">({{ order.steps | length }} Steps)</span>
   </h2>
 
@@ -134,7 +134,7 @@
           <span>Start: {{ step.started_at.strftime("%H:%M:%S") }}</span>
           {% endif %}
           {% if item.duration %}
-          <span>Dauer: {{ item.duration }}</span>
+          <span>Duration: {{ item.duration }}</span>
           {% endif %}
         </div>
 
@@ -163,25 +163,25 @@
   </div>
   {% else %}
   <div class="bg-white rounded-lg border border-gray-200 px-4 py-6 text-center text-sm text-gray-400">
-    Keine Steps aufgezeichnet.
+    No steps recorded.
   </div>
   {% endif %}
 </div>
 
-<!-- Admin Aktionen -->
+<!-- Admin Actions -->
 {% if order.status.value in ("delivered", "provisioned") %}
 <div id="admin-actions" class="mt-8 bg-white rounded-lg border border-gray-200 p-5">
-  <h2 class="text-sm font-semibold text-gray-700 mb-5">Admin Aktionen</h2>
+  <h2 class="text-sm font-semibold text-gray-700 mb-5">Admin Actions</h2>
 
   <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 
-    <!-- Ändern -->
+    <!-- Extend / Modify -->
     <div>
-      <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Verlängern / Ändern</h3>
+      <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Extend / Modify</h3>
       <form method="post" action="/ui/orders/{{ order.id }}/change" class="space-y-3">
 
         <div>
-          <label class="block text-xs font-medium text-gray-600 mb-1">Laufzeit bis</label>
+          <label class="block text-xs font-medium text-gray-600 mb-1">Valid until</label>
           <input type="date" name="new_until"
                  value="{{ order.requested_until.strftime('%Y-%m-%d') if order.requested_until else '' }}"
                  class="rounded border border-gray-300 text-sm px-3 py-1.5 w-full focus:outline-none focus:ring-1 focus:ring-blue-400">
@@ -189,13 +189,13 @@
 
         {% if asset_type and asset_type.allow_user_lists %}
         <div>
-          <label class="block text-xs font-medium text-gray-600 mb-1">RDP-User <span class="text-gray-400">(einer pro Zeile)</span></label>
+          <label class="block text-xs font-medium text-gray-600 mb-1">RDP Users <span class="text-gray-400">(one per line)</span></label>
           <textarea name="rdp_users" rows="3"
                     class="rounded border border-gray-300 text-sm px-3 py-1.5 w-full font-mono focus:outline-none focus:ring-1 focus:ring-blue-400"
                     >{{ order.rdp_users | join('\n') if order.rdp_users else '' }}</textarea>
         </div>
         <div>
-          <label class="block text-xs font-medium text-gray-600 mb-1">Admin-User <span class="text-gray-400">(einer pro Zeile)</span></label>
+          <label class="block text-xs font-medium text-gray-600 mb-1">Admin Users <span class="text-gray-400">(one per line)</span></label>
           <textarea name="admin_users" rows="3"
                     class="rounded border border-gray-300 text-sm px-3 py-1.5 w-full font-mono focus:outline-none focus:ring-1 focus:ring-blue-400"
                     >{{ order.admin_users | join('\n') if order.admin_users else '' }}</textarea>
@@ -204,22 +204,22 @@
 
         <button type="submit"
                 class="px-4 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 focus:outline-none">
-          Ändern
+          Update
         </button>
       </form>
     </div>
 
-    <!-- Abbestellen -->
+    <!-- Cancel -->
     <div>
-      <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Abbestellen</h3>
+      <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Cancel</h3>
       <p class="text-xs text-gray-500 mb-3">
-        Löscht die Zuweisung und gibt das Asset zurück in den Pool (gemäß Deprovision-Policy).
+        Removes the assignment and returns the asset to the pool (per deprovision policy).
       </p>
       <form method="post" action="/ui/orders/{{ order.id }}/cancel"
-            onsubmit="return confirm('Bestellung #{{ order.id }} wirklich abbestellen?')">
+            onsubmit="return confirm('Really cancel order #{{ order.id }}?')">
         <button type="submit"
                 class="px-4 py-1.5 bg-red-600 text-white text-sm rounded hover:bg-red-700 focus:outline-none">
-          Jetzt abbestellen
+          Cancel now
         </button>
       </form>
     </div>

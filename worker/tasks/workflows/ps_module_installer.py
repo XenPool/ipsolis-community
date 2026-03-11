@@ -100,9 +100,9 @@ def install_ps_module(self, ps_module_id: int) -> dict:
 
         if not installed_version:
             error = (
-                f"Modul '{module_name}' wurde nicht installiert. "
-                "Der Modulname existiert möglicherweise nicht in der PSGallery. "
-                "Bitte den exakten Namen unter https://www.powershellgallery.com prüfen."
+                f"Module '{module_name}' was not installed. "
+                "The module name may not exist in the PSGallery. "
+                "Please verify the exact name at https://www.powershellgallery.com"
             )
             _set_status(db, ps_module_id, "failed", error_log=error)
             logger.warning("ps_module_installer: Get-InstalledModule returned nothing for %s", module_name)

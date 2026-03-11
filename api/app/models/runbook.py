@@ -1,4 +1,4 @@
-"""ORM-Models für dynamische Runbooks."""
+"""ORM models for dynamic runbooks."""
 
 from datetime import datetime
 from typing import Any

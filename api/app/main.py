@@ -42,9 +42,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 app = FastAPI(
     title="XenPool IT Selfservice API",
     description=(
-        "Dispatcher und REST-API für den eigenständigen Ivanti-Automation-Ersatz. "
-        "Empfängt Webhooks von ServiceNow und Self-Service-Portal-Anfragen, "
-        "legt Orders an und dispatcht Celery-Runbooks."
+        "Dispatcher and REST API for the standalone Ivanti Automation replacement. "
+        "Receives webhooks from ServiceNow and self-service portal requests, "
+        "creates orders and dispatches Celery runbooks."
     ),
     version="0.1.0",
     docs_url="/docs",

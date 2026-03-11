@@ -37,7 +37,7 @@ _SECRET_MASK = "***"
 
 
 def _mask(cfg: AppConfig) -> AppConfigRead:
-    """Gibt AppConfigRead zurück; maskiert den Wert wenn is_secret=True."""
+    """Returns AppConfigRead; masks the value if is_secret=True."""
     return AppConfigRead(
         id=cfg.id,
         key=cfg.key,
@@ -271,7 +271,7 @@ async def delete_asset_type(type_id: int, db: AsyncSession = Depends(get_db)) ->
     if not asset_type:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Asset type {type_id} not found")
 
-    # Prüfen ob noch Assets oder Orders verknüpft sind
+    # Check if assets or orders are still linked
     linked_assets = await db.execute(
         select(AssetPool).where(AssetPool.asset_type_id == type_id)
     )
@@ -301,7 +301,7 @@ async def delete_asset_type(type_id: int, db: AsyncSession = Depends(get_db)) ->
 async def create_asset(
     payload: AssetPoolCreate, db: AsyncSession = Depends(get_db)
 ) -> AssetPool:
-    # Asset-Typ prüfen
+    # Validate asset type
     type_result = await db.execute(select(AssetType).where(AssetType.id == payload.asset_type_id))
     if not type_result.scalar_one_or_none():
         raise HTTPException(

@@ -1,11 +1,11 @@
 {% extends "base.html" %}
 
-{% block title %}Script-Editor – XenPool Admin{% endblock %}
+{% block title %}Script Editor – XenPool Admin{% endblock %}
 
 {% block content %}
 <div class="mb-4">
-  <h1 class="text-lg font-semibold text-gray-900">Script-Editor</h1>
-  <p class="text-xs text-gray-500 mt-1">PowerShell-Scripts im Browser bearbeiten. scripts/ivanti/ ist read-only.</p>
+  <h1 class="text-lg font-semibold text-gray-900">Script Editor</h1>
+  <p class="text-xs text-gray-500 mt-1">Edit PowerShell scripts in the browser. scripts/ivanti/ is read-only.</p>
 </div>
 
 <div class="flex gap-4" style="height: calc(100vh - 180px); min-height: 500px;">
@@ -29,7 +29,7 @@
 
     <!-- Datei-Kopfzeile -->
     <div class="flex items-center justify-between bg-white rounded border border-gray-200 px-3 py-2">
-      <span id="current-file" class="text-sm text-gray-500">Keine Datei ausgewählt</span>
+      <span id="current-file" class="text-sm text-gray-500">No file selected</span>
       <div class="flex gap-2">
         <button id="btn-save" onclick="saveCurrentFile()" disabled
                 class="px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed">
@@ -41,7 +41,7 @@
     <!-- Monaco Editor -->
     <div id="editor-container" class="flex-1 rounded border border-gray-200 overflow-hidden bg-gray-900">
       <div id="monaco-placeholder" class="flex items-center justify-center h-full text-gray-500 text-sm">
-        Datei auswählen zum Bearbeiten
+        Select file to edit
       </div>
       <div id="monaco-editor" class="w-full h-full" style="display:none;"></div>
     </div>
@@ -52,13 +52,13 @@
         <span class="text-xs font-semibold text-gray-700">Modul-Testlauf</span>
         <select id="test-module-key"
                 class="flex-1 rounded border border-gray-300 text-xs px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400">
-          <option value="">– Modul wählen –</option>
+          <option value="">– Select module –</option>
         </select>
         <input id="test-params-input" type="text" placeholder='{"asset_name": "XP-TVDI-001"}'
                class="flex-1 rounded border border-gray-300 text-xs font-mono px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400">
         <button onclick="runTest()"
                 class="px-3 py-1.5 bg-green-600 text-white text-xs font-medium rounded hover:bg-green-700 whitespace-nowrap">
-          ▶ Ausführen
+          ▶ Run
         </button>
       </div>
       <div id="test-output" class="hidden">
@@ -165,11 +165,11 @@ async function loadFileBrowser() {
     if (!isReadonly) writeableDirs.push(cat);
   }
 
-  // Neue-Datei-Dialog: Verzeichnisse befüllen
+  // New file dialog: populate directories
   const sel = document.getElementById('new-file-dir');
   sel.innerHTML = writeableDirs.map(d => `<option value="${d}">${d}</option>`).join('');
 
-  // Module für Test-Runner
+  // Modules for test runner
   loadModules();
 }
 
@@ -205,9 +205,9 @@ async function saveCurrentFile() {
     body: JSON.stringify({ content }),
   });
   if (resp.ok) {
-    showToast('Gespeichert ✓');
+    showToast('Saved ✓');
   } else {
-    alert('Fehler beim Speichern');
+    alert('Error saving');
   }
 }
 
@@ -240,7 +240,7 @@ async function createNewFile() {
     openFile(dir, name, false);
   } else {
     const err = await resp.json();
-    alert(err.detail || 'Fehler beim Anlegen');
+    alert(err.detail || 'Error creating file');
   }
 }
 
@@ -249,7 +249,7 @@ async function loadModules() {
   const resp = await fetch('/admin/modules');
   const data = await resp.json();
   const sel = document.getElementById('test-module-key');
-  sel.innerHTML = '<option value="">– Modul wählen –</option>';
+  sel.innerHTML = '<option value="">– Select module –</option>';
   for (const group of (data.groups || [])) {
     const mods = data.modules?.[group] || [];
     if (!mods.length) continue;
@@ -279,13 +279,13 @@ let testPollInterval = null;
 
 async function runTest() {
   const module_key = document.getElementById('test-module-key').value;
-  if (!module_key) { alert('Bitte ein Modul wählen'); return; }
+  if (!module_key) { alert('Please select a module'); return; }
 
   let params = {};
   try {
     const raw = document.getElementById('test-params-input').value.trim();
     if (raw) params = JSON.parse(raw);
-  } catch(e) { alert('Params ist kein gültiges JSON'); return; }
+  } catch(e) { alert('Params is not valid JSON'); return; }
 
   // Platzhalter durch leere Strings ersetzen
   for (const [k, v] of Object.entries(params)) {
@@ -295,7 +295,7 @@ async function runTest() {
   const outputEl = document.getElementById('test-output');
   const preEl = document.getElementById('test-output-pre');
   outputEl.classList.remove('hidden');
-  preEl.textContent = '⏳ Läuft…';
+  preEl.textContent = '⏳ Running…';
   preEl.className = 'rounded bg-gray-900 text-gray-400 text-xs font-mono p-3 overflow-auto max-h-48';
 
   const resp = await fetch('/admin/scripts/test', {
@@ -317,7 +317,7 @@ async function runTest() {
         preEl.textContent = JSON.stringify(pollData.result, null, 2);
       } else {
         preEl.className = 'rounded bg-gray-900 text-red-400 text-xs font-mono p-3 overflow-auto max-h-48';
-        preEl.textContent = '❌ ' + (pollData.error || 'Fehler');
+        preEl.textContent = '❌ ' + (pollData.error || 'Error');
       }
     }
   }, 1000);
