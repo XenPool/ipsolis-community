@@ -1,0 +1,30 @@
+name: Deploy to prelive
+
+on:
+  push:
+    branches:
+      - prelive
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    steps:
+      - name: Pull latest code
+        run: |
+          cd ${{ secrets.PRELIVE_PATH }}
+          git pull origin prelive
+
+      - name: Rebuild and restart containers
+        run: |
+          cd ${{ secrets.PRELIVE_PATH }}
+          docker compose --profile dev up --build -d
+
+      - name: Run database migrations
+        run: |
+          cd ${{ secrets.PRELIVE_PATH }}
+          docker compose exec -T api alembic upgrade head
+
+      - name: Health check
+        run: |
+          sleep 10
+          curl -f http://localhost:8000/health || exit 1
