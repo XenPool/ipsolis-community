@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
-from app.routes import admin, admin_modules, admin_runbooks, assets, health, orders, portal, scripts, ui, webhook
+from app.routes import admin, admin_modules, admin_runbooks, assets, health, orders, portal, ui, webhook
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -72,6 +72,5 @@ app.include_router(assets.router)
 app.include_router(admin.router)
 app.include_router(admin_modules.router)
 app.include_router(admin_runbooks.router)
-app.include_router(scripts.router)
 app.include_router(ui.router)
 app.include_router(portal.router)

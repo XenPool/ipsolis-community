@@ -566,16 +566,6 @@ async def module_params_fragment(
     )
 
 
-# ── Script-Editor UI (read-only reference browser) ────────────────────────────
-
-@router.get("/scripts", response_class=HTMLResponse)
-async def scripts_editor(request: Request) -> HTMLResponse:
-    return templates.TemplateResponse(
-        request, "ui/scripts.html",
-        {"active_page": "scripts"},
-    )
-
-
 # ── Script Modules UI ──────────────────────────────────────────────────────────
 
 @router.get("/modules", response_class=HTMLResponse)
