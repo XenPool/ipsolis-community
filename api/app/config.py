@@ -11,6 +11,7 @@ class Settings(BaseSettings):
 
     # ── Umgebung ──────────────────────────────────────────────────
     ENVIRONMENT: str = "development"
+    ADMIN_AUTH_DISABLED: bool = False  # Set true to bypass X-Admin-Key in browser/dev use
 
     # ── Datenbank ─────────────────────────────────────────────────
     DATABASE_URL: str = "postgresql+asyncpg://xpuser:changeme@localhost:5432/itselfservice"

@@ -5,17 +5,12 @@ Entspricht dem Ivanti-Modul 'Pool Management'.
 
 import json
 import logging
-import os
 from datetime import datetime, timezone
 
 from sqlalchemy import text as sql_text
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
-
-ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
-MOCK_SCRIPTS = os.getenv("MOCK_SCRIPTS", "true" if ENVIRONMENT == "development" else "false").lower() == "true"
-
 
 def reserve_asset(
     db: Session,
@@ -37,9 +32,6 @@ def reserve_asset(
         {"success": True, "asset_id": int, "asset_name": str}
         {"success": False, "error": str}
     """
-    if MOCK_SCRIPTS:
-        return _mock_reserve_asset(db, order_id, asset_type_id, expires_at)
-
     # REUSE_EXISTING_BY_OWNER: user already has an assigned instance
     if personal_provisioning_strategy == "reuse_existing_by_owner" and user_email:
         row = db.execute(
@@ -165,13 +157,6 @@ def check_capacity(db: Session, asset_type_id: int, pool_capacity: int) -> dict:
         {"success": True, "current": n, "capacity": m}
         {"success": False, "current": n, "capacity": m, "error": str}
     """
-    if MOCK_SCRIPTS:
-        logger.info(
-            "[MOCK] check_capacity: asset_type_id=%s capacity=%s",
-            asset_type_id, pool_capacity,
-        )
-        return {"success": True, "current": 3, "capacity": pool_capacity, "mock": True}
-
     row = db.execute(
         sql_text("""
             SELECT COUNT(*) FROM orders
@@ -189,64 +174,3 @@ def check_capacity(db: Session, asset_type_id: int, pool_capacity: int) -> dict:
         }
     return {"success": True, "current": current, "capacity": pool_capacity}
 
-
-# ── Mocks ─────────────────────────────────────────────────────────────────────
-
-def _mock_reserve_asset(db: Session, order_id: int, asset_type_id: int, expires_at: datetime) -> dict:
-    import time
-    logger.info(
-        "[MOCK] Searching pool for asset_type_id=%s order_id=%s ...",
-        asset_type_id, order_id,
-    )
-    time.sleep(0.5)  # Simuliert DB-Zugriff
-
-    # Try to pick a real free asset so that assigned_asset_id on the order is correct
-    row = db.execute(
-        sql_text("""
-            SELECT id, name FROM asset_pool
-            WHERE asset_type_id = :at AND status = 'free'
-            LIMIT 1
-            FOR UPDATE SKIP LOCKED
-        """),
-        {"at": asset_type_id},
-    ).fetchone()
-
-    if row:
-        asset_id, asset_name = row[0], row[1]
-        db.execute(
-            sql_text("""
-                UPDATE asset_pool
-                SET status = 'reserved',
-                    current_order_id = :order_id,
-                    expires_at = :expires_at
-                WHERE id = :id
-            """),
-            {"id": asset_id, "order_id": order_id, "expires_at": expires_at},
-        )
-        db.execute(
-            sql_text("UPDATE orders SET assigned_asset_id = :aid WHERE id = :oid"),
-            {"aid": asset_id, "oid": order_id},
-        )
-        db.commit()
-        logger.info(
-            "[MOCK] Asset reserved: %s (id=%s) for order %s until %s",
-            asset_name, asset_id, order_id, expires_at.isoformat(),
-        )
-        return {"success": True, "asset_id": asset_id, "asset_name": asset_name}
-
-    # No real asset in pool – fallback to mock ID (development without populated pool)
-    mock_asset_id = 1000 + order_id
-    mock_asset_name = f"VDI-MOCK-{mock_asset_id:04d}"
-    logger.info(
-        "[MOCK] No real asset found – using mock: %s (id=%s) for order %s",
-        mock_asset_name, mock_asset_id, order_id,
-    )
-    return {"success": True, "asset_id": mock_asset_id, "asset_name": mock_asset_name}
-
-
-def _mock_release_asset(asset_id: int) -> dict:
-    import time
-    logger.info("[MOCK] Releasing asset_id=%s back to pool ...", asset_id)
-    time.sleep(0.3)
-    logger.info("[MOCK] Asset %s is FREE", asset_id)
-    return {"success": True, "asset_id": asset_id}

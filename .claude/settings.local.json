@@ -20,7 +20,8 @@
       "Bash(__NEW_LINE_9bf2a83e7e4b7c56__ echo \"\")",
       "Bash(docker cp:*)",
       "Bash(docker exec xp_postgres psql -U xpuser -d itselfservice -c \"SELECT id, status, error_message FROM orders WHERE id=12;\")",
-      "Bash(xargs grep -l \"order_change_log\")"
+      "Bash(xargs grep -l \"order_change_log\")",
+      "Bash(docker exec:*)"
     ]
   }
 }

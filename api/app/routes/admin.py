@@ -9,7 +9,7 @@ from app.database import get_db
 from app.models.asset import AssetPool, AssetStatus, AssetType
 from app.models.audit import AuditLog
 from app.models.config import AppConfig
-from app.models.order import Order
+from app.models.order import Order, OrderStep
 from app.schemas.admin import (
     AppConfigCreate,
     AppConfigRead,
@@ -120,6 +120,47 @@ async def delete_config(key: str, db: AsyncSession = Depends(get_db)) -> None:
     await db.delete(cfg)
     await db.commit()
     logger.info("admin: deleted config key=%s", key)
+
+
+@router.post("/config/ad/test")
+async def test_ad_connection(db: AsyncSession = Depends(get_db)) -> dict:
+    """Tries to bind to AD with current ad.* config and returns a status dict."""
+    from sqlalchemy import text as sa_text
+    from urllib.parse import quote
+
+    async def _get(key: str, default: str = "") -> str:
+        r = await db.execute(sa_text("SELECT value FROM app_config WHERE key = :k"), {"k": key})
+        row = r.fetchone()
+        return row[0] if row and row[0] else default
+
+    server_host = await _get("ad.server", "dc.example.com")
+    server_port = int(await _get("ad.port", "389"))
+    bind_user = await _get("ad.username", "")
+    bind_password = await _get("ad.password", "")
+    domain = await _get("ad.domain", "")
+    base_dn = await _get("ad.base_dn", "DC=example,DC=com")
+
+    raw_user = f"{domain}\\{bind_user}" if domain else bind_user
+    url = (f"ldap+ntlm-password://{quote(raw_user, safe='')}:"
+           f"{quote(bind_password, safe='')}@{server_host}:{server_port}")
+
+    try:
+        from msldap.commons.factory import LDAPConnectionFactory
+        factory = LDAPConnectionFactory.from_url(url)
+        client = factory.get_client()
+        await client.connect()
+        count = 0
+        async for _, err in client.pagedsearch("(objectClass=user)", ["sAMAccountName"],
+                                               tree=base_dn):
+            if err:
+                break
+            count += 1
+            if count >= 1:
+                break
+        await client.disconnect()
+        return {"ok": True, "message": f"Bind successful. Found {count} user(s) in search."}
+    except Exception as exc:
+        return {"ok": False, "message": str(exc)}
 
 
 # ── Asset-Typen ────────────────────────────────────────────────────────────────
@@ -271,24 +312,31 @@ async def delete_asset_type(type_id: int, db: AsyncSession = Depends(get_db)) ->
     if not asset_type:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Asset type {type_id} not found")
 
-    # Check if assets or orders are still linked
-    linked_assets = await db.execute(
-        select(AssetPool).where(AssetPool.asset_type_id == type_id)
+    # Cascade-delete all related data so deletion always succeeds.
+    # 1. Collect order IDs for this asset type
+    order_ids = list(
+        (await db.execute(select(Order.id).where(Order.asset_type_id == type_id))).scalars().all()
     )
-    if linked_assets.scalar_one_or_none():
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"Asset type {type_id} still has assets in the pool",
+    if order_ids:
+        # 2. Nullify current_order_id on assets that point to these orders
+        await db.execute(
+            AssetPool.__table__.update()
+            .where(AssetPool.__table__.c.current_order_id.in_(order_ids))
+            .values(current_order_id=None)
         )
-    linked_orders = await db.execute(
-        select(Order).where(Order.asset_type_id == type_id)
+        # 3. Delete order steps (no DB cascade defined)
+        await db.execute(
+            OrderStep.__table__.delete().where(OrderStep.__table__.c.order_id.in_(order_ids))
+        )
+        # 4. Delete orders (order_change_log cascades via FK)
+        await db.execute(
+            Order.__table__.delete().where(Order.__table__.c.id.in_(order_ids))
+        )
+    # 5. Delete assets in the pool for this type (asset_type_id is NOT NULL)
+    await db.execute(
+        AssetPool.__table__.delete().where(AssetPool.__table__.c.asset_type_id == type_id)
     )
-    if linked_orders.scalar_one_or_none():
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"Asset type {type_id} still has orders referencing it",
-        )
-
+    # 6. runbook_definitions/steps cascade via FK ondelete=CASCADE
     await aaudit(db, "asset_type", asset_type.id, "deleted", old=_type_snap(asset_type), by="api:delete_asset_type")
     await db.delete(asset_type)
     await db.commit()
@@ -363,6 +411,11 @@ async def delete_asset(asset_id: int, db: AsyncSession = Depends(get_db)) -> Non
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Asset {asset_id} has status {asset.status.value!r} – only FREE or MAINTENANCE assets can be deleted",
         )
+    await db.execute(
+        Order.__table__.update()
+        .where(Order.__table__.c.assigned_asset_id == asset_id)
+        .values(assigned_asset_id=None)
+    )
     await aaudit(db, "asset", asset.id, "deleted", old=_asset_snap(asset), by="api:delete_asset")
     await db.delete(asset)
     await db.commit()
@@ -423,3 +476,149 @@ async def list_audit_log(
     query = query.order_by(AuditLog.timestamp.desc()).limit(limit).offset(offset)
     result = await db.execute(query)
     return list(result.scalars().all())
+
+
+# ── Email Templates ─────────────────────────────────────────────────────────────
+
+@router.get("/email-templates")
+async def list_email_templates(db: AsyncSession = Depends(get_db)) -> list[dict]:
+    """Lists all email templates (without body, for table display)."""
+    from sqlalchemy import text as sa_text
+    rows = (await db.execute(sa_text(
+        "SELECT id, event_key, description, subject, is_active, updated_at "
+        "FROM email_templates ORDER BY event_key"
+    ))).fetchall()
+    return [
+        {
+            "id": r[0], "event_key": r[1], "description": r[2],
+            "subject": r[3], "is_active": r[4],
+            "updated_at": r[5].isoformat() if r[5] else None,
+        }
+        for r in rows
+    ]
+
+
+@router.get("/email-templates/{event_key}")
+async def get_email_template(event_key: str, db: AsyncSession = Depends(get_db)) -> dict:
+    """Returns a single email template including body and available_variables."""
+    from sqlalchemy import text as sa_text
+    row = (await db.execute(
+        sa_text(
+            "SELECT id, event_key, description, subject, body, available_variables, is_active, updated_at "
+            "FROM email_templates WHERE event_key = :k"
+        ),
+        {"k": event_key},
+    )).fetchone()
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Template {event_key!r} not found")
+    return {
+        "id": row[0], "event_key": row[1], "description": row[2],
+        "subject": row[3], "body": row[4],
+        "available_variables": row[5] or [],
+        "is_active": row[6],
+        "updated_at": row[7].isoformat() if row[7] else None,
+    }
+
+
+@router.put("/email-templates/{event_key}")
+async def update_email_template(
+    event_key: str,
+    payload: dict,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Updates subject, body, and/or is_active for an email template."""
+    from sqlalchemy import text as sa_text
+    row = (await db.execute(
+        sa_text("SELECT id FROM email_templates WHERE event_key = :k"),
+        {"k": event_key},
+    )).fetchone()
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Template {event_key!r} not found")
+
+    fields: list[str] = []
+    params: dict = {"k": event_key}
+    if "subject" in payload:
+        fields.append("subject = :subject")
+        params["subject"] = payload["subject"]
+    if "body" in payload:
+        fields.append("body = :body")
+        params["body"] = payload["body"]
+    if "is_active" in payload:
+        fields.append("is_active = :is_active")
+        params["is_active"] = bool(payload["is_active"])
+    if not fields:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="No fields to update")
+
+    fields.append("updated_at = NOW()")
+    await db.execute(
+        sa_text(f"UPDATE email_templates SET {', '.join(fields)} WHERE event_key = :k"),
+        params,
+    )
+    await db.commit()
+    logger.info("admin: updated email_template event_key=%s fields=%s", event_key, list(payload.keys()))
+    return {"ok": True, "event_key": event_key}
+
+
+# ── Email Test ──────────────────────────────────────────────────────────────────
+
+@router.post("/config/email/test")
+async def test_email(payload: dict = None, db: AsyncSession = Depends(get_db)) -> dict:
+    """Sends a test email using the current email.* config settings."""
+    import asyncio
+    import smtplib
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.text import MIMEText
+    from sqlalchemy import text as sa_text
+
+    async def _get(key: str, default: str = "") -> str:
+        r = await db.execute(sa_text("SELECT value FROM app_config WHERE key = :k"), {"k": key})
+        row = r.fetchone()
+        return row[0] if row and row[0] else default
+
+    smtp_host = await _get("email.smtp_server", "localhost")
+    smtp_port = int(await _get("email.smtp_port", "25"))
+    smtp_user = await _get("email.username", "")
+    smtp_password = await _get("email.password", "")
+    mail_from = await _get("email.from", "noreply@example.com")
+    from_name = await _get("email.from_name", "XenPool IT Selfservice")
+    bcc = await _get("email.bcc", "")
+    company_name = await _get("company.name", "XenPool")
+
+    to_address = (payload or {}).get("to") or bcc or mail_from
+
+    subject = f"[{company_name}] Test Email"
+    html_body = f"""<!DOCTYPE html>
+<html><head><meta charset="UTF-8"></head>
+<body style="font-family:Arial,sans-serif;background:#f4f4f4;padding:20px;">
+<table width="620" style="background:#fff;border-radius:4px;margin:0 auto;">
+  <tr><td style="background:#BB0A30;padding:24px 32px;color:#fff;font-size:20px;font-weight:bold;">
+    {company_name} IT Self-Service
+  </td></tr>
+  <tr><td style="padding:28px 32px;font-size:14px;color:#333;">
+    <p>This is a test email from the {company_name} IT Self-Service system.</p>
+    <p>If you received this, your SMTP configuration is working correctly.</p>
+  </td></tr>
+  <tr><td style="background:#f8f8f8;padding:16px 32px;font-size:11px;color:#aaa;text-align:center;">
+    {company_name} IT Self-Service | This email was generated automatically.
+  </td></tr>
+</table>
+</body></html>"""
+
+    def _send():
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"] = f"{from_name} <{mail_from}>"
+        msg["To"] = to_address
+        msg.attach(MIMEText(html_body, "html", "utf-8"))
+        with smtplib.SMTP(smtp_host, smtp_port) as server:
+            if smtp_port == 587:
+                server.starttls()
+            if smtp_user:
+                server.login(smtp_user, smtp_password)
+            server.sendmail(mail_from, [to_address], msg.as_string())
+
+    try:
+        await asyncio.get_event_loop().run_in_executor(None, _send)
+        return {"ok": True, "message": f"Test email sent to {to_address}"}
+    except Exception as exc:
+        return {"ok": False, "message": str(exc)}

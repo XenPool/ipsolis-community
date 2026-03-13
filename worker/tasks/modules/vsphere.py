@@ -6,37 +6,26 @@ Corresponds to Ivanti modules 'Update-VMwareTools' and 'Restart-VM'.
 
 import json
 import logging
-import os
 import subprocess
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 SCRIPTS_DIR = Path("/app/scripts/vsphere")
 
 
 def update_vmware_tools(asset_name: str) -> dict:
     """Aktualisiert VMware Tools auf der VM."""
-    if ENVIRONMENT == "development":
-        return _mock_update_tools(asset_name)
-
     return _run_ps_script("Update-VMwareTools.ps1", {"VMName": asset_name})
 
 
 def restart_vm(asset_name: str) -> dict:
     """Reboots the VM and waits for availability."""
-    if ENVIRONMENT == "development":
-        return _mock_restart_vm(asset_name)
-
     return _run_ps_script("Restart-VM.ps1", {"VMName": asset_name})
 
 
 def get_vm_status(asset_name: str) -> dict:
     """Returns the current status of the VM."""
-    if ENVIRONMENT == "development":
-        return _mock_get_status(asset_name)
-
     return _run_ps_script("Get-VMStatus.ps1", {"VMName": asset_name})
 
 
@@ -67,33 +56,3 @@ def _run_ps_script(script_name: str, params: dict) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-
-# ── Mocks ─────────────────────────────────────────────────────────────────────
-
-def _mock_update_tools(asset_name: str) -> dict:
-    import time
-    logger.info("[MOCK] vSphere: Updating VMware Tools on '%s' ...", asset_name)
-    time.sleep(2.0)  # Simuliert Tools-Update-Laufzeit
-    logger.info("[MOCK] vSphere: VMware Tools updated on '%s' (version: 12.3.5)", asset_name)
-    return {"success": True, "tools_version": "12.3.5", "reboot_required": False}
-
-
-def _mock_restart_vm(asset_name: str) -> dict:
-    import time
-    logger.info("[MOCK] vSphere: Initiating reboot of '%s' ...", asset_name)
-    time.sleep(1.0)
-    logger.info("[MOCK] vSphere: '%s' rebooting ...", asset_name)
-    time.sleep(3.0)  # Simuliert Boot-Zeit
-    logger.info("[MOCK] vSphere: '%s' is back online (Tools running)", asset_name)
-    return {"success": True, "power_state": "poweredOn", "tools_status": "running"}
-
-
-def _mock_get_status(asset_name: str) -> dict:
-    logger.info("[MOCK] vSphere: Getting status of '%s'", asset_name)
-    return {
-        "success": True,
-        "power_state": "poweredOn",
-        "tools_status": "running",
-        "ip_address": "10.100.50.42",
-        "guest_os": "Windows Server 2022",
-    }

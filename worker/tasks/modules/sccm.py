@@ -8,7 +8,6 @@ import os
 
 logger = logging.getLogger(__name__)
 
-ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 SCCM_TASK_SEQUENCE_ID = os.getenv("SCCM_TASK_SEQUENCE_ID", "TSQ00001")
 SCCM_SITE_CODE = os.getenv("SCCM_SITE_CODE", "XP1")
 
@@ -19,17 +18,11 @@ def trigger_reinstall(asset_name: str) -> dict:
 
     Nach dem Trigger: VM wird reinstalliert und ist danach wieder FREE im Pool.
     """
-    if ENVIRONMENT == "development":
-        return _mock_trigger_reinstall(asset_name)
-
     return _production_trigger(asset_name)
 
 
 def check_reinstall_status(asset_name: str) -> dict:
     """Checks whether the SCCM reinstallation is complete."""
-    if ENVIRONMENT == "development":
-        return _mock_check_status(asset_name)
-
     return _production_check_status(asset_name)
 
 
@@ -69,35 +62,3 @@ def _production_trigger(asset_name: str) -> dict:
 def _production_check_status(asset_name: str) -> dict:
     return {"success": True, "status": "unknown", "message": "Not yet implemented"}
 
-
-# ── Mocks ─────────────────────────────────────────────────────────────────────
-
-def _mock_trigger_reinstall(asset_name: str) -> dict:
-    import time
-    logger.info(
-        "[MOCK] SCCM: Triggering Unattended Reinstall for '%s' "
-        "(TaskSequence: %s, Site: %s) ...",
-        asset_name, SCCM_TASK_SEQUENCE_ID, SCCM_SITE_CODE,
-    )
-    time.sleep(1.5)
-    logger.info(
-        "[MOCK] SCCM: Reinstall task queued for '%s' – "
-        "estimated completion: ~45 minutes",
-        asset_name,
-    )
-    return {
-        "success": True,
-        "computer": asset_name,
-        "task_sequence_id": SCCM_TASK_SEQUENCE_ID,
-        "status": "queued",
-    }
-
-
-def _mock_check_status(asset_name: str) -> dict:
-    logger.info("[MOCK] SCCM: Checking reinstall status for '%s' ...", asset_name)
-    return {
-        "success": True,
-        "computer": asset_name,
-        "status": "completed",
-        "last_execution": "2025-01-01T12:00:00Z",
-    }

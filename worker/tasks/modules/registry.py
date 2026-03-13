@@ -50,6 +50,7 @@ def _notify_send_confirmation(
 
 
 def _notify_send_provision(
+    db,
     user_email: str,
     user_name: str,
     asset_name: str,
@@ -60,6 +61,7 @@ def _notify_send_provision(
     if expires_at is None:
         expires_at = datetime.now(timezone.utc)
     return notifications.send_provision_confirmation(
+        db=db,
         user_email=user_email or "",
         user_name=user_name or "",
         asset_name=asset_name or "",
@@ -69,11 +71,13 @@ def _notify_send_provision(
 
 
 def _notify_send_reclaim(
+    db,
     user_email: str,
     user_name: str,
     asset_name: str,
 ) -> dict:
     return notifications.send_reclaim_notification(
+        db=db,
         user_email=user_email or "",
         user_name=user_name or "",
         asset_name=asset_name or "",
@@ -187,7 +191,7 @@ MODULE_REGISTRY: dict[str, dict] = {
     },
     "notifications.send_provision_confirmation": {
         "fn": _notify_send_provision,
-        "needs_db": False,
+        "needs_db": True,
         "description": "Sends provisioning confirmation with VM name and RDP access",
         "params": ["user_email", "user_name", "asset_name", "rdp_users", "expires_at"],
         "output_keys": [],
@@ -195,7 +199,7 @@ MODULE_REGISTRY: dict[str, dict] = {
     },
     "notifications.send_reclaim": {
         "fn": _notify_send_reclaim,
-        "needs_db": False,
+        "needs_db": True,
         "description": "Notifies user about their VM being returned to the pool",
         "params": ["user_email", "user_name", "asset_name"],
         "output_keys": [],

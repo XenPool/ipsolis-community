@@ -15,15 +15,52 @@ principal_source-Werte:
 
 import json
 import logging
-import os
-import time
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from tasks.modules.config_reader import get_config, get_config_int
+
 logger = logging.getLogger(__name__)
 
-ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
+
+# ── LDAP helpers (msldap – supports NTLM signing for modern Windows Server) ─────
+
+def _build_msldap_url(db: Session) -> tuple[str, str]:
+    """Returns (msldap_url, base_dn) using ad.* keys from app_config."""
+    from urllib.parse import quote
+
+    server_host = get_config(db, "ad.server", "dc.example.com")
+    server_port = get_config_int(db, "ad.port", 389)
+    bind_user = get_config(db, "ad.username", "")
+    bind_password = get_config(db, "ad.password", "")
+    domain = get_config(db, "ad.domain", "")
+    base_dn = get_config(db, "ad.base_dn", "DC=example,DC=com")
+
+    raw_user = f"{domain}\\{bind_user}" if domain else bind_user
+    url = (f"ldap+ntlm-password://{quote(raw_user, safe='')}:"
+           f"{quote(bind_password, safe='')}@{server_host}:{server_port}")
+    return url, base_dn
+
+
+async def _resolve_dn_async(principal: str, client, base_dn: str) -> str:
+    """Resolves an email or sAMAccountName to the user's full DN in AD."""
+    if "@" in principal:
+        # Try mail first, fall back to UPN (userPrincipalName) — covers users with no mail attribute
+        ldap_filter = f"(|(mail={principal})(userPrincipalName={principal}))"
+    else:
+        sam = principal.split("\\")[-1] if "\\" in principal else principal
+        ldap_filter = f"(sAMAccountName={sam})"
+
+    async for entry, err in client.pagedsearch(ldap_filter, ["distinguishedName"], tree=base_dn):
+        if err:
+            raise ValueError(f"LDAP search error: {err}")
+        dn = entry["attributes"].get("distinguishedName")
+        if isinstance(dn, list):
+            dn = dn[0]
+        if dn:
+            return dn
+    raise ValueError(f"User '{principal}' not found in AD")
 
 
 # ── Principal resolution ────────────────────────────────────────────────────────
@@ -90,41 +127,68 @@ def _write_change_log(
 
 # ── Handler-Funktionen ─────────────────────────────────────────────────────────
 
-def _grant_ad_group(identifier: str, principal: str) -> dict:
-    """Adds principal to the AD group identified by identifier."""
-    if ENVIRONMENT == "development":
-        logger.info("[MOCK] AD Group grant: %s → %s", principal, identifier)
-        time.sleep(0.1)
-        return {"success": True, "mock": True}
-    # Production: pypsrp / WinRM
-    raise NotImplementedError("AD group grant not yet implemented for production")
+def _grant_ad_group(identifier: str, principal: str, db: Session) -> dict:
+    """Adds principal to the AD group identified by its DN."""
+    import asyncio
+    from msldap.commons.factory import LDAPConnectionFactory
+
+    url, base_dn = _build_msldap_url(db)
+
+    async def _do():
+        factory = LDAPConnectionFactory.from_url(url)
+        client = factory.get_client()
+        await client.connect()
+        try:
+            user_dn = await _resolve_dn_async(principal, client, base_dn)
+            _, err = await client.add_user_to_group(user_dn, identifier)
+            if err and "already" not in str(err).lower() and "exists" not in str(err).lower():
+                raise RuntimeError(f"LDAP add_user_to_group failed: {err}")
+            return user_dn
+        finally:
+            await client.disconnect()
+
+    user_dn = asyncio.run(_do())
+    logger.info("AD group grant OK: %s → %s (dn=%s)", principal, identifier, user_dn)
+    return {"success": True, "user_dn": user_dn}
 
 
-def _grant_entra_group(identifier: str, principal: str) -> dict:
+def _grant_entra_group(identifier: str, principal: str, db: Session) -> dict:
     """Adds principal to the Entra group identified by identifier (MS Graph)."""
-    if ENVIRONMENT == "development":
-        logger.info("[MOCK] Entra Group grant: %s → %s", principal, identifier)
-        time.sleep(0.1)
-        return {"success": True, "mock": True}
-    raise NotImplementedError("Entra group grant not yet implemented for production")
+    raise NotImplementedError("Entra group grant not yet implemented")
 
 
-def _revoke_ad_group(identifier: str, principal: str) -> dict:
-    """Entfernt principal aus AD-Gruppe identifier."""
-    if ENVIRONMENT == "development":
-        logger.info("[MOCK] AD Group revoke: %s ← %s", principal, identifier)
-        time.sleep(0.1)
-        return {"success": True, "mock": True}
-    raise NotImplementedError("AD group revoke not yet implemented for production")
+def _revoke_ad_group(identifier: str, principal: str, db: Session) -> dict:
+    """Removes principal from the AD group identified by its DN."""
+    import asyncio
+    from msldap.commons.factory import LDAPConnectionFactory
+
+    url, base_dn = _build_msldap_url(db)
+
+    async def _do():
+        factory = LDAPConnectionFactory.from_url(url)
+        client = factory.get_client()
+        await client.connect()
+        try:
+            user_dn = await _resolve_dn_async(principal, client, base_dn)
+            _, err = await client.del_user_from_group(user_dn, identifier)
+            if err:
+                err_s = str(err).lower()
+                # Treat "already not a member" as success (idempotent)
+                # AD error 0x561 (WILL_NOT_PERFORM / problem 5003) = user not in group
+                if not any(s in err_s for s in ("no such", "not a member", "will_not_perform", "0x561", "5003")):
+                    raise RuntimeError(f"LDAP del_user_from_group failed: {err}")
+            return user_dn
+        finally:
+            await client.disconnect()
+
+    user_dn = asyncio.run(_do())
+    logger.info("AD group revoke OK: %s ← %s (dn=%s)", principal, identifier, user_dn)
+    return {"success": True, "user_dn": user_dn}
 
 
-def _revoke_entra_group(identifier: str, principal: str) -> dict:
-    """Entfernt principal aus Entra-Gruppe identifier."""
-    if ENVIRONMENT == "development":
-        logger.info("[MOCK] Entra Group revoke: %s ← %s", principal, identifier)
-        time.sleep(0.1)
-        return {"success": True, "mock": True}
-    raise NotImplementedError("Entra group revoke not yet implemented for production")
+def _revoke_entra_group(identifier: str, principal: str, db: Session) -> dict:
+    """Removes principal from Entra group identifier."""
+    raise NotImplementedError("Entra group revoke not yet implemented")
 
 
 _GRANT_HANDLERS: dict[str, object] = {
@@ -162,7 +226,7 @@ def grant(
 
     if not row or not row[0]:
         logger.info("[target_executor] No targets defined for asset_type_id=%s", asset_type_id)
-        return {"success": True, "grants": 0, "mock": ENVIRONMENT == "development"}
+        return {"success": True, "grants": 0}
 
     targets: list[dict] = row[0]
     granted = 0
@@ -208,12 +272,12 @@ def grant(
                 continue
 
             try:
-                result = handler(identifier, principal)
+                result = handler(identifier, principal, db)
                 state = "success" if result.get("success") else "failed"
                 _write_change_log(
                     db, order_id, target_type, identifier, "grant",
                     principal=principal, state=state,
-                    metadata={"mock": result.get("mock", False)},
+                    metadata={},
                     idempotency_key=ikey,
                 )
                 if state == "success":
@@ -235,7 +299,7 @@ def grant(
 
     if errors:
         return {"success": False, "grants": granted, "errors": errors}
-    return {"success": True, "grants": granted, "mock": ENVIRONMENT == "development"}
+    return {"success": True, "grants": granted}
 
 
 def revoke(
@@ -271,7 +335,7 @@ def revoke(
             "[target_executor] No change log entries to revoke for user=%s asset_type=%s",
             user_email, asset_type_id,
         )
-        return {"success": True, "revokes": 0, "mock": ENVIRONMENT == "development"}
+        return {"success": True, "revokes": 0}
 
     revoked = 0
     errors: list[str] = []
@@ -290,7 +354,7 @@ def revoke(
             continue
 
         try:
-            result = handler(identifier, principal)
+            result = handler(identifier, principal, db)
             new_state = "rolled_back" if result.get("success") else "failed"
             db.execute(
                 text("UPDATE order_change_log SET state = :state WHERE id = :id"),
@@ -315,4 +379,4 @@ def revoke(
 
     if errors:
         return {"success": False, "revokes": revoked, "errors": errors}
-    return {"success": True, "revokes": revoked, "mock": ENVIRONMENT == "development"}
+    return {"success": True, "revokes": revoked}

@@ -12,6 +12,7 @@ from sqlalchemy.orm import selectinload
 
 from app.database import get_db
 from app.models.asset import AssetPool, AssetStatus, AssetType
+from app.models.config import AppConfig
 from app.models.global_var import GlobalVar
 from app.models.ps_module import PsModule
 from app.models.order import Order, OrderAction, OrderStatus
@@ -619,28 +620,61 @@ async def ps_modules_page(
     )
 
 
-# ── Global Variables UI ────────────────────────────────────────────────────────
+# ── Settings UI ────────────────────────────────────────────────────────────────
 
-@router.get("/global-vars", response_class=HTMLResponse)
-async def global_vars_page(
+@router.get("/settings", response_class=HTMLResponse)
+async def settings_page(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
-    result = await db.execute(select(GlobalVar).order_by(GlobalVar.key))
-    vars_list = result.scalars().all()
-    _SECRET_MASK = "***"
-    masked = [
+    _MASK = "***"
+
+    # Load GlobalVar (script variables)
+    vars_result = await db.execute(select(GlobalVar).order_by(GlobalVar.key))
+    vars_list = vars_result.scalars().all()
+    masked_vars = [
         {
             "id": v.id,
             "key": v.key,
-            "value": _SECRET_MASK if v.is_secret else (v.value or ""),
+            "value": _MASK if v.is_secret else (v.value or ""),
             "description": v.description or "",
             "is_secret": v.is_secret,
             "updated_at": v.updated_at,
         }
         for v in vars_list
     ]
-    return templates.TemplateResponse(
-        request, "ui/global_vars.html",
-        {"vars": masked, "active_page": "global-vars"},
+
+    # Load ad.* config keys
+    ad_result = await db.execute(
+        select(AppConfig).where(AppConfig.key.like("ad.%")).order_by(AppConfig.key)
     )
+    ad_rows = ad_result.scalars().all()
+    ad_config = {r.key: (_MASK if r.is_secret else (r.value or "")) for r in ad_rows}
+
+    # Load email.* config keys as dict for editable form
+    email_result = await db.execute(
+        select(AppConfig).where(AppConfig.key.like("email.%")).order_by(AppConfig.key)
+    )
+    email_rows = email_result.scalars().all()
+    email_config = {r.key: (_MASK if r.is_secret else (r.value or "")) for r in email_rows}
+
+    # Load email templates
+    tpl_result = await db.execute(
+        text("SELECT event_key, description, subject, is_active FROM email_templates ORDER BY event_key")
+    )
+    email_templates = [
+        {"event_key": r[0], "description": r[1], "subject": r[2], "is_active": r[3]}
+        for r in tpl_result.fetchall()
+    ]
+
+    return templates.TemplateResponse(
+        request, "ui/settings.html",
+        {"vars": masked_vars, "ad_config": ad_config, "email_config": email_config,
+         "email_templates": email_templates, "active_page": "settings"},
+    )
+
+
+@router.get("/global-vars", response_class=RedirectResponse)
+async def global_vars_redirect() -> RedirectResponse:
+    """Backward-compat redirect for old bookmarks."""
+    return RedirectResponse(url="/ui/settings#vars", status_code=301)

@@ -13,8 +13,8 @@ pydantic-settings==2.7.0
 # WinRM / pypsrp for Active Roles
 pypsrp==0.8.1
 
-# LDAP for Active Directory lookups
-ldap3==2.9.1
+# LDAP for Active Directory (msldap supports NTLM signing required by modern Windows Server)
+msldap
 
 # HTTP
 httpx==0.28.1

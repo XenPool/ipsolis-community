@@ -1,21 +1,21 @@
-"""Module: Active Directory – LDAP user lookup via ldap3.
+"""Module: Active Directory – LDAP user lookup via msldap.
 
 Reads AD configuration (server, base DN, credentials) from the app_config table.
 Returns user information (name, email, department).
+
+Uses msldap instead of ldap3 because msldap supports NTLM with message signing,
+which is required by modern Windows Server AD (LDAPServerIntegrity = Require signing).
 
 Corresponds to the Ivanti module 'QAD Lookup' (standard LDAP instead of Quest AD).
 """
 
 import logging
-import os
 
 from sqlalchemy.orm import Session
 
 from tasks.modules.config_reader import get_config, get_config_int
 
 logger = logging.getLogger(__name__)
-
-ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 
 
 def lookup_user(identifier: str, db: Session) -> dict:
@@ -31,18 +31,12 @@ def lookup_user(identifier: str, db: Session) -> dict:
                   "first_name": str, "last_name": str, "department": str | None}
         Error:   {"success": False, "error": str}
     """
-    if ENVIRONMENT == "development":
-        return _mock_lookup_user(identifier)
-
     return _ldap_lookup_user(identifier, db)
 
 
 def _ldap_lookup_user(identifier: str, db: Session) -> dict:
-    """Real LDAP lookup via ldap3."""
-    try:
-        import ldap3
-    except ImportError:
-        return {"success": False, "error": "ldap3 not installed"}
+    """Real LDAP lookup via msldap (supports NTLM signing)."""
+    import asyncio
 
     server_host = get_config(db, "ad.server", "dc.example.com")
     server_port = get_config_int(db, "ad.port", 389)
@@ -53,32 +47,53 @@ def _ldap_lookup_user(identifier: str, db: Session) -> dict:
 
     # sAMAccountName or mail filter depending on identifier type
     if "@" in identifier:
-        ldap_filter = f"(mail={ldap3.utils.conv.escape_filter_chars(identifier)})"
+        ldap_filter = f"(mail={identifier})"
     else:
         sam = identifier.split("\\")[-1] if "\\" in identifier else identifier
-        ldap_filter = f"(sAMAccountName={ldap3.utils.conv.escape_filter_chars(sam)})"
-
-    bind_dn = f"{domain}\\{bind_user}" if domain else bind_user
+        ldap_filter = f"(sAMAccountName={sam})"
 
     try:
-        server = ldap3.Server(server_host, port=server_port, get_info=ldap3.NONE)
-        conn = ldap3.Connection(server, user=bind_dn, password=bind_password, auto_bind=True)
+        result = asyncio.run(_msldap_lookup(
+            server_host, server_port, domain, bind_user, bind_password,
+            base_dn, ldap_filter, identifier
+        ))
+        return result
+    except Exception as e:
+        logger.error("LDAP lookup failed for '%s': %s", identifier, e)
+        return {"success": False, "error": str(e)}
 
-        conn.search(
-            search_base=base_dn,
-            search_filter=ldap_filter,
-            search_scope=ldap3.SUBTREE,
-            attributes=["mail", "displayName", "givenName", "sn", "department", "sAMAccountName"],
-        )
 
-        if not conn.entries:
+async def _msldap_lookup(server_host, server_port, domain, bind_user, bind_password,
+                          base_dn, ldap_filter, identifier) -> dict:
+    from msldap.commons.factory import LDAPConnectionFactory
+    from urllib.parse import quote
+
+    user_escaped = quote(f"{domain}\\{bind_user}" if domain else bind_user, safe="")
+    pass_escaped = quote(bind_password, safe="")
+    url = f"ldap+ntlm-password://{user_escaped}:{pass_escaped}@{server_host}:{server_port}"
+
+    factory = LDAPConnectionFactory.from_url(url)
+    client = factory.get_client()
+    await client.connect()
+
+    try:
+        attrs = ["mail", "displayName", "givenName", "sn", "department", "sAMAccountName",
+                 "distinguishedName"]
+        found = None
+        async for entry, err in client.pagedsearch(ldap_filter, attrs, tree=base_dn):
+            if err:
+                raise Exception(str(err))
+            found = entry["attributes"]
+            break
+
+        if not found:
             return {"success": False, "error": f"User '{identifier}' not found in AD"}
 
-        entry = conn.entries[0]
-
-        def _attr(name: str) -> str | None:
-            val = getattr(entry, name, None)
-            return str(val) if val else None
+        def _attr(key):
+            v = found.get(key)
+            if isinstance(v, list):
+                return v[0] if v else None
+            return str(v) if v else None
 
         return {
             "success": True,
@@ -88,58 +103,8 @@ def _ldap_lookup_user(identifier: str, db: Session) -> dict:
             "last_name": _attr("sn"),
             "department": _attr("department"),
             "sam_account": _attr("sAMAccountName"),
+            "dn": _attr("distinguishedName"),
         }
+    finally:
+        await client.disconnect()
 
-    except Exception as e:
-        logger.error("LDAP lookup failed for '%s': %s", identifier, e)
-        return {"success": False, "error": str(e)}
-
-
-# ── Mocks ─────────────────────────────────────────────────────────────────────
-
-_MOCK_USERS: dict[str, dict] = {
-    "s.muster": {
-        "success": True,
-        "email": "stefan.muster@xenpool.de",
-        "display_name": "Stefan Muster",
-        "first_name": "Stefan",
-        "last_name": "Muster",
-        "department": "IT",
-        "sam_account": "s.muster",
-    },
-    "p.nutzer": {
-        "success": True,
-        "email": "peter.nutzer@xenpool.de",
-        "display_name": "Peter Nutzer",
-        "first_name": "Peter",
-        "last_name": "Nutzer",
-        "department": "Finance",
-        "sam_account": "p.nutzer",
-    },
-}
-
-
-def _mock_lookup_user(identifier: str) -> dict:
-    logger.info("[MOCK] AD lookup for '%s'", identifier)
-
-    # Normalize: remove domain prefix and @ for mock lookup
-    sam = identifier.split("\\")[-1] if "\\" in identifier else identifier
-    sam = sam.split("@")[0].lower()
-
-    if sam in _MOCK_USERS:
-        result = _MOCK_USERS[sam].copy()
-        logger.info("[MOCK] AD found: %s (%s)", result["display_name"], result["email"])
-        return result
-
-    # Generic fallback: return identifier as mock user
-    display = identifier.replace("\\", " ").replace(".", " ").replace("@", " ").title()
-    logger.info("[MOCK] AD not found, generating fallback for '%s'", identifier)
-    return {
-        "success": True,
-        "email": identifier if "@" in identifier else f"{sam}@xenpool.de",
-        "display_name": display,
-        "first_name": display.split()[0] if display.split() else display,
-        "last_name": display.split()[-1] if len(display.split()) > 1 else "",
-        "department": None,
-        "sam_account": sam,
-    }

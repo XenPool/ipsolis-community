@@ -15,11 +15,10 @@ def make_log_json(
     input_params: dict,
     output: dict,
     duration_ms: float,
-    mock: bool = False,
 ) -> str:
     """Creates a structured JSON log entry for a step.
 
-    Format: {"module": key, "input": {...}, "output": {...}, "duration_ms": n, "mock": bool}
+    Format: {"module": key, "input": {...}, "output": {...}, "duration_ms": n}
     """
 
     def _sanitize(obj):
@@ -38,7 +37,6 @@ def make_log_json(
         "input": _sanitize(input_params),
         "output": _sanitize(output),
         "duration_ms": round(duration_ms),
-        "mock": mock,
     })
 
 

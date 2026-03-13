@@ -25,6 +25,9 @@ python-multipart==0.0.20
 jinja2==3.1.4
 aiofiles==24.1.0
 
+# Active Directory / LDAP (msldap supports NTLM signing required by modern Windows Server)
+msldap
+
 # Email
 aiosmtplib==3.0.2
 

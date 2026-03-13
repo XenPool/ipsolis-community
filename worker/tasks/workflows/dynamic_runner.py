@@ -31,9 +31,6 @@ DATABASE_URL = os.getenv(
     "postgresql+psycopg2://xpuser:changeme@localhost:5432/itselfservice",
 ).replace("postgresql+asyncpg://", "postgresql+psycopg2://")
 
-ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
-MOCK_SCRIPTS = os.getenv("MOCK_SCRIPTS", "true" if ENVIRONMENT == "development" else "false").lower() == "true"
-
 
 def _get_db_session() -> Session:
     engine = create_engine(DATABASE_URL, pool_pre_ping=True)
@@ -56,8 +53,7 @@ def _run_step_inline(
     try:
         result = fn()
         duration_ms = (time.monotonic() - t_start) * 1000
-        mock = result.get("mock", ENVIRONMENT == "development")
-        log_json = make_log_json(step_name, {}, result, duration_ms, mock)
+        log_json = make_log_json(step_name, {}, result, duration_ms)
 
         if not result.get("success", True):
             raise RuntimeError(result.get("error", f"Step {step_name!r} returned success=False"))
@@ -261,27 +257,26 @@ def _run_targets_mode(
         )
 
     elif action == "delete":
-        # Step 1: Revoke access (critical) – no group targets for return_to_pool
-        if deprovision_policy != "return_to_pool":
-            result = _run_step_inline(
-                db, order_id, "Revoke access",
-                lambda: target_executor.revoke(
-                    db=db,
-                    user_email=order.get("user_email") or "",
-                    asset_type_id=order["asset_type_id"],
-                ),
-                critical=True,
+        # Step 1: Revoke access (critical) – always, regardless of deprovision_policy
+        result = _run_step_inline(
+            db, order_id, "Revoke access",
+            lambda: target_executor.revoke(
+                db=db,
+                user_email=order.get("user_email") or "",
+                asset_type_id=order["asset_type_id"],
+            ),
+            critical=True,
+        )
+        if result is None:
+            audit_helper.waudit(
+                db, "order", order_id, "status_changed",
+                old={"status": "processing"},
+                new={"status": "failed", "step": "Revoke access"},
+                by="celery:dynamic_runner[targets_only]",
+                ctx=str(celery_task.request.id),
             )
-            if result is None:
-                audit_helper.waudit(
-                    db, "order", order_id, "status_changed",
-                    old={"status": "processing"},
-                    new={"status": "failed", "step": "Revoke access"},
-                    by="celery:dynamic_runner[targets_only]",
-                    ctx=str(celery_task.request.id),
-                )
-                db.commit()
-                return {"success": False, "order_id": order_id, "failed_step": "Revoke access"}
+            db.commit()
+            return {"success": False, "order_id": order_id, "failed_step": "Revoke access"}
 
         # Step 2+: Policy-Routing
         asset_id = order.get("assigned_asset_id")
@@ -291,7 +286,7 @@ def _run_targets_mode(
             pass
 
         elif deprovision_policy == "return_to_pool":
-            # Only release pool reservation, no group targets
+            # Release pool reservation (access already revoked above)
             if needs_asset and asset_id:
                 _run_step_inline(
                     db, order_id, "Release assignment",
@@ -386,13 +381,10 @@ def _run_db_script(
     db: Session,
     script_module_id: int,
     rendered_params: dict,
-    force_real: bool = False,
 ) -> dict:
     """Executes a script_module from the DB.
 
-    In development mode: returns a mock success result without actually running,
-    unless force_real=True (used by the module editor test runner).
-    In production: writes to a temp file and calls pwsh.
+    Writes to a temp file and calls pwsh/python/bash.
     Returns a dict with at minimum {"success": bool}.
     """
     # Load script content
@@ -404,13 +396,6 @@ def _run_db_script(
         return {"success": False, "error": f"script_module {script_module_id} not found"}
 
     script_name, script_content, script_type = row[0], row[1], row[2]
-
-    if MOCK_SCRIPTS and not force_real:
-        logger.info(
-            "[MOCK] script_module=%s params=%s – returning mock success",
-            script_name, list(rendered_params.keys()),
-        )
-        return {"success": True, "mock": True, "module": script_name}
 
     global_vars = _load_global_vars(db)
     preamble = _build_ps_preamble(global_vars, rendered_params)
@@ -646,8 +631,7 @@ def _run_runbook_path(
                 # New path: execute DB script with global vars injected
                 logger.debug("[runbook_path] script_module_id=%s params: %s", script_module_id, list(rendered.keys()))
                 result = _run_db_script(db, script_module_id, rendered)
-                mock = result.get("mock", ENVIRONMENT == "development")
-                log_json = make_log_json(step_ref, rendered, result, (time.monotonic() - t_start) * 1000, mock)
+                log_json = make_log_json(step_ref, rendered, result, (time.monotonic() - t_start) * 1000)
             else:
                 # Legacy path: Python module registry
                 from tasks.modules.registry import MODULE_REGISTRY
@@ -659,12 +643,11 @@ def _run_runbook_path(
                 logger.debug("[runbook_path] %s params: %s", module_key, list(rendered.keys()))
                 result = fn(db, **rendered) if needs_db else fn(**rendered)
                 duration_ms = (time.monotonic() - t_start) * 1000
-                mock = result.get("mock", ENVIRONMENT == "development")
                 for ok in reg.get("output_keys", []):
                     if ok in result:
                         ctx[ok] = result[ok]
                         logger.debug("[runbook_path] ctx[%s] = %s", ok, result[ok])
-                log_json = make_log_json(module_key, rendered, result, duration_ms, mock)
+                log_json = make_log_json(module_key, rendered, result, duration_ms)
 
             if not result.get("success", True):
                 raise RuntimeError(result.get("error", f"Module {step_ref} returned success=False"))
@@ -997,7 +980,7 @@ def test_script_module(self: Task, script_module_id: int, params: dict) -> dict:
     db = _get_db_session()
     t_start = time.monotonic()
     try:
-        result = _run_db_script(db, script_module_id, params, force_real=True)
+        result = _run_db_script(db, script_module_id, params)
         duration_ms = (time.monotonic() - t_start) * 1000
         return {
             "success": result.get("success", True),

@@ -1,0 +1,661 @@
+{% extends "base.html" %}
+
+{% block title %}Settings – XenPool Admin{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+  <h1 class="text-lg font-semibold text-gray-900">Settings</h1>
+  <p class="text-xs text-gray-500 mt-1">System configuration, service accounts, and script variables.</p>
+</div>
+
+<!-- Tab bar -->
+<div class="border-b border-gray-200 mb-6">
+  <nav class="flex gap-1" id="tab-nav">
+    <button onclick="showTab('ad')" id="tab-btn-ad"
+            class="tab-btn px-4 py-2 text-sm font-medium border-b-2 border-blue-600 text-blue-700">
+      Active Directory
+    </button>
+    <button onclick="showTab('vars')" id="tab-btn-vars"
+            class="tab-btn px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">
+      Script Variables
+    </button>
+    <button onclick="showTab('email')" id="tab-btn-email"
+            class="tab-btn px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">
+      E-Mail
+    </button>
+    <button onclick="showTab('sccm')" id="tab-btn-sccm"
+            class="tab-btn px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">
+      SCCM
+    </button>
+    <button onclick="showTab('hosting')" id="tab-btn-hosting"
+            class="tab-btn px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">
+      Hosting Infra
+    </button>
+  </nav>
+</div>
+
+<!-- ── Tab: Active Directory ─────────────────────────────────────────────── -->
+<div id="tab-ad">
+  <div id="ad-banner" class="hidden mb-4 px-4 py-3 rounded text-sm font-medium"></div>
+
+  <div class="bg-white rounded-lg border border-gray-200 p-6 max-w-2xl">
+    <h2 class="text-sm font-semibold text-gray-700 mb-4">LDAP / Active Directory Connection</h2>
+    <div class="space-y-4">
+
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">Server (DC hostname / IP)</label>
+          <input type="text" id="ad-server" value="{{ ad_config.get('ad.server', '') }}"
+                 placeholder="dc.example.com"
+                 class="w-full rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400 font-mono">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">Port</label>
+          <input type="number" id="ad-port" value="{{ ad_config.get('ad.port', '389') }}"
+                 placeholder="389"
+                 class="w-full rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400 font-mono">
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <input type="checkbox" id="ad-use-ssl"
+               {% if ad_config.get('ad.use_ssl', 'false') == 'true' %}checked{% endif %}
+               class="rounded border-gray-300">
+        <label for="ad-use-ssl" class="text-sm text-gray-700 cursor-pointer">Use LDAPS (SSL, typically port 636)</label>
+      </div>
+
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">Base DN</label>
+        <input type="text" id="ad-base-dn" value="{{ ad_config.get('ad.base_dn', '') }}"
+               placeholder="DC=example,DC=com"
+               class="w-full rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400 font-mono">
+      </div>
+
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">NetBIOS Domain</label>
+          <input type="text" id="ad-domain" value="{{ ad_config.get('ad.domain', '') }}"
+                 placeholder="EXAMPLE"
+                 class="w-full rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400 font-mono">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">Service Account (sAMAccountName)</label>
+          <input type="text" id="ad-username" value="{{ ad_config.get('ad.username', '') }}"
+                 placeholder="svc_vdi"
+                 class="w-full rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400 font-mono">
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">Password</label>
+        <input type="password" id="ad-password" value=""
+               placeholder="(leave blank to keep current)"
+               class="w-full rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400">
+      </div>
+
+    </div>
+
+    <div class="flex gap-3 mt-6">
+      <button onclick="saveAdConfig()"
+              class="px-5 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700">
+        Save
+      </button>
+      <button onclick="testAdConnection()"
+              class="px-5 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded hover:bg-gray-200 border border-gray-300">
+        Test Connection
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Tab: Script Variables ─────────────────────────────────────────────── -->
+<div id="tab-vars" class="hidden">
+  <p class="text-xs text-gray-500 mb-4">
+    Central configuration values for scripts. Available as
+    <code class="font-mono bg-gray-100 px-1 rounded text-xs">$VARS.key</code>.
+  </p>
+
+  <div class="bg-white rounded-lg border border-gray-200 overflow-hidden mb-6">
+    <table class="min-w-full divide-y divide-gray-200 text-sm" id="vars-table">
+      <thead class="bg-gray-50">
+        <tr>
+          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide w-48">Key</th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Value</th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Description</th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide w-20 text-center">Secret</th>
+          <th class="px-4 py-3 w-32"></th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100">
+        {% for v in vars %}
+        <tr data-var-id="{{ v.id }}" class="hover:bg-gray-50">
+          <td class="px-4 py-2.5">
+            <code class="font-mono text-sm text-gray-800">{{ v.key }}</code>
+          </td>
+          <td class="px-4 py-2.5">
+            {% if v.is_secret %}
+            <span class="text-gray-400 font-mono text-xs">***</span>
+            {% else %}
+            <span class="font-mono text-xs text-gray-700">{{ v.value or '–' }}</span>
+            {% endif %}
+          </td>
+          <td class="px-4 py-2.5 text-xs text-gray-500">{{ v.description or '–' }}</td>
+          <td class="px-4 py-2.5 text-center">
+            {% if v.is_secret %}
+            <span class="inline-block w-4 h-4 bg-orange-400 rounded-full" title="Secret"></span>
+            {% else %}
+            <span class="inline-block w-4 h-4 bg-gray-200 rounded-full" title="Not a secret"></span>
+            {% endif %}
+          </td>
+          <td class="px-4 py-2.5 text-right text-xs">
+            <button onclick="editVar({{ v.id }}, '{{ v.key }}', '{{ v.is_secret | lower }}')"
+                    class="text-gray-500 hover:text-blue-600 mr-2">Edit</button>
+            <button onclick="deleteVar({{ v.id }}, '{{ v.key }}')"
+                    class="text-red-400 hover:text-red-600">Delete</button>
+          </td>
+        </tr>
+        {% else %}
+        <tr id="empty-row">
+          <td colspan="5" class="px-4 py-10 text-center text-gray-400 text-sm">No variables defined yet.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="bg-white rounded-lg border border-gray-200 p-5">
+    <h2 class="text-sm font-semibold text-gray-700 mb-4">New Variable</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">Key <span class="text-red-500">*</span></label>
+        <input type="text" id="new-key" placeholder="e.g. smtp_host"
+               class="w-full rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400 font-mono">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">Value</label>
+        <input type="text" id="new-value" placeholder="Value"
+               class="w-full rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">Description</label>
+        <input type="text" id="new-desc" placeholder="optional"
+               class="w-full rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400">
+      </div>
+      <div class="flex items-end gap-3 pb-0.5">
+        <label class="flex items-center gap-1.5 text-sm text-gray-700 cursor-pointer">
+          <input type="checkbox" id="new-secret" class="rounded border-gray-300">
+          Secret
+        </label>
+        <button onclick="createVar()"
+                class="flex-1 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700">
+          Create
+        </button>
+      </div>
+    </div>
+    <div id="create-result" class="mt-2"></div>
+  </div>
+
+  <!-- Edit modal -->
+  <div id="edit-modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg p-6 w-96 shadow-xl">
+      <h3 class="text-sm font-semibold text-gray-900 mb-4">Edit Variable</h3>
+      <input type="hidden" id="edit-var-id">
+      <div class="space-y-3">
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">Key</label>
+          <code id="edit-key-display" class="font-mono text-sm text-gray-800"></code>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">Value</label>
+          <input type="text" id="edit-value"
+                 class="w-full rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">Description</label>
+          <input type="text" id="edit-desc"
+                 class="w-full rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400">
+        </div>
+        <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+          <input type="checkbox" id="edit-secret" class="rounded border-gray-300">
+          Secret (value will be masked)
+        </label>
+      </div>
+      <div class="flex gap-2 mt-4">
+        <button onclick="document.getElementById('edit-modal').classList.add('hidden')"
+                class="flex-1 py-2 text-sm text-gray-500 border border-gray-300 rounded hover:bg-gray-50">
+          Cancel
+        </button>
+        <button onclick="saveEdit()"
+                class="flex-1 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">
+          Save
+        </button>
+      </div>
+      <div id="edit-result" class="mt-2"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Tab: E-Mail ───────────────────────────────────────────────────────── -->
+<div id="tab-email" class="hidden">
+  <div id="email-banner" class="hidden mb-4 px-4 py-3 rounded text-sm font-medium"></div>
+
+  <!-- Section A: SMTP Settings -->
+  <div class="bg-white rounded-lg border border-gray-200 p-6 max-w-2xl mb-6">
+    <h2 class="text-sm font-semibold text-gray-700 mb-4">SMTP Settings</h2>
+    <div class="space-y-4">
+
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">SMTP Server</label>
+          <input type="text" id="email-smtp-server" value="{{ email_config.get('email.smtp_server', '') }}"
+                 placeholder="smtp.example.com"
+                 class="w-full rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400 font-mono">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">Port</label>
+          <input type="number" id="email-smtp-port" value="{{ email_config.get('email.smtp_port', '25') }}"
+                 placeholder="25"
+                 class="w-full rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400 font-mono">
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">From Address</label>
+          <input type="email" id="email-from" value="{{ email_config.get('email.from', '') }}"
+                 placeholder="noreply@example.com"
+                 class="w-full rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400 font-mono">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">From Name</label>
+          <input type="text" id="email-from-name" value="{{ email_config.get('email.from_name', '') }}"
+                 placeholder="XenPool IT Selfservice"
+                 class="w-full rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400">
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">BCC Address</label>
+        <input type="email" id="email-bcc" value="{{ email_config.get('email.bcc', '') }}"
+               placeholder="it-team@example.com (optional)"
+               class="w-full rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400 font-mono">
+      </div>
+
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">SMTP Username</label>
+          <input type="text" id="email-username" value="{{ email_config.get('email.username', '') }}"
+                 placeholder="(leave blank if no auth)"
+                 class="w-full rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400 font-mono">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">SMTP Password</label>
+          <input type="password" id="email-password" value=""
+                 placeholder="(leave blank to keep current)"
+                 class="w-full rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400">
+        </div>
+      </div>
+
+    </div>
+
+    <div class="flex gap-3 mt-6">
+      <button onclick="saveEmailConfig()"
+              class="px-5 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700">
+        Save Settings
+      </button>
+      <button onclick="testEmailConfig()"
+              class="px-5 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded hover:bg-gray-200 border border-gray-300">
+        Send Test Email
+      </button>
+    </div>
+  </div>
+
+  <!-- Section B: Email Templates -->
+  <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+    <div class="px-5 py-3 border-b border-gray-100 bg-gray-50">
+      <h2 class="text-sm font-semibold text-gray-700">Email Templates</h2>
+      <p class="text-xs text-gray-400 mt-0.5">Customise the subject and body for each notification event. Use <code class="font-mono bg-gray-100 px-1 rounded">{{ '{{variable_name}}' }}</code> for dynamic values.</p>
+    </div>
+    <table class="min-w-full divide-y divide-gray-200 text-sm">
+      <thead class="bg-gray-50">
+        <tr>
+          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Event</th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Subject</th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide w-20 text-center">Active</th>
+          <th class="px-4 py-3 w-20"></th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100" id="templates-tbody">
+        {% for t in email_templates %}
+        <tr class="hover:bg-gray-50">
+          <td class="px-4 py-2.5">
+            <div class="font-medium text-gray-800">{{ t.event_key }}</div>
+            <div class="text-xs text-gray-400 mt-0.5">{{ t.description or '' }}</div>
+          </td>
+          <td class="px-4 py-2.5 text-xs text-gray-600 font-mono">{{ t.subject }}</td>
+          <td class="px-4 py-2.5 text-center">
+            {% if t.is_active %}
+            <span class="inline-block w-4 h-4 bg-green-400 rounded-full" title="Active"></span>
+            {% else %}
+            <span class="inline-block w-4 h-4 bg-gray-300 rounded-full" title="Inactive"></span>
+            {% endif %}
+          </td>
+          <td class="px-4 py-2.5 text-right">
+            <button onclick="editTemplate('{{ t.event_key }}')"
+                    class="text-gray-500 hover:text-blue-600 text-xs">Edit</button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ── Email Template Edit Modal ─────────────────────────────────────────── -->
+<div id="tpl-modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+  <div class="bg-white rounded-lg p-6 w-2xl max-w-3xl w-full shadow-xl mx-4">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-sm font-semibold text-gray-900">Edit Template: <span id="tpl-event-key" class="font-mono text-blue-700"></span></h3>
+      <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+        <input type="checkbox" id="tpl-is-active" class="rounded border-gray-300">
+        Active
+      </label>
+    </div>
+    <div class="space-y-3">
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">Subject</label>
+        <input type="text" id="tpl-subject"
+               class="w-full rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400 font-mono">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">Body (HTML)</label>
+        <textarea id="tpl-body" rows="10"
+                  class="w-full rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400 font-mono text-xs leading-relaxed"></textarea>
+      </div>
+      <div>
+        <button onclick="document.getElementById('tpl-vars').classList.toggle('hidden')"
+                class="text-xs text-blue-600 hover:underline">
+          Available Variables ▾
+        </button>
+        <div id="tpl-vars" class="hidden mt-2 flex flex-wrap gap-1"></div>
+      </div>
+    </div>
+    <div id="tpl-save-result" class="mt-2 text-xs"></div>
+    <div class="flex gap-2 mt-4">
+      <button onclick="document.getElementById('tpl-modal').classList.add('hidden')"
+              class="flex-1 py-2 text-sm text-gray-500 border border-gray-300 rounded hover:bg-gray-50">
+        Cancel
+      </button>
+      <button onclick="saveTemplate()"
+              class="flex-1 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">
+        Save
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Tab: SCCM ─────────────────────────────────────────────────────────── -->
+<div id="tab-sccm" class="hidden">
+  <div class="bg-white rounded-lg border border-gray-200 p-10 text-center text-gray-400 text-sm">
+    SCCM configuration coming soon.
+  </div>
+</div>
+
+<!-- ── Tab: Hosting Infra ────────────────────────────────────────────────── -->
+<div id="tab-hosting" class="hidden">
+  <div class="bg-white rounded-lg border border-gray-200 p-10 text-center text-gray-400 text-sm">
+    Hosting infrastructure configuration coming soon.
+  </div>
+</div>
+
+
+<script>
+// ── Tab switching ──────────────────────────────────────────────────────────────
+function showTab(name) {
+  ['ad', 'vars', 'email', 'sccm', 'hosting'].forEach(function(t) {
+    document.getElementById('tab-' + t).classList.add('hidden');
+    var btn = document.getElementById('tab-btn-' + t);
+    btn.classList.remove('border-blue-600', 'text-blue-700');
+    btn.classList.add('border-transparent', 'text-gray-500');
+  });
+  document.getElementById('tab-' + name).classList.remove('hidden');
+  var active = document.getElementById('tab-btn-' + name);
+  active.classList.remove('border-transparent', 'text-gray-500');
+  active.classList.add('border-blue-600', 'text-blue-700');
+}
+
+// Show tab from URL hash
+var hash = window.location.hash.replace('#', '');
+if (['ad', 'vars', 'email', 'sccm', 'hosting'].indexOf(hash) !== -1) showTab(hash);
+
+// ── Active Directory ───────────────────────────────────────────────────────────
+async function saveAdConfig() {
+  var fields = {
+    'ad.server':   document.getElementById('ad-server').value.trim(),
+    'ad.port':     document.getElementById('ad-port').value.trim(),
+    'ad.use_ssl':  document.getElementById('ad-use-ssl').checked ? 'true' : 'false',
+    'ad.base_dn':  document.getElementById('ad-base-dn').value.trim(),
+    'ad.domain':   document.getElementById('ad-domain').value.trim(),
+    'ad.username': document.getElementById('ad-username').value.trim(),
+  };
+  var pw = document.getElementById('ad-password').value;
+  if (pw) fields['ad.password'] = pw;
+
+  var errors = [];
+  for (var key in fields) {
+    var resp = await fetch('/admin/config/' + key, {
+      method: 'PUT',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({value: fields[key]}),
+    });
+    if (!resp.ok) errors.push(key);
+  }
+  showBanner(errors.length === 0
+    ? {ok: true,  message: 'Settings saved.'}
+    : {ok: false, message: 'Failed to save: ' + errors.join(', ')});
+}
+
+async function testAdConnection() {
+  // Save current form values first so the test uses what's on screen
+  await saveAdConfig();
+  showBanner({ok: null, message: 'Testing connection…'});
+  var resp = await fetch('/admin/config/ad/test', {method: 'POST'});
+  var data = await resp.json();
+  showBanner(data);
+}
+
+function showBanner(data) {
+  var el = document.getElementById('ad-banner');
+  el.classList.remove('hidden', 'bg-green-50', 'text-green-800', 'border', 'border-green-200',
+                       'bg-red-50', 'text-red-800', 'border-red-200',
+                       'bg-blue-50', 'text-blue-800', 'border-blue-200');
+  if (data.ok === true) {
+    el.classList.add('bg-green-50', 'text-green-800', 'border', 'border-green-200');
+  } else if (data.ok === false) {
+    el.classList.add('bg-red-50', 'text-red-800', 'border', 'border-red-200');
+  } else {
+    el.classList.add('bg-blue-50', 'text-blue-800', 'border', 'border-blue-200');
+  }
+  el.textContent = data.message;
+  el.classList.remove('hidden');
+}
+
+// ── Script Variables ───────────────────────────────────────────────────────────
+async function createVar() {
+  var key = document.getElementById('new-key').value.trim();
+  if (!key) { alert('Key is required'); return; }
+  var resp = await fetch('/admin/global-vars', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      key: key,
+      value: document.getElementById('new-value').value || null,
+      description: document.getElementById('new-desc').value.trim() || null,
+      is_secret: document.getElementById('new-secret').checked,
+    }),
+  });
+  if (resp.ok) { location.reload(); return; }
+  var err = {}; try { err = await resp.json(); } catch(e) {}
+  document.getElementById('create-result').innerHTML =
+    '<div class="text-xs text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">'
+    + (err.detail || JSON.stringify(err)) + '</div>';
+}
+
+function editVar(id, key, isSecret) {
+  document.getElementById('edit-var-id').value = id;
+  document.getElementById('edit-key-display').textContent = key;
+  document.getElementById('edit-value').value = '';
+  document.getElementById('edit-value').placeholder = isSecret === 'true' ? '(Secret – enter new value to change)' : '';
+  document.getElementById('edit-desc').value = '';
+  document.getElementById('edit-secret').checked = isSecret === 'true';
+  document.getElementById('edit-result').innerHTML = '';
+  document.getElementById('edit-modal').classList.remove('hidden');
+}
+
+async function saveEdit() {
+  var id = document.getElementById('edit-var-id').value;
+  var resp = await fetch('/admin/global-vars/' + id, {
+    method: 'PUT',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      value: document.getElementById('edit-value').value || null,
+      description: document.getElementById('edit-desc').value.trim() || null,
+      is_secret: document.getElementById('edit-secret').checked,
+    }),
+  });
+  if (resp.ok) { location.reload(); return; }
+  var err = {}; try { err = await resp.json(); } catch(e) {}
+  document.getElementById('edit-result').innerHTML =
+    '<div class="text-xs text-red-600 mt-2">' + (err.detail || JSON.stringify(err)) + '</div>';
+}
+
+async function deleteVar(id, key) {
+  if (!confirm("Really delete variable '" + key + "'?")) return;
+  var resp = await fetch('/admin/global-vars/' + id, {method: 'DELETE'});
+  if (resp.status === 204) {
+    var row = document.querySelector('[data-var-id="' + id + '"]');
+    if (row) row.remove();
+  } else {
+    var err = {}; try { err = await resp.json(); } catch(e) {}
+    alert(err.detail || 'Error deleting');
+  }
+}
+
+// ── E-Mail Settings ─────────────────────────────────────────────────────────────
+async function saveEmailConfig() {
+  var fields = {
+    'email.smtp_server': document.getElementById('email-smtp-server').value.trim(),
+    'email.smtp_port':   document.getElementById('email-smtp-port').value.trim(),
+    'email.from':        document.getElementById('email-from').value.trim(),
+    'email.from_name':   document.getElementById('email-from-name').value.trim(),
+    'email.bcc':         document.getElementById('email-bcc').value.trim(),
+    'email.username':    document.getElementById('email-username').value.trim(),
+  };
+  var pw = document.getElementById('email-password').value;
+  if (pw) fields['email.password'] = pw;
+
+  var errors = [];
+  for (var key in fields) {
+    var resp = await fetch('/admin/config/' + key, {
+      method: 'PUT',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({value: fields[key]}),
+    });
+    if (!resp.ok) errors.push(key);
+  }
+  showEmailBanner(errors.length === 0
+    ? {ok: true,  message: 'Settings saved.'}
+    : {ok: false, message: 'Failed to save: ' + errors.join(', ')});
+}
+
+async function testEmailConfig() {
+  await saveEmailConfig();
+  showEmailBanner({ok: null, message: 'Sending test email…'});
+  var toAddr = document.getElementById('email-bcc').value.trim()
+            || document.getElementById('email-from').value.trim();
+  var resp = await fetch('/admin/config/email/test', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({to: toAddr}),
+  });
+  var data = await resp.json();
+  showEmailBanner(data);
+}
+
+function showEmailBanner(data) {
+  var el = document.getElementById('email-banner');
+  el.classList.remove('hidden', 'bg-green-50', 'text-green-800', 'border', 'border-green-200',
+                       'bg-red-50', 'text-red-800', 'border-red-200',
+                       'bg-blue-50', 'text-blue-800', 'border-blue-200');
+  if (data.ok === true) {
+    el.classList.add('bg-green-50', 'text-green-800', 'border', 'border-green-200');
+  } else if (data.ok === false) {
+    el.classList.add('bg-red-50', 'text-red-800', 'border', 'border-red-200');
+  } else {
+    el.classList.add('bg-blue-50', 'text-blue-800', 'border', 'border-blue-200');
+  }
+  el.textContent = data.message;
+  el.classList.remove('hidden');
+}
+
+// ── Email Templates ─────────────────────────────────────────────────────────────
+var _currentTemplateKey = null;
+
+async function editTemplate(eventKey) {
+  _currentTemplateKey = eventKey;
+  var resp = await fetch('/admin/email-templates/' + eventKey);
+  if (!resp.ok) { alert('Failed to load template'); return; }
+  var t = await resp.json();
+
+  document.getElementById('tpl-event-key').textContent = eventKey;
+  document.getElementById('tpl-subject').value = t.subject || '';
+  document.getElementById('tpl-body').value = t.body || '';
+  document.getElementById('tpl-is-active').checked = t.is_active;
+  document.getElementById('tpl-save-result').textContent = '';
+
+  // Render available variables as chips
+  var varsDiv = document.getElementById('tpl-vars');
+  varsDiv.innerHTML = '';
+  varsDiv.classList.add('hidden');
+  (t.available_variables || []).forEach(function(v) {
+    var chip = document.createElement('code');
+    chip.className = 'bg-gray-100 text-gray-700 text-xs px-2 py-0.5 rounded font-mono cursor-pointer hover:bg-blue-50';
+    chip.title = 'Click to insert';
+    chip.textContent = '{{' + v.name + '}}';
+    chip.onclick = function() {
+      var ta = document.getElementById('tpl-body');
+      var pos = ta.selectionStart;
+      var val = ta.value;
+      ta.value = val.slice(0, pos) + '{{' + v.name + '}}' + val.slice(pos);
+      ta.focus();
+    };
+    varsDiv.appendChild(chip);
+  });
+
+  document.getElementById('tpl-modal').classList.remove('hidden');
+}
+
+async function saveTemplate() {
+  if (!_currentTemplateKey) return;
+  var resp = await fetch('/admin/email-templates/' + _currentTemplateKey, {
+    method: 'PUT',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      subject: document.getElementById('tpl-subject').value,
+      body: document.getElementById('tpl-body').value,
+      is_active: document.getElementById('tpl-is-active').checked,
+    }),
+  });
+  var el = document.getElementById('tpl-save-result');
+  if (resp.ok) {
+    el.className = 'mt-2 text-xs text-green-700';
+    el.textContent = 'Saved.';
+    setTimeout(function() { location.reload(); }, 800);
+  } else {
+    var err = {}; try { err = await resp.json(); } catch(e) {}
+    el.className = 'mt-2 text-xs text-red-600';
+    el.textContent = err.detail || 'Error saving template.';
+  }
+}
+</script>
+{% endblock %}
