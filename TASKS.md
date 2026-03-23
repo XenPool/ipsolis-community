@@ -21,11 +21,11 @@ Add new tasks at the top.
 - Note: a `delete` runbook must be configured per asset type in the Admin UI for
   `runbook_only` / `composite` asset types; `group_only` types work without a runbook
 
-### [open] Legacy Workflow Cleanup — Prio 1b (depends on Beat-Scheduler migration)
-After `check_expiring_assets` is migrated, the three hardcoded workflow files are fully obsolete.
-- [ ] Delete `worker/tasks/workflows/vdi_provision.py`
-- [ ] Delete `worker/tasks/workflows/vdi_modify.py`
-- [ ] Delete `worker/tasks/workflows/vdi_reclaim.py`
+### [done] Legacy Workflow Cleanup — Prio 1b (2026-03-23)
+- `check_expiring_assets` moved into `dynamic_runner.py` (new task name:
+  `tasks.workflows.dynamic_runner.check_expiring_assets`); beat_schedule updated
+- Deleted: `vdi_provision.py`, `vdi_modify.py`, `vdi_reclaim.py`
+- Removed from `__init__.py`: legacy includes + task_routes entries
 
 ### [open] Portal Authentication — Prio 2
 The portal is currently fully open (email input only, no session/auth).

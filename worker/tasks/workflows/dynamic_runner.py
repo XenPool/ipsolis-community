@@ -12,6 +12,7 @@ import re
 import subprocess
 import tempfile
 import time
+from datetime import timedelta
 
 _ANSI_ESCAPE = re.compile(r"\x1b\[[0-9;]*[mGKHFABCDJsu]")
 from datetime import datetime, timezone
@@ -1039,5 +1040,136 @@ def test_script_module(self: Task, script_module_id: int, params: dict) -> dict:
             "error": str(e),
             "duration_ms": round(duration_ms),
         }
+    finally:
+        db.close()
+
+
+@app.task(
+    name="tasks.workflows.dynamic_runner.check_expiring_assets",
+    queue="reclaim",
+)
+def check_expiring_assets() -> dict:
+    """
+    Celery Beat Task: Checks hourly for expiring assets and triggers lifecycle completion.
+
+    - Immediately expired (expires_at <= NOW): create a 'delete' order and dispatch
+      dynamic_runner.run so the full DB-driven deprovision runbook is executed.
+    - Expiring soon (expires_at <= NOW + REMINDER_HOURS): send reminder email.
+    """
+    from tasks.modules.notifications import send_expiry_reminder
+
+    reminder_hours = int(os.getenv("REMINDER_HOURS_BEFORE_EXPIRY", "24"))
+    logger.info("=== check_expiring_assets: Checking for expired/expiring assets ===")
+
+    db = _get_db_session()
+    try:
+        # ── Expired assets: create delete order + dispatch dynamic_runner ──
+        expired = db.execute(
+            text("""
+                SELECT a.id as asset_id, a.name as asset_name, o.id as order_id,
+                       o.user_email, o.user_name, o.owner_email, o.owner_name,
+                       o.asset_type_id, o.provisioned_state, a.expires_at
+                FROM asset_pool a
+                JOIN orders o ON o.id = a.current_order_id
+                WHERE a.status = 'busy'
+                  AND a.expires_at <= NOW()
+                  AND o.status NOT IN ('expired', 'cancelled', 'failed')
+            """),
+        ).fetchall()
+
+        reclaim_count = 0
+        for row in expired:
+            logger.info(
+                "Asset expired: %s (order_id=%s, expired_at=%s) – creating delete order",
+                row.asset_name, row.order_id, row.expires_at,
+            )
+
+            # Serialise provisioned_state (JSONB → Python dict via psycopg2; may be None)
+            ps_json = json.dumps(row.provisioned_state) if row.provisioned_state else None
+
+            # Create a new 'delete' order that dynamic_runner can execute
+            new_order = db.execute(
+                text("""
+                    INSERT INTO orders (
+                        user_email, user_name, owner_email, owner_name,
+                        asset_type_id, assigned_asset_id,
+                        action, status, provisioned_state,
+                        requested_from, requested_until,
+                        created_at, updated_at
+                    ) VALUES (
+                        :user_email, :user_name, :owner_email, :owner_name,
+                        :asset_type_id, :asset_id,
+                        'delete', 'processing',
+                        CAST(:provisioned_state AS jsonb),
+                        NOW(), NOW(),
+                        NOW(), NOW()
+                    )
+                    RETURNING id
+                """),
+                {
+                    "user_email": row.user_email,
+                    "user_name": row.user_name,
+                    "owner_email": row.owner_email,
+                    "owner_name": row.owner_name,
+                    "asset_type_id": row.asset_type_id,
+                    "asset_id": row.asset_id,
+                    "provisioned_state": ps_json,
+                },
+            )
+            new_order_id = new_order.fetchone()[0]
+
+            # Mark the original provision order as expired immediately
+            db.execute(
+                text("UPDATE orders SET status = 'expired', updated_at = NOW() WHERE id = :id"),
+                {"id": row.order_id},
+            )
+            db.commit()
+
+            run.delay(new_order_id)
+            logger.info(
+                "Dispatched dynamic_runner delete order_id=%s for asset '%s'",
+                new_order_id, row.asset_name,
+            )
+            reclaim_count += 1
+
+        # ── Assets expiring soon: reminder email ──
+        reminder_time = datetime.now(timezone.utc) + timedelta(hours=reminder_hours)
+        expiring_soon = db.execute(
+            text("""
+                SELECT a.name as asset_name, o.user_email, o.user_name, a.expires_at
+                FROM asset_pool a
+                JOIN orders o ON o.id = a.current_order_id
+                WHERE a.status = 'busy'
+                  AND a.expires_at > NOW()
+                  AND a.expires_at <= :reminder_time
+                  AND o.status IN ('delivered', 'provisioned')
+            """),
+            {"reminder_time": reminder_time},
+        ).fetchall()
+
+        reminder_count = 0
+        for row in expiring_soon:
+            hours_remaining = (
+                row.expires_at.replace(tzinfo=timezone.utc) - datetime.now(timezone.utc)
+            ).total_seconds() / 3600
+            logger.info(
+                "Asset expiring soon: %s (user=%s, in %.1fh) – sending reminder",
+                row.asset_name, row.user_email, hours_remaining,
+            )
+            send_expiry_reminder(
+                user_email=row.user_email,
+                user_name=row.user_name,
+                asset_name=row.asset_name,
+                expires_at=row.expires_at,
+                hours_remaining=hours_remaining,
+            )
+            reminder_count += 1
+
+        logger.info(
+            "=== check_expiring_assets DONE: %s reclaimed, %s reminders sent ===",
+            reclaim_count, reminder_count,
+        )
+        return {"reclaimed": reclaim_count, "reminders_sent": reminder_count}
+
     finally:
         db.close()
