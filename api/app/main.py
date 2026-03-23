@@ -6,9 +6,10 @@ import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.sessions import SessionMiddleware
 
 from app.config import settings
-from app.routes import admin, admin_modules, admin_runbooks, assets, health, orders, portal, ui, webhook
+from app.routes import admin, admin_modules, admin_runbooks, assets, auth, health, orders, portal, ui, webhook
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -52,6 +53,16 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# ── Session (must be added before CORS so the cookie is available in all routes)
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=settings.API_SECRET_KEY,
+    session_cookie="xp_session",
+    max_age=28800,       # 8 hours
+    https_only=False,    # set True behind HTTPS in production
+    same_site="lax",
+)
+
 # ── CORS ──────────────────────────────────────────────────────────────────────
 app.add_middleware(
     CORSMiddleware,
@@ -73,4 +84,5 @@ app.include_router(admin.router)
 app.include_router(admin_modules.router)
 app.include_router(admin_runbooks.router)
 app.include_router(ui.router)
+app.include_router(auth.router)   # login / callback / logout — before portal
 app.include_router(portal.router)

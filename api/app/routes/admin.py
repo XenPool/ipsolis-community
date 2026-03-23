@@ -163,6 +163,35 @@ async def test_ad_connection(db: AsyncSession = Depends(get_db)) -> dict:
         return {"ok": False, "message": str(exc)}
 
 
+@router.post("/config/entra/test")
+async def test_entra_connection(db: AsyncSession = Depends(get_db)) -> dict:
+    """Verifies Entra ID credentials by acquiring an app-only token (client credentials flow)."""
+    from app.utils.entra import _get_entra_config, get_msal_app
+
+    cfg = await _get_entra_config(db)
+    mode = cfg.get("entra.mode", "disabled")
+
+    if mode == "disabled":
+        return {"ok": None, "message": "Entra ID mode is set to 'disabled' – no test performed."}
+
+    msal_app = get_msal_app(cfg)
+    if msal_app is None:
+        return {"ok": False, "message": "Missing tenant_id, client_id, or client_secret."}
+
+    try:
+        import msal
+        # Client credentials flow: acquires an app-only token to verify credentials
+        result = msal_app.acquire_token_for_client(
+            scopes=["https://graph.microsoft.com/.default"]
+        )
+        if "access_token" in result:
+            return {"ok": True, "message": "Entra ID credentials valid – app token acquired successfully."}
+        error = result.get("error_description") or result.get("error") or "Unknown error"
+        return {"ok": False, "message": f"Token acquisition failed: {error}"}
+    except Exception as exc:
+        return {"ok": False, "message": str(exc)}
+
+
 # ── Asset-Typen ────────────────────────────────────────────────────────────────
 
 @router.post("/asset-types", response_model=AssetTypeRead, status_code=status.HTTP_201_CREATED)

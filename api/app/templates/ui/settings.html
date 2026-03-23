@@ -38,8 +38,90 @@
 <div id="tab-ad">
   <div id="ad-banner" class="hidden mb-4 px-4 py-3 rounded text-sm font-medium"></div>
 
+  <!-- ── Entra ID / Azure AD (Portal SSO) ──────────────────────────────── -->
+  <div class="bg-white rounded-lg border border-gray-200 p-6 max-w-2xl mb-6">
+    <h2 class="text-sm font-semibold text-gray-700 mb-1">Entra ID / Azure AD — Portal SSO</h2>
+    <p class="text-xs text-gray-500 mb-4">
+      OAuth2/OIDC login for the self-service portal. Works with cloud-only accounts and
+      on-premises accounts synced via Entra ID Connect (hybrid).
+      Set <strong>Mode = disabled</strong> to keep the portal open (development / before Entra setup).
+    </p>
+    <div class="space-y-4">
+
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">Mode</label>
+        <select id="entra-mode"
+                class="w-full rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400">
+          <option value="disabled"   {% if entra_config.get('entra.mode','disabled') == 'disabled'             %}selected{% endif %}>disabled — portal open (no login required)</option>
+          <option value="entra_only" {% if entra_config.get('entra.mode','disabled') == 'entra_only'           %}selected{% endif %}>entra_only — Entra ID login required</option>
+          <option value="entra_with_onprem" {% if entra_config.get('entra.mode','disabled') == 'entra_with_onprem' %}selected{% endif %}>entra_with_onprem — Entra ID + on-prem LDAP check</option>
+        </select>
+      </div>
+
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">Tenant ID</label>
+          <input type="text" id="entra-tenant-id"
+                 value="{{ entra_config.get('entra.tenant_id', '') }}"
+                 placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                 class="w-full rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400 font-mono">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">Client ID (App Registration)</label>
+          <input type="text" id="entra-client-id"
+                 value="{{ entra_config.get('entra.client_id', '') }}"
+                 placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                 class="w-full rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400 font-mono">
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">Client Secret</label>
+        <input type="password" id="entra-client-secret"
+               value=""
+               placeholder="(leave blank to keep current)"
+               class="w-full rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400">
+      </div>
+
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">Redirect URI</label>
+        <input type="text" id="entra-redirect-uri"
+               value="{{ entra_config.get('entra.redirect_uri', '') }}"
+               placeholder="https://selfservice.xenpool.de/portal/auth/callback"
+               class="w-full rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400 font-mono">
+        <p class="text-xs text-gray-400 mt-1">Must match the Redirect URI registered in your Entra ID App Registration.</p>
+      </div>
+
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">Allowed UPN Domains <span class="font-normal text-gray-400">(optional)</span></label>
+        <input type="text" id="entra-allowed-domains"
+               value="{{ entra_config.get('entra.allowed_domains', '') }}"
+               placeholder="xenpool.de, xenpool.local"
+               class="w-full rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400 font-mono">
+        <p class="text-xs text-gray-400 mt-1">Comma-separated. Leave blank to allow all domains in your tenant.</p>
+      </div>
+
+    </div>
+
+    <div class="flex gap-3 mt-6">
+      <button onclick="saveEntraConfig()"
+              class="px-5 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700">
+        Save
+      </button>
+      <button onclick="testEntraConfig()"
+              class="px-5 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded hover:bg-gray-200 border border-gray-300">
+        Test Connection
+      </button>
+    </div>
+  </div>
+
+  <!-- ── On-Premises AD / LDAP ──────────────────────────────────────────── -->
   <div class="bg-white rounded-lg border border-gray-200 p-6 max-w-2xl">
-    <h2 class="text-sm font-semibold text-gray-700 mb-4">LDAP / Active Directory Connection</h2>
+    <h2 class="text-sm font-semibold text-gray-700 mb-1">On-Premises Active Directory / LDAP</h2>
+    <p class="text-xs text-gray-500 mb-4">
+      Service account for on-premises AD group management (Active Roles) and user lookups.
+      Required regardless of the Entra ID mode above.
+    </p>
     <div class="space-y-4">
 
       <div class="grid grid-cols-2 gap-4">
@@ -105,8 +187,8 @@
         Test Connection
       </button>
     </div>
-  </div>
-</div>
+  </div><!-- /on-prem AD card -->
+</div><!-- /tab-ad -->
 
 <!-- ── Tab: Script Variables ─────────────────────────────────────────────── -->
 <div id="tab-vars" class="hidden">
@@ -511,6 +593,40 @@ function showTab(name) {
 // Show tab from URL hash
 var hash = window.location.hash.replace('#', '');
 if (['ad', 'vars', 'email', 'sccm', 'hosting'].indexOf(hash) !== -1) showTab(hash);
+
+// ── Entra ID ───────────────────────────────────────────────────────────────────
+async function saveEntraConfig() {
+  var fields = {
+    'entra.mode':            document.getElementById('entra-mode').value,
+    'entra.tenant_id':       document.getElementById('entra-tenant-id').value.trim(),
+    'entra.client_id':       document.getElementById('entra-client-id').value.trim(),
+    'entra.redirect_uri':    document.getElementById('entra-redirect-uri').value.trim(),
+    'entra.allowed_domains': document.getElementById('entra-allowed-domains').value.trim(),
+  };
+  var secret = document.getElementById('entra-client-secret').value;
+  if (secret) fields['entra.client_secret'] = secret;
+
+  var errors = [];
+  for (var key in fields) {
+    var resp = await fetch('/admin/config/' + key, {
+      method: 'PUT',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({value: fields[key]}),
+    });
+    if (!resp.ok) errors.push(key);
+  }
+  showBanner(errors.length === 0
+    ? {ok: true,  message: 'Entra ID settings saved.'}
+    : {ok: false, message: 'Failed to save: ' + errors.join(', ')});
+}
+
+async function testEntraConfig() {
+  await saveEntraConfig();
+  showBanner({ok: null, message: 'Testing Entra ID connection…'});
+  var resp = await fetch('/admin/config/entra/test', {method: 'POST'});
+  var data = await resp.json();
+  showBanner(data);
+}
 
 // ── Active Directory ───────────────────────────────────────────────────────────
 async function saveAdConfig() {

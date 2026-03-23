@@ -28,6 +28,9 @@ aiofiles==24.1.0
 # Active Directory / LDAP (msldap supports NTLM signing required by modern Windows Server)
 msldap
 
+# Entra ID / Azure AD SSO (portal authentication)
+msal>=1.31.0
+
 # Email
 aiosmtplib==3.0.2
 

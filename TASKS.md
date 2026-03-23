@@ -27,12 +27,30 @@ Add new tasks at the top.
 - Deleted: `vdi_provision.py`, `vdi_modify.py`, `vdi_reclaim.py`
 - Removed from `__init__.py`: legacy includes + task_routes entries
 
-### [open] Portal Authentication — Prio 2
-The portal is currently fully open (email input only, no session/auth).
-For production use within the company network, at least one of the following options:
-- [ ] Option A: Entra ID / OIDC (SSO via `msal` or `authlib`)
-- [ ] Option B: Simple IP allowlist + session cookie (faster for internal MVP)
-Decision pending.
+### [done] Portal Authentication — Entra ID SSO (2026-03-23)
+- `msal` added to `api/requirements.txt`
+- `SessionMiddleware` added to `main.py` (signed cookie, 8h TTL)
+- `api/app/utils/entra.py` — MSAL helper (auth URL, token exchange, domain check)
+- `api/app/routes/auth.py` — `/portal/login`, `/portal/auth/callback`, `/portal/logout`
+- `api/app/routes/portal.py` — `require_portal_auth` dependency on all routes; dev bypass active
+- `base_portal.html` — user name chip + Sign out link in nav bar
+- `portal/auth_error.html` — error page for login failures
+- `api/app/templates/ui/settings.html` — "Entra ID / Azure AD" section in Identity & Directory tab
+- `POST /admin/config/entra/test` — verifies credentials via client-credentials token flow
+- Migration 0019 — seeds 6 `entra.*` config keys (`entra.mode` defaults to `disabled`)
+- Two-phase rollout: test with cloud-only Entra accounts now; switch to hybrid after Entra Connect setup
+
+### [open] Entra ID Connect / Cloud Sync setup — infrastructure (no code change needed)
+Sync `xenpool.local` on-prem users to the Entra ID tenant so they can use portal SSO with
+their existing domain credentials. Pure Windows Server / Azure infrastructure task.
+- [ ] Install Entra ID Connect (or Entra Cloud Sync agent) on a domain-joined server
+- [ ] Configure UPN suffix (`xenpool.de`) for synced accounts
+- [ ] Verify synced users can log into the portal (no code change required)
+
+### [open] Cloud group management via Microsoft Graph — future
+Extend `target_executor` to manage Entra cloud-only security groups for asset types
+that define `{"type": "entra_group", "group_id": "..."}` targets.
+Requires Microsoft Graph API integration (separate sprint).
 
 ### [open] Basic Tests (Happy Path) — Prio 3
 No automated tests exist yet.

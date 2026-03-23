@@ -1,7 +1,8 @@
 """User Self-Service Portal – HTML routes.
 
-No admin key required (internal tool, no login for MVP).
-Actions: Order new access, extend, change RDP/admin users.
+Authentication: Entra ID SSO when entra.mode != 'disabled' (controlled via
+admin settings). In development mode or when mode='disabled' a mock user is
+injected so the portal works without Entra credentials.
 """
 import logging
 from datetime import date, datetime, timezone
@@ -13,14 +14,53 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.config import settings
 from app.database import get_db
 from app.models.asset import AssetPool, AssetType
+from app.models.config import AppConfig
 from app.models.order import Order, OrderAction, OrderStatus
 from app.utils.ad_lookup import lookup_user
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/portal", tags=["portal"])
 templates = Jinja2Templates(directory="/app/app/templates")
+
+_DEV_USER = {"email": "dev@xenpool.local", "name": "Dev User (bypass)", "oid": "", "upn": "dev@xenpool.local"}
+
+
+async def require_portal_auth(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """FastAPI dependency: returns the authenticated portal user dict.
+
+    - entra.mode == 'disabled' OR ENVIRONMENT=development → returns _DEV_USER (no redirect)
+    - session["portal_user"] present → returns stored user
+    - Otherwise → stores intended URL in session and redirects to /portal/login
+    """
+    if settings.is_development:
+        return _DEV_USER
+
+    # Read entra.mode from DB (cached per-request via the dependency)
+    mode_row = await db.execute(
+        select(AppConfig).where(AppConfig.key == "entra.mode")
+    )
+    mode_cfg = mode_row.scalar_one_or_none()
+    mode = (mode_cfg.value or "disabled") if mode_cfg else "disabled"
+
+    if mode == "disabled":
+        return _DEV_USER
+
+    user = request.session.get("portal_user")
+    if user:
+        return user
+
+    # Store the originally requested URL so callback can redirect back
+    request.session["login_next"] = str(request.url)
+    raise HTTPException(
+        status_code=302,
+        headers={"Location": "/portal/login"},
+    )
 
 _STATUS_COLORS = {
     "pending":      "bg-gray-100 text-gray-700",
@@ -47,7 +87,11 @@ _STEP_COLORS = {
 # ── Overview ───────────────────────────────────────────────────────────────────
 
 @router.get("/", response_class=HTMLResponse)
-async def portal_index(request: Request, db: AsyncSession = Depends(get_db)):
+async def portal_index(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(require_portal_auth),
+):
     result = await db.execute(
         select(Order)
         .options(selectinload(Order.steps))
@@ -79,6 +123,7 @@ async def portal_index(request: Request, db: AsyncSession = Depends(get_db)):
     return templates.TemplateResponse("portal/index.html", {
         "request": request,
         "active_page": "overview",
+        "user": current_user,
         "orders": orders,
         "asset_type_names": asset_type_names,
         "asset_type_categories": asset_type_categories,
@@ -90,12 +135,17 @@ async def portal_index(request: Request, db: AsyncSession = Depends(get_db)):
 # ── New Order ──────────────────────────────────────────────────────────────────
 
 @router.get("/orders/new", response_class=HTMLResponse)
-async def portal_new_order_form(request: Request, db: AsyncSession = Depends(get_db)):
+async def portal_new_order_form(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(require_portal_auth),
+):
     types_result = await db.execute(select(AssetType).order_by(AssetType.name))
     asset_types = list(types_result.scalars().all())
     return templates.TemplateResponse("portal/order_new.html", {
         "request": request,
         "active_page": "new",
+        "user": current_user,
         "asset_types": asset_types,
         "today": date.today().isoformat(),
         "error": None,
@@ -179,6 +229,7 @@ def _validate_order_attrs(
 async def portal_create_order(
     request: Request,
     db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(require_portal_auth),
     user_name: str = Form(...),
     user_email: str = Form(...),
     owner_name: str = Form(""),
@@ -197,6 +248,7 @@ async def portal_create_order(
         return templates.TemplateResponse("portal/order_new.html", {
             "request": request,
             "active_page": "new",
+            "user": current_user,
             "asset_types": list(types_result.scalars().all()),
             "today": date.today().isoformat(),
             "error": msg,
@@ -267,6 +319,7 @@ async def portal_order_detail(
     request: Request,
     order_id: int,
     db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(require_portal_auth),
 ):
     result = await db.execute(
         select(Order).options(selectinload(Order.steps)).where(Order.id == order_id)
@@ -299,6 +352,7 @@ async def portal_order_detail(
     return templates.TemplateResponse("portal/order_detail.html", {
         "request": request,
         "active_page": "overview",
+        "user": current_user,
         "order": order,
         "asset_type": asset_type,
         "asset_type_name": asset_type_name,
@@ -316,6 +370,7 @@ async def portal_order_detail(
 async def portal_extend_order(
     order_id: int,
     db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(require_portal_auth),
     new_until: str = Form(...),
 ):
     result = await db.execute(select(Order).where(Order.id == order_id))
@@ -360,6 +415,7 @@ async def portal_extend_order(
 async def portal_modify_order(
     order_id: int,
     db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(require_portal_auth),
     rdp_users: list[str] = Form(default=[]),
     admin_users: list[str] = Form(default=[]),
 ):
@@ -403,6 +459,7 @@ async def portal_modify_order(
 async def portal_change_order(
     order_id: int,
     db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(require_portal_auth),
     new_until: str | None = Form(default=None),
     rdp_users: list[str] = Form(default=[]),
     admin_users: list[str] = Form(default=[]),
@@ -474,6 +531,7 @@ async def portal_change_order(
 async def portal_cancel_order(
     order_id: int,
     db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(require_portal_auth),
 ):
     result = await db.execute(select(Order).where(Order.id == order_id))
     original = result.scalar_one_or_none()
@@ -517,7 +575,11 @@ async def portal_cancel_order(
 # ── My IT – Active Assets Overview ────────────────────────────────────────────
 
 @router.get("/my-it", response_class=HTMLResponse)
-async def portal_my_it(request: Request, db: AsyncSession = Depends(get_db)):
+async def portal_my_it(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(require_portal_auth),
+):
     result = await db.execute(
         select(Order)
         .options(selectinload(Order.steps))
@@ -549,6 +611,7 @@ async def portal_my_it(request: Request, db: AsyncSession = Depends(get_db)):
     return templates.TemplateResponse("portal/my_it.html", {
         "request": request,
         "active_page": "my-it",
+        "user": current_user,
         "orders": orders,
         "asset_type_names": asset_type_names,
         "asset_type_categories": asset_type_categories,
@@ -563,6 +626,7 @@ async def portal_my_it_detail(
     request: Request,
     order_id: int,
     db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(require_portal_auth),
 ):
     result = await db.execute(select(Order).where(Order.id == order_id))
     order = result.scalar_one_or_none()
@@ -588,6 +652,7 @@ async def portal_my_it_detail(
     return templates.TemplateResponse("portal/my_it_detail.html", {
         "request": request,
         "active_page": "my-it",
+        "user": current_user,
         "order": order,
         "asset_type": asset_type,
         "asset_type_name": asset_type_name,
