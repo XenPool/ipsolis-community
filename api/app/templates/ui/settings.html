@@ -152,6 +152,30 @@
       {% endif %}
     </div>
   </div>
+
+  <!-- Order Settings -->
+  <div class="bg-white rounded-lg border border-gray-200 p-6 max-w-2xl mt-4">
+    <h2 class="text-sm font-semibold text-gray-700 mb-1">Order Settings</h2>
+    <p class="text-xs text-gray-500 mb-4">
+      Controls for the self-service portal ordering process.
+    </p>
+    <div>
+      <label class="block text-xs font-medium text-gray-600 mb-1">Maximum Advance Days</label>
+      <p class="text-xs text-gray-400 mb-2">
+        How many days in advance users can set the start date of an order. Set to 0 for no limit.
+      </p>
+      <input type="number" id="cfg-max-advance-days"
+             value="{{ portal_config.get('portal.max_advance_days', '30') }}"
+             min="0" max="365" step="1"
+             class="w-32 rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400">
+    </div>
+    <div class="mt-6">
+      <button onclick="saveOrderSettings()"
+              class="px-5 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700">
+        Save
+      </button>
+    </div>
+  </div>
 </div>
 
 <!-- ── Tab: Active Directory ─────────────────────────────────────────────── -->
@@ -729,6 +753,26 @@ async function saveAppTitle() {
     banner.className = 'mb-4 px-4 py-3 rounded text-sm font-medium bg-green-50 text-green-800 border border-green-200';
     banner.textContent = 'Settings saved.';
     setTimeout(function() { location.reload(); }, 800);
+  } else {
+    var err = {}; try { err = await resp.json(); } catch(e) {}
+    banner.className = 'mb-4 px-4 py-3 rounded text-sm font-medium bg-red-50 text-red-800 border border-red-200';
+    banner.textContent = err.detail || 'Error saving settings.';
+  }
+  banner.classList.remove('hidden');
+}
+
+// ── Order Settings ────────────────────────────────────────────────────────────
+async function saveOrderSettings() {
+  var val = document.getElementById('cfg-max-advance-days').value.trim() || '30';
+  var resp = await fetch('/admin/config/portal.max_advance_days', {
+    method: 'PUT',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({value: val}),
+  });
+  var banner = document.getElementById('general-banner');
+  if (resp.ok) {
+    banner.className = 'mb-4 px-4 py-3 rounded text-sm font-medium bg-green-50 text-green-800 border border-green-200';
+    banner.textContent = 'Order settings saved.';
   } else {
     var err = {}; try { err = await resp.json(); } catch(e) {}
     banner.className = 'mb-4 px-4 py-3 rounded text-sm font-medium bg-red-50 text-red-800 border border-red-200';

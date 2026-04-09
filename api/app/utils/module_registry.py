@@ -67,6 +67,7 @@ MODULE_METADATA: list[dict] = [
             "user_email", "user_name", "owner_email", "owner_name",
             "asset_type_name", "asset_type_description",
             "requested_from", "expires_at", "snow_req", "snow_ritm",
+            "scheduled_date",
         ],
         "output_keys": [],
     },

@@ -26,6 +26,7 @@ class OrderAction(str, enum.Enum):
 
 class OrderStatus(str, enum.Enum):
     PENDING      = "pending"
+    SCHEDULED    = "scheduled"      # Future-dated: asset reserved, execution delayed
     PROCESSING   = "processing"
     PROVISIONING = "provisioning"   # Worker started provision
     PROVISIONED  = "provisioned"    # Provision completed (active)

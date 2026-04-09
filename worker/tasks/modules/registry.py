@@ -28,6 +28,7 @@ def _notify_send_confirmation(
     expires_at=None,
     snow_req: str | None = None,
     snow_ritm: str | None = None,
+    scheduled_date: str | None = None,
 ) -> dict:
     from datetime import datetime, timezone
     if requested_from is None:
@@ -46,6 +47,7 @@ def _notify_send_confirmation(
         requested_until=expires_at,
         snow_req=snow_req,
         snow_ritm=snow_ritm,
+        scheduled_date=scheduled_date,
     )
 
 
@@ -159,6 +161,7 @@ MODULE_REGISTRY: dict[str, dict] = {
             "user_email", "user_name", "owner_email", "owner_name",
             "asset_type_name", "asset_type_description",
             "requested_from", "expires_at", "snow_req", "snow_ritm",
+            "scheduled_date",
         ],
         "output_keys": [],
         "group": "notifications",

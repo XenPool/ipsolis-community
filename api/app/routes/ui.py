@@ -703,11 +703,19 @@ async def settings_page(
     hosting_vsphere = _cfg_dict(vsphere_rows)
     hosting_xenserver = _cfg_dict(xenserver_rows)
 
+    # Load portal.* config keys
+    portal_result = await db.execute(
+        select(AppConfig).where(AppConfig.key.like("portal.%")).order_by(AppConfig.key)
+    )
+    portal_rows = portal_result.scalars().all()
+    portal_config = {r.key: (r.value or "") for r in portal_rows}
+
     return templates.TemplateResponse(
         request, "ui/settings.html",
         {"vars": masked_vars, "ad_config": ad_config, "entra_config": entra_config,
          "email_config": email_config, "email_templates": email_templates,
          "hosting_vsphere": hosting_vsphere, "hosting_xenserver": hosting_xenserver,
+         "portal_config": portal_config,
          "active_page": "settings"},
     )
 

@@ -39,5 +39,11 @@ app.conf.update(
             "schedule": crontab(minute=0),  # Every full hour
             "options": {"queue": "reclaim"},
         },
+        # Dispatch scheduled orders whose start date has arrived
+        "check-scheduled-orders": {
+            "task": "tasks.workflows.dynamic_runner.check_scheduled_orders",
+            "schedule": crontab(minute=0),  # Every full hour
+            "options": {"queue": "provision"},
+        },
     },
 )

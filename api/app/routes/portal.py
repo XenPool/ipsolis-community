@@ -5,7 +5,7 @@ admin settings). In development mode or when mode='disabled' a mock user is
 injected so the portal works without Entra credentials.
 """
 import logging
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 import base64
 
@@ -96,6 +96,7 @@ async def require_portal_auth(
 
 _STATUS_COLORS = {
     "pending":      "bg-gray-100 text-gray-700",
+    "scheduled":    "bg-indigo-100 text-indigo-700",
     "processing":   "bg-blue-100 text-blue-700",
     "provisioning": "bg-blue-100 text-blue-700",
     "delivered":    "bg-green-100 text-green-700",
@@ -169,6 +170,7 @@ async def portal_index(
 
 _ACTIVE_ORDER_STATUSES = (
     OrderStatus.PENDING,
+    OrderStatus.SCHEDULED,
     OrderStatus.PROCESSING,
     OrderStatus.PROVISIONING,
     OrderStatus.PROVISIONED,
@@ -244,6 +246,14 @@ async def portal_new_order_form(
     types_result = await db.execute(select(AssetType).order_by(AssetType.name))
     asset_types = list(types_result.scalars().all())
     unavailable_ids = await _get_unavailable_type_ids(db, asset_types)
+
+    # Load max advance days setting
+    max_adv_row = await db.execute(
+        select(AppConfig.value).where(AppConfig.key == "portal.max_advance_days")
+    )
+    max_advance_days = int((max_adv_row.scalar_one_or_none() or "0") or "0")
+    max_from_date = (date.today() + timedelta(days=max_advance_days)).isoformat() if max_advance_days > 0 else ""
+
     return templates.TemplateResponse("portal/order_new.html", {
         "request": request,
         "active_page": "new",
@@ -251,6 +261,8 @@ async def portal_new_order_form(
         "asset_types": asset_types,
         "unavailable_ids": unavailable_ids,
         "today": date.today().isoformat(),
+        "max_advance_days": max_advance_days,
+        "max_from_date": max_from_date,
         "error": None,
     })
 
@@ -349,6 +361,11 @@ async def portal_create_order(
     async def _render_error(msg: str):
         types_result = await db.execute(select(AssetType).order_by(AssetType.name))
         all_types = list(types_result.scalars().all())
+        max_adv_row = await db.execute(
+            select(AppConfig.value).where(AppConfig.key == "portal.max_advance_days")
+        )
+        max_adv = int((max_adv_row.scalar_one_or_none() or "0") or "0")
+        max_from = (date.today() + timedelta(days=max_adv)).isoformat() if max_adv > 0 else ""
         return templates.TemplateResponse("portal/order_new.html", {
             "request": request,
             "active_page": "new",
@@ -356,6 +373,8 @@ async def portal_create_order(
             "asset_types": all_types,
             "unavailable_ids": await _get_unavailable_type_ids(db, all_types),
             "today": date.today().isoformat(),
+            "max_advance_days": max_adv,
+            "max_from_date": max_from,
             "error": msg,
             # Return form values
             "form": {
@@ -377,6 +396,18 @@ async def portal_create_order(
     if until_dt <= from_dt:
         return await _render_error("The end date must be after the start date.")
 
+    # Validate max advance days
+    max_adv_row = await db.execute(
+        select(AppConfig.value).where(AppConfig.key == "portal.max_advance_days")
+    )
+    max_advance_days = int((max_adv_row.scalar_one_or_none() or "0") or "0")
+    if max_advance_days > 0:
+        max_date = datetime.combine(date.today(), datetime.min.time()).replace(tzinfo=timezone.utc) + timedelta(days=max_advance_days)
+        if from_dt > max_date:
+            return await _render_error(
+                f"The start date cannot be more than {max_advance_days} days in the future."
+            )
+
     # Load asset type for attribute validation
     at_result = await db.execute(select(AssetType).where(AssetType.id == asset_type_id))
     asset_type = at_result.scalar_one_or_none()
@@ -397,6 +428,9 @@ async def portal_create_order(
     rdp_clean = [u.strip() for u in rdp_users if u.strip()]
     admin_clean = [u.strip() for u in admin_users if u.strip()]
 
+    # Determine if this is a future-dated order
+    is_future = from_dt.date() > date.today()
+
     order = Order(
         user_email=user_email,
         user_name=user_name,
@@ -408,19 +442,35 @@ async def portal_create_order(
         requested_from=from_dt,
         requested_until=until_dt,
         action=OrderAction.PROVISION,
-        status=OrderStatus.PENDING,
+        status=OrderStatus.SCHEDULED if is_future else OrderStatus.PENDING,
         config=order_config,
     )
     db.add(order)
     await db.flush()
 
-    from app.routes.webhook import _dispatch_runbook
-    task_id = _dispatch_runbook(order)
-    order.celery_task_id = task_id
-    order.status = OrderStatus.PROCESSING
-    await db.commit()
+    if is_future:
+        # Future-dated: don't dispatch the runbook yet; Beat task will dispatch on start date
+        # Send confirmation email immediately so user knows the order is received
+        from celery import Celery
+        celery_app = Celery(broker=settings.CELERY_BROKER_URL)
+        celery_app.send_task(
+            "tasks.workflows.dynamic_runner.send_scheduled_confirmation",
+            args=[order.id],
+            queue="provision",
+        )
+        logger.info(
+            "Portal: Scheduled order created id=%s user=%s start=%s",
+            order.id, order.user_email, from_dt.date().isoformat(),
+        )
+    else:
+        # Immediate: dispatch runbook now
+        from app.routes.webhook import _dispatch_runbook
+        task_id = _dispatch_runbook(order)
+        order.celery_task_id = task_id
+        order.status = OrderStatus.PROCESSING
+        logger.info("Portal: Order created id=%s user=%s", order.id, order.user_email)
 
-    logger.info("Portal: Order created id=%s user=%s", order.id, order.user_email)
+    await db.commit()
     return RedirectResponse(url=f"/portal/orders/{order.id}", status_code=303)
 
 
@@ -655,11 +705,18 @@ async def portal_cancel_order(
         raise HTTPException(status_code=404, detail="Order not found")
     _assert_owns_order(original, current_user["email"])
 
-    if original.status not in (OrderStatus.DELIVERED, OrderStatus.PROVISIONED):
+    if original.status not in (OrderStatus.DELIVERED, OrderStatus.PROVISIONED, OrderStatus.SCHEDULED):
         raise HTTPException(
             status_code=422,
-            detail="Only active orders (DELIVERED/PROVISIONED) can be cancelled",
+            detail="Only active or scheduled orders can be cancelled",
         )
+
+    # Scheduled orders: simply cancel (nothing provisioned yet)
+    if original.status == OrderStatus.SCHEDULED:
+        original.status = OrderStatus.CANCELLED
+        await db.commit()
+        logger.info("Portal: Scheduled order cancelled id=%s", order_id)
+        return RedirectResponse(url=f"/portal/orders/{order_id}", status_code=303)
 
     cancel_order = Order(
         user_email=original.user_email,
@@ -702,7 +759,7 @@ async def portal_my_it(
         .options(selectinload(Order.steps))
         .where(_user_order_filter(current_user["email"]))
         .where(Order.action == OrderAction.PROVISION)
-        .where(Order.status.in_([OrderStatus.DELIVERED, OrderStatus.PROVISIONED]))
+        .where(Order.status.in_([OrderStatus.DELIVERED, OrderStatus.PROVISIONED, OrderStatus.SCHEDULED]))
         .order_by(Order.created_at.desc())
     )
     raw_orders = list(result.scalars().all())
@@ -727,9 +784,10 @@ async def portal_my_it(
         asset_names = {row.id: row.name for row in asset_rows}
 
     # Drop orders whose asset was deleted (assigned_personal requires a live asset)
+    # Scheduled orders are exempt: no asset is assigned yet (that happens at dispatch time)
     orders = [
         o for o in raw_orders
-        if not (
+        if o.status == OrderStatus.SCHEDULED or not (
             asset_types_by_id.get(o.asset_type_id) is not None
             and asset_types_by_id[o.asset_type_id].assignment_model == "assigned_personal"
             and o.assigned_asset_id is None
@@ -762,8 +820,8 @@ async def portal_my_it_detail(
         raise HTTPException(status_code=404, detail="Order not found")
     _assert_owns_order(order, current_user["email"])
 
-    if order.status not in (OrderStatus.DELIVERED, OrderStatus.PROVISIONED):
-        raise HTTPException(status_code=422, detail="Only active assets can be managed here")
+    if order.status not in (OrderStatus.DELIVERED, OrderStatus.PROVISIONED, OrderStatus.SCHEDULED):
+        raise HTTPException(status_code=422, detail="Only active or scheduled assets can be managed here")
 
     asset_type = None
     asset_type_name = None

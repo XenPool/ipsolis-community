@@ -200,6 +200,15 @@ def _run_targets_mode(
     needs_asset = assignment_model in ("assigned_personal", "dedicated_shared")
 
     if action == "provision":
+        # Detect if this was a scheduled (future-dated) order
+        _sched_date = None
+        _created = order.get("created_at")
+        if _created and requested_from:
+            _created_dt = _created if isinstance(_created, datetime) else datetime.fromisoformat(str(_created))
+            _from_dt = requested_from if isinstance(requested_from, datetime) else datetime.fromisoformat(str(requested_from))
+            if _from_dt.date() > _created_dt.date():
+                _sched_date = _from_dt.strftime("%d.%m.%Y")
+
         # Step 1: Order confirmation (non-critical)
         _run_step_inline(
             db, order_id, "Order confirmation",
@@ -215,6 +224,7 @@ def _run_targets_mode(
                 requested_until=expires_at,
                 snow_req=order.get("snow_req"),
                 snow_ritm=order.get("servicenow_ref"),
+                scheduled_date=_sched_date,
             ),
             critical=False,
         )
@@ -1171,6 +1181,63 @@ def test_script_module(self: Task, script_module_id: int, params: dict) -> dict:
         db.close()
 
 
+@app.task(name="tasks.workflows.dynamic_runner.send_scheduled_confirmation")
+def send_scheduled_confirmation(order_id: int) -> dict:
+    """Sends order confirmation email for a scheduled (future-dated) order.
+
+    Called immediately at order creation so the user knows the order was received
+    and will be executed on the scheduled start date.
+    """
+    from tasks.modules import notifications as notif
+
+    db = _get_db_session()
+    try:
+        row = db.execute(
+            text("""
+                SELECT o.user_email, o.user_name, o.owner_email, o.owner_name,
+                       o.requested_from, o.requested_until, o.snow_req, o.servicenow_ref,
+                       at.name as asset_type_name, at.description as asset_type_description
+                FROM orders o
+                JOIN asset_types at ON at.id = o.asset_type_id
+                WHERE o.id = :id
+            """),
+            {"id": order_id},
+        ).fetchone()
+        if not row:
+            return {"success": False, "error": f"Order {order_id} not found"}
+
+        requested_from = row.requested_from
+        if isinstance(requested_from, str):
+            requested_from = datetime.fromisoformat(requested_from)
+        requested_until = row.requested_until
+        if isinstance(requested_until, str):
+            requested_until = datetime.fromisoformat(requested_until)
+
+        scheduled_date = requested_from.strftime("%d.%m.%Y")
+
+        result = notif.send_order_confirmation(
+            db=db,
+            user_email=row.user_email or "",
+            user_name=row.user_name or "",
+            owner_email=row.owner_email,
+            owner_name=row.owner_name,
+            asset_type_name=row.asset_type_name or "",
+            asset_type_description=row.asset_type_description or "",
+            requested_from=requested_from,
+            requested_until=requested_until,
+            snow_req=row.snow_req,
+            snow_ritm=row.servicenow_ref,
+            scheduled_date=scheduled_date,
+        )
+        logger.info(
+            "Sent scheduled order confirmation for order_id=%s (execution: %s)",
+            order_id, scheduled_date,
+        )
+        return result
+    finally:
+        db.close()
+
+
 @app.task(
     name="tasks.workflows.dynamic_runner.check_expiring_assets",
     queue="reclaim",
@@ -1298,6 +1365,48 @@ def check_expiring_assets() -> dict:
             reclaim_count, reminder_count,
         )
         return {"reclaimed": reclaim_count, "reminders_sent": reminder_count}
+
+    finally:
+        db.close()
+
+
+@app.task(name="tasks.workflows.dynamic_runner.check_scheduled_orders")
+def check_scheduled_orders() -> dict:
+    """
+    Celery Beat Task: Dispatches scheduled orders whose start date has arrived.
+
+    Finds orders with status='scheduled' where requested_from <= NOW(),
+    transitions them to 'processing', and dispatches dynamic_runner.run.
+    """
+    logger.info("=== check_scheduled_orders: Looking for due scheduled orders ===")
+
+    db = _get_db_session()
+    try:
+        due_orders = db.execute(
+            text("""
+                SELECT id, user_email, requested_from
+                FROM orders
+                WHERE status = 'scheduled'
+                  AND requested_from <= NOW()
+            """),
+        ).fetchall()
+
+        dispatched = 0
+        for row in due_orders:
+            logger.info(
+                "Scheduled order due: order_id=%s user=%s requested_from=%s – dispatching",
+                row.id, row.user_email, row.requested_from,
+            )
+            db.execute(
+                text("UPDATE orders SET status = 'processing', updated_at = NOW() WHERE id = :id"),
+                {"id": row.id},
+            )
+            db.commit()
+            run.delay(row.id)
+            dispatched += 1
+
+        logger.info("=== check_scheduled_orders DONE: %s orders dispatched ===", dispatched)
+        return {"dispatched": dispatched}
 
     finally:
         db.close()

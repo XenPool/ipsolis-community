@@ -158,10 +158,14 @@
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
       <div>
         <label class="block text-xs font-medium text-gray-600 mb-1">From <span class="text-red-500">*</span></label>
-        <input type="date" name="requested_from" required
+        <input type="date" name="requested_from" id="requested-from" required
                value="{{ form.requested_from if form else today }}"
                min="{{ today }}"
+               {% if max_advance_days and max_advance_days > 0 %}max="{{ max_from_date }}"{% endif %}
                class="w-full rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400">
+        {% if max_advance_days and max_advance_days > 0 %}
+        <p class="text-xs text-gray-400 mt-1">Up to {{ max_advance_days }} days in advance</p>
+        {% endif %}
       </div>
       <div>
         <label class="block text-xs font-medium text-gray-600 mb-1">Until <span class="text-red-500">*</span></label>
@@ -170,6 +174,11 @@
                min="{{ today }}"
                class="w-full rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400">
       </div>
+    </div>
+    <div id="schedule-hint" class="hidden mt-3 rounded bg-blue-50 border border-blue-200 px-3 py-2">
+      <p class="text-xs text-blue-700">
+        <strong>Scheduled order:</strong> Your order will be reserved now and automatically executed on the selected start date.
+      </p>
     </div>
   </div>
 
@@ -430,6 +439,18 @@ document.addEventListener('DOMContentLoaded', function() {
       });
     });
   }
+
+  // Schedule hint: show when start date is in the future
+  var fromInput = document.getElementById('requested-from');
+  function updateScheduleHint() {
+    var hint = document.getElementById('schedule-hint');
+    if (!fromInput || !hint) return;
+    var val = fromInput.value;
+    var todayStr = '{{ today }}';
+    hint.classList.toggle('hidden', !val || val <= todayStr);
+  }
+  if (fromInput) fromInput.addEventListener('change', updateScheduleHint);
+  updateScheduleHint();
 
   // Set initial state
   updateAttrSection();

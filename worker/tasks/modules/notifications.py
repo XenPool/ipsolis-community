@@ -111,8 +111,13 @@ def send_order_confirmation(
     requested_until: datetime,
     snow_req: str | None,
     snow_ritm: str | None,
+    scheduled_date: str | None = None,
 ) -> dict:
-    """Sends order confirmation to requester and optionally owner."""
+    """Sends order confirmation to requester and optionally owner.
+
+    If scheduled_date is set, the email template can include {{scheduled_note}}
+    to inform the user that execution is delayed until that date.
+    """
     from tasks.modules.config_reader import get_config
 
     company_name = get_config(db, "company.name", "XenPool")
@@ -126,6 +131,11 @@ def send_order_confirmation(
     if owner_email and owner_email.lower() != user_email.lower():
         recipients.append(owner_email)
 
+    # Build scheduled note for email template
+    scheduled_note = ""
+    if scheduled_date:
+        scheduled_note = f"Your order is scheduled and will be automatically executed on {scheduled_date}."
+
     variables = {
         "company_name": company_name,
         "requester_name": user_name,
@@ -138,6 +148,8 @@ def send_order_confirmation(
         "until_date": requested_until.strftime("%d.%m.%Y"),
         "snow_req": snow_req or "",
         "snow_ritm": snow_ritm or "",
+        "scheduled_date": scheduled_date or "",
+        "scheduled_note": scheduled_note,
     }
 
     subject, body = _render_template(db, "order_confirmation", variables)
