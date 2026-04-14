@@ -15,8 +15,6 @@ router = APIRouter(prefix="/ui", tags=["admin-auth"])
 @router.get("/login", response_class=HTMLResponse)
 async def admin_login_page(request: Request):
     """Renders the admin login form."""
-    if settings.is_development or settings.ADMIN_AUTH_DISABLED:
-        return RedirectResponse(url="/ui/", status_code=302)
     if request.session.get("admin_authenticated"):
         return RedirectResponse(url="/ui/", status_code=302)
     return templates.TemplateResponse("admin/login.html", {

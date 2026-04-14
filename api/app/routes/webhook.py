@@ -43,19 +43,18 @@ async def receive_servicenow_webhook(
     - X-Hub-Signature-256: sha256=<hmac>  (optional, but recommended)
     - JSON body according to WebhookPayload schema
     """
-    # HMAC validation (enforce in production)
-    if not settings.is_development:
-        if not x_hub_signature_256:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Missing X-Hub-Signature-256 header",
-            )
-        body = await request.body()
-        if not _verify_hmac(body, x_hub_signature_256):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid webhook signature",
-            )
+    # HMAC signature validation
+    if not x_hub_signature_256:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing X-Hub-Signature-256 header",
+        )
+    body = await request.body()
+    if not _verify_hmac(body, x_hub_signature_256):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid webhook signature",
+        )
 
     # Resolve asset type by name
     result = await db.execute(

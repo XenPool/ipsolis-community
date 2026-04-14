@@ -31,17 +31,16 @@ def reserve_asset(
         {"success": True, "asset_id": int, "asset_name": str}
         {"success": False, "error": str}
     """
-    # CREATE_NEW: stub – actual instance creation via runbook step
+    # CREATE_NEW: instance creation must be handled by a subsequent runbook step
     if personal_provisioning_strategy == "create_new":
         logger.info(
-            "[STUB] create_new: New instance for order_id=%s asset_type_id=%s – "
-            "Actual creation must be performed via vsphere runbook", order_id, asset_type_id,
+            "create_new: Instance creation for order_id=%s asset_type_id=%s "
+            "deferred to runbook step", order_id, asset_type_id,
         )
         return {
             "success": True,
             "asset_id": None,
             "asset_name": f"NEW-INSTANCE-order-{order_id}",
-            "stub": True,
         }
 
     # ASSIGN_EXISTING_FREE (default): first free instance from pool – race-condition-safe
@@ -91,8 +90,7 @@ def reserve_asset(
 
 
 def release_asset(db: Session, asset_id: int) -> dict:
-    """Returns a VM to the pool (status FREE).
-    No mock: pure DB operation, always execute."""
+    """Returns a VM to the pool (status FREE)."""
     result = db.execute(
         sql_text("""
             UPDATE asset_pool
@@ -114,7 +112,6 @@ def release_asset(db: Session, asset_id: int) -> dict:
 
 def set_asset_busy(db: Session, asset_id: int, order_id: int, expires_at: datetime) -> dict:
     """Setzt VM auf BUSY nach erfolgreicher Bereitstellung."""
-    # No mock: pure DB operation, always execute
     result = db.execute(
         sql_text("""
             UPDATE asset_pool

@@ -220,7 +220,7 @@ def grant(
     assigned asset name (e.g. CN=XenPool-VDI-{asset_name}-RDP-Users,...).
 
     Returns:
-        {"success": True, "grants": n, "mock": bool}
+        {"success": True, "grants": n}
         {"success": False, "grants": n, "errors": [...]}
     """
     row = db.execute(
@@ -317,7 +317,7 @@ def revoke(
     Sets state = 'rolled_back' for successfully rolled back entries.
 
     Returns:
-        {"success": True, "revokes": n, "mock": bool}
+        {"success": True, "revokes": n}
         {"success": False, "revokes": n, "errors": [...]}
     """
     rows = db.execute(

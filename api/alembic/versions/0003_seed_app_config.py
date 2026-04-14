@@ -33,7 +33,6 @@ _SEED_ROWS = [
     ("ad.password",        "",                       "Passwort des Service-Accounts",         True),
     # ── Allgemein ─────────────────────────────────────────────────────────────
     ("company.name",       "XenPool",                "Firmenname für E-Mail-Templates",       False),
-    ("environment.type",   "development",            "Umgebungstyp (development/production)", False),
 ]
 
 

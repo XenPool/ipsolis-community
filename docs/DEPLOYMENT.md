@@ -87,9 +87,6 @@ nano .env
 ### Required settings to change
 
 ```ini
-# Set to production -- this disables all mocks
-ENVIRONMENT=production
-
 # Secure database credentials
 POSTGRES_PASSWORD=<generate-a-strong-password>
 
@@ -100,8 +97,6 @@ ADMIN_API_KEY=<random-string-min-32-chars>
 
 # CORS -- set to your production domain
 CORS_ORIGINS=https://selfservice.yourcompany.com
-
-# Flower monitoring password (optional, dev-only service)
 FLOWER_PASSWORD=<strong-password>
 ```
 
@@ -266,10 +261,8 @@ services:
 EOF
 ```
 
-> **Key differences from development**:
-> - Hot-reload volumes are removed (code is baked into the Docker image)
-> - API runs with 4 Uvicorn workers instead of `--reload`
-> - Flower monitoring UI is not started (it's in the `dev` profile)
+> **Note**: The production compose overlay adds nginx for SSL termination.
+> All application code is baked into the Docker images at build time.
 
 ---
 
@@ -411,8 +404,8 @@ Navigate to **Admin > Settings** and set:
 
 Use the **Test Entra Connection** button to verify the configuration.
 
-> When `entra.mode` is set to `disabled`, the portal uses a mock user for
-> development purposes. **Never use this in production.**
+> When `entra.mode` is set to `disabled`, the portal is inaccessible and
+> returns HTTP 503. Entra ID SSO must be configured for portal access.
 
 ---
 

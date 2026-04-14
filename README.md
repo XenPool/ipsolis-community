@@ -108,7 +108,7 @@ git clone https://github.com/XenPool/IT-SelfService.git
 cd IT-SelfService
 
 cp .env.example .env
-# Edit .env -- defaults work for development (mock mode)
+# Edit .env -- set database credentials and API secrets
 
 docker compose up --build
 ```
@@ -120,7 +120,7 @@ docker compose up --build
 | API Docs (Swagger) | http://localhost:8000/docs |
 | Celery Flower | http://localhost:5555 |
 
-In development mode (`ENVIRONMENT=development`), all external calls (vSphere, SCCM, AD, SMTP) are mocked with realistic delays and logging. No external infrastructure required.
+After startup, configure external systems (Active Directory, SMTP, vSphere, Entra ID SSO) through the Admin UI at `/ui/settings`.
 
 ## Production Deployment
 

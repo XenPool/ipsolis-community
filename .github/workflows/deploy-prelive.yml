@@ -17,7 +17,7 @@ jobs:
       - name: Rebuild and restart containers
         run: |
           cd ${{ secrets.PRELIVE_PATH }}
-          docker compose -f docker-compose.yml -f docker-compose.prelive.yml --profile dev up --build -d
+          docker compose -f docker-compose.yml -f docker-compose.prelive.yml up --build -d
 
       - name: Run database migrations
         run: |

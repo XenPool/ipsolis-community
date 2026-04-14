@@ -233,14 +233,12 @@ document.querySelectorAll('.step-log-structured').forEach(el => {
   try {
     const log = JSON.parse(el.dataset.log);
     const success = log.output?.success !== false && !log.output?.error;
-    const hasMock = !!log.mock;
     const dur = log.duration_ms != null ? `${log.duration_ms}ms` : '';
     const moduleName = log.module || log.module_key || '';
 
     // ── Header bar ──────────────────────────────────────────────────────────
     let html = `<div class="flex items-center gap-2 mb-2 text-xs">`;
     html += `<span class="font-mono font-semibold text-gray-700">${esc(moduleName)}</span>`;
-    if (hasMock) html += `<span class="px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-700 font-sans">mock</span>`;
     if (dur)     html += `<span class="text-gray-400 font-sans">${esc(dur)}</span>`;
     const statusCls = success ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700';
     const statusTxt = success ? 'success' : 'failed';

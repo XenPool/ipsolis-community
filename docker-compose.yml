@@ -58,11 +58,7 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./api/app:/app/app          # Hot-Reload im Dev-Modus
-      - ./api/alembic:/app/alembic  # Migrationen ohne Rebuild sichtbar
-      - ./api/tests:/app/tests      # Tests (pytest)
-      - ./worker:/app/worker        # Worker code accessible for tests
-      - ./scripts:/app/scripts      # Script-Editor: Lese- und Schreibzugriff
+      - ./scripts:/app/scripts      # PowerShell scripts (read/write for script editor)
     depends_on:
       postgres:
         condition: service_healthy
@@ -91,9 +87,8 @@ services:
       CELERY_RESULT_BACKEND: redis://redis:6379/1
       PYTHONUNBUFFERED: "1"
     volumes:
-      - ./worker/tasks:/app/tasks  # Hot-Reload im Dev-Modus
-      - ./scripts:/app/scripts:ro  # PowerShell Scripts (read-only)
-      - ps_user_modules:/root/.local/share/powershell/Modules  # Persistente PS-Module
+      - ./scripts:/app/scripts:ro          # PowerShell scripts (read-only)
+      - ps_user_modules:/root/.local/share/powershell/Modules
     depends_on:
       postgres:
         condition: service_healthy
@@ -126,7 +121,6 @@ services:
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/1
     volumes:
-      - ./worker/tasks:/app/tasks
       - beat_schedule:/app/beat_schedule
       - ps_user_modules:/root/.local/share/powershell/Modules
     depends_on:
@@ -141,7 +135,7 @@ services:
       --schedule /app/beat_schedule/celerybeat-schedule
 
   # ─────────────────────────────────────────────────────────────────
-  # Flower – Celery Monitoring UI (Dev only)
+  # Flower – Celery Monitoring UI
   # ─────────────────────────────────────────────────────────────────
   flower:
     build:
@@ -162,8 +156,6 @@ services:
       celery -A tasks flower
       --port=5555
       --broker=redis://redis:6379/0
-    profiles:
-      - dev
 
 volumes:
   postgres_data:

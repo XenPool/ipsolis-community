@@ -9,11 +9,7 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # ── Umgebung ──────────────────────────────────────────────────
-    ENVIRONMENT: str = "development"
-    ADMIN_AUTH_DISABLED: bool = False  # Set true to bypass X-Admin-Key in browser/dev use
-
-    # ── Datenbank ─────────────────────────────────────────────────
+    # ── Database ─────────────────────────────────────────────────
     DATABASE_URL: str = "postgresql+asyncpg://xpuser:changeme@localhost:5432/itselfservice"
 
     # ── Celery ────────────────────────────────────────────────────
@@ -21,44 +17,14 @@ class Settings(BaseSettings):
     CELERY_RESULT_BACKEND: str = "redis://localhost:6379/1"
 
     # ── API ───────────────────────────────────────────────────────
-    API_SECRET_KEY: str = "dev_secret_key_not_for_production"
-    CORS_ORIGINS: str = "http://localhost:3000,http://localhost:8000"
-    WEBHOOK_SECRET_TOKEN: str = "dev_webhook_token"
-    ADMIN_API_KEY: str = "xpdev_admin_key_change_in_production"
-
-    # ── vSphere ───────────────────────────────────────────────────
-    VSPHERE_SERVER: str = "vcenter.example.com"
-    VSPHERE_USER: str = "svc@vsphere.local"
-    VSPHERE_PASSWORD: str = ""
-    VSPHERE_DATACENTER: str = "DC01"
-    VSPHERE_CLUSTER: str = "CL-VDI"
-
-    # ── SCCM ─────────────────────────────────────────────────────
-    SCCM_WINRM_HOST: str = "sccm-server.example.com"
-    SCCM_WINRM_USER: str = ""
-    SCCM_WINRM_PASSWORD: str = ""
-    SCCM_TASK_SEQUENCE_ID: str = "TSQ00001"
-    SCCM_SITE_CODE: str = "XP1"
-
-    # ── SMTP ─────────────────────────────────────────────────────
-    SMTP_HOST: str = "localhost"
-    SMTP_PORT: int = 587
-    SMTP_USER: str = ""
-    SMTP_PASSWORD: str = ""
-    SMTP_TLS: bool = True
-    MAIL_FROM: str = "noreply@example.com"
-    MAIL_FROM_NAME: str = "XenPool IT Selfservice"
-
-    # ── Scheduling ───────────────────────────────────────────────
-    REMINDER_HOURS_BEFORE_EXPIRY: int = 24
+    API_SECRET_KEY: str = "change_me_in_production_min_32_chars"
+    CORS_ORIGINS: str = "https://localhost"
+    WEBHOOK_SECRET_TOKEN: str = "change_me_webhook_secret"
+    ADMIN_API_KEY: str = "change_me_admin_key_min_32_chars"
 
     @property
     def cors_origins_list(self) -> list[str]:
         return [o.strip() for o in self.CORS_ORIGINS.split(",")]
-
-    @property
-    def is_development(self) -> bool:
-        return self.ENVIRONMENT == "development"
 
 
 settings = Settings()

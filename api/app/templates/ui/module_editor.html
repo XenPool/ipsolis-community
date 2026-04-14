@@ -344,14 +344,11 @@ function _renderTestResult(data) {
   var out  = (data && data.output) ? data.output : data || {};
   var ok   = out.success !== false && (data ? data.success !== false : true);
   var ms   = (data && data.duration_ms) ? data.duration_ms : 0;
-  var mock = out.mock === true;
-
   // Status bar
   document.getElementById('test-result-status').innerHTML =
     (ok ? '<span class="text-green-400 font-semibold">✓ Erfolg</span>'
         : '<span class="text-red-400 font-semibold">✗ Error</span>')
-    + '<span class="text-gray-500">' + ms + ' ms</span>'
-    + (mock ? '<span class="bg-yellow-800 text-yellow-300 px-1.5 py-0.5 rounded text-xs ml-1">mock</span>' : '');
+    + '<span class="text-gray-500">' + ms + ' ms</span>';
 
   // Stdout: prefer out.stdout, then string output field, then error message
   var stdout = (out.stdout != null ? out.stdout : null)

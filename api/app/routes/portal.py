@@ -1,8 +1,6 @@
 """User Self-Service Portal – HTML routes.
 
-Authentication: Entra ID SSO when entra.mode != 'disabled' (controlled via
-admin settings). In development mode or when mode='disabled' a mock user is
-injected so the portal works without Entra credentials.
+Authentication: Entra ID SSO (entra.mode must be set to 'enabled' via Admin > Settings).
 """
 import logging
 from datetime import date, datetime, timedelta, timezone
@@ -27,7 +25,6 @@ from app.utils.ad_lookup import lookup_user
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/portal", tags=["portal"])
-_DEV_USER = {"email": "dev@xenpool.local", "name": "Dev User (bypass)", "oid": "", "upn": "dev@xenpool.local"}
 
 
 @router.get("/logo", include_in_schema=False)
@@ -66,22 +63,21 @@ async def require_portal_auth(
 ) -> dict:
     """FastAPI dependency: returns the authenticated portal user dict.
 
-    - entra.mode == 'disabled' OR ENVIRONMENT=development → returns _DEV_USER (no redirect)
-    - session["portal_user"] present → returns stored user
-    - Otherwise → stores intended URL in session and redirects to /portal/login
+    Requires Entra ID SSO to be configured (entra.mode = 'enabled').
+    If not configured, redirects to a setup hint page.
     """
-    if settings.is_development:
-        return _DEV_USER
-
-    # Read entra.mode from DB (cached per-request via the dependency)
+    # Read entra.mode from DB
     mode_row = await db.execute(
         select(AppConfig).where(AppConfig.key == "entra.mode")
     )
     mode_cfg = mode_row.scalar_one_or_none()
     mode = (mode_cfg.value or "disabled") if mode_cfg else "disabled"
 
-    if mode == "disabled":
-        return _DEV_USER
+    if mode != "enabled":
+        raise HTTPException(
+            status_code=503,
+            detail="Portal authentication is not configured. An administrator must enable Entra ID SSO in Admin > Settings.",
+        )
 
     user = request.session.get("portal_user")
     if user:
