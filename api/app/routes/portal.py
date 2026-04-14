@@ -73,7 +73,7 @@ async def require_portal_auth(
     mode_cfg = mode_row.scalar_one_or_none()
     mode = (mode_cfg.value or "disabled") if mode_cfg else "disabled"
 
-    if mode != "enabled":
+    if mode == "disabled":
         raise HTTPException(
             status_code=503,
             detail="Portal authentication is not configured. An administrator must enable Entra ID SSO in Admin > Settings.",

@@ -5,12 +5,15 @@ app_logo) to be set once and reflected in every template render without
 per-request DB queries or per-route parameter passing.
 """
 
+import os
+
 from fastapi.templating import Jinja2Templates
 
 APP_TITLE_DEFAULT = "IT Selfservice"
 
 templates = Jinja2Templates(directory="/app/app/templates")
 templates.env.globals["app_title"] = APP_TITLE_DEFAULT
+templates.env.globals["app_version"] = os.environ.get("APP_VERSION", "0.0.0")
 templates.env.globals["app_logo"] = False          # bool: whether a logo is configured
 templates.env.globals["app_logo_position"] = "left"
 templates.env.globals["app_logo_size"] = "80"

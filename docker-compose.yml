@@ -48,6 +48,8 @@ services:
     build:
       context: ./api
       dockerfile: Dockerfile
+      args:
+        APP_VERSION: ${APP_VERSION:-1.0.0}
     container_name: xp_api
     restart: unless-stopped
     env_file: .env

@@ -19,6 +19,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY app/ ./app/
 
+# Version (passed from docker-compose via build arg)
+ARG APP_VERSION=0.0.0
+ENV APP_VERSION=${APP_VERSION}
+
 # Alembic (migrations)
 COPY alembic/ ./alembic/
 COPY alembic.ini .

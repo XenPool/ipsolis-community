@@ -1,4 +1,5 @@
 import logging
+import os
 from contextlib import asynccontextmanager
 from collections.abc import AsyncGenerator
 
@@ -27,11 +28,13 @@ structlog.configure(
 
 logger = structlog.get_logger(__name__)
 
+APP_VERSION = os.environ.get("APP_VERSION", "0.0.0")
+
 
 # ── Lifespan ──────────────────────────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    logger.info("IT Selfservice API starting", version="0.1.0")
+    logger.info("IT Selfservice API starting", version=APP_VERSION)
 
     # Load configurable app globals from DB into Jinja2 environment
     _APP_KEYS = ("app.title", "app.logo", "app.logo_position", "app.logo_size", "app.logo_show_title", "app.logo_title_size")
@@ -60,7 +63,7 @@ app = FastAPI(
         "Receives webhooks from ServiceNow and self-service portal requests, "
         "creates orders and dispatches Celery runbooks."
     ),
-    version="0.1.0",
+    version=APP_VERSION,
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan,
