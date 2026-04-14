@@ -10,9 +10,7 @@ async def require_admin_key(
     request: Request,
     api_key: str | None = Security(_api_key_header),
 ) -> None:
-    """Dependency: validates X-Admin-Key header or admin session. Disabled in dev mode."""
-    if settings.is_development or settings.ADMIN_AUTH_DISABLED:
-        return
+    """Dependency: validates X-Admin-Key header or admin session cookie."""
     if api_key and api_key == settings.ADMIN_API_KEY:
         return
     if request.session.get("admin_authenticated"):
@@ -27,11 +25,8 @@ async def require_admin_key(
 async def require_admin_session(request: Request) -> None:
     """Dependency: validates admin session cookie for browser-based UI access.
 
-    Disabled in dev mode or when ADMIN_AUTH_DISABLED=true.
     Redirects unauthenticated requests to /ui/login, preserving the intended URL.
     """
-    if settings.is_development or settings.ADMIN_AUTH_DISABLED:
-        return
     if not request.session.get("admin_authenticated"):
         request.session["admin_next"] = str(request.url)
         raise HTTPException(

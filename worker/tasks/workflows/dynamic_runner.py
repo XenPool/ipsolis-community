@@ -129,16 +129,10 @@ def _write_provisioned_state(
     logger.info("[dynamic_runner] provisioned_state written for order_id=%s", order_id)
 
 
-def _stub_deallocate(order_id: int) -> dict:
-    """Stub: Halt/deallocate VM. Real implementation via vsphere runbook."""
-    logger.info("[STUB] Halt instance for order_id=%s – real implementation via runbook", order_id)
-    return {"success": True, "stub": True, "message": "VM-Deallocate mocked (runbook implementation pending)"}
-
-
-def _stub_delete_instance(order_id: int) -> dict:
-    """Stub: Delete VM. Real implementation via vsphere runbook."""
-    logger.info("[STUB] Delete instance for order_id=%s – real implementation via runbook", order_id)
-    return {"success": True, "stub": True, "message": "VM-Delete mocked (runbook implementation pending)"}
+def _skip_instance_action(order_id: int, action: str) -> dict:
+    """Log that an instance-level action is deferred to a separate runbook."""
+    logger.info("Instance action '%s' for order_id=%s must be handled via a configured runbook", action, order_id)
+    return {"success": True, "skipped": True, "message": f"Instance {action} must be configured via a runbook"}
 
 
 def _lookup_asset_name(db: Session, order: dict) -> str | None:
@@ -297,7 +291,7 @@ def _run_targets_mode(
             db.commit()
             return {"success": False, "order_id": order_id, "failed_step": "Grant access"}
 
-        # Set asset to BUSY (pure DB op, no mock)
+        # Set asset to BUSY
         if reserved_asset_id:
             pool_manager.set_asset_busy(db, reserved_asset_id, order_id, expires_at)
 
@@ -395,7 +389,7 @@ def _run_targets_mode(
                 )
             _run_step_inline(
                 db, order_id, "Pause instance",
-                lambda: _stub_deallocate(order_id),
+                lambda: _skip_instance_action(order_id, "deallocate"),
                 critical=False,
             )
 
@@ -409,7 +403,7 @@ def _run_targets_mode(
                 )
             _run_step_inline(
                 db, order_id, "Delete instance",
-                lambda: _stub_delete_instance(order_id),
+                lambda: _skip_instance_action(order_id, "delete"),
                 critical=False,
             )
 

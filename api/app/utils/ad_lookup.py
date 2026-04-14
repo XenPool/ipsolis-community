@@ -7,8 +7,8 @@ which modern Windows Server AD requires (LDAPServerIntegrity = Require signing).
 AD config is read from env vars first; if AD_SERVER is not set, falls back
 to the app_config table (configured via Admin -> Settings -> Active Directory).
 
-When AD is not configured, all identifiers are accepted with a warning log
-so the portal remains usable during initial setup.
+When AD is not configured, lookup functions return an error indicating that
+AD must be set up via the Admin UI.
 """
 import asyncio
 import logging
@@ -88,9 +88,7 @@ def lookup_user(identifier: str) -> dict:
 
     ad_config = _get_ad_config()
     if not ad_config:
-        logger.warning("[ad_lookup] AD not configured — accepting '%s' without validation. "
-                       "Configure AD via Admin -> Settings -> Active Directory.", identifier)
-        return _accept_without_validation(identifier)
+        return {"success": False, "error": "Active Directory is not configured. Configure AD via Admin > Settings > Active Directory."}
 
     return _msldap_lookup_sync(identifier, ad_config)
 
@@ -112,15 +110,7 @@ def lookup_manager(identifier: str) -> dict:
 
     ad_config = _get_ad_config()
     if not ad_config:
-        logger.warning("[ad_lookup] AD not configured — returning mock manager for '%s'", identifier)
-        return {
-            "success": True,
-            "manager": {
-                "email": "dev@xenpool.local",
-                "display_name": "Dev Manager (mock)",
-                "sam_account": "devmanager",
-            },
-        }
+        return {"success": False, "error": "Active Directory is not configured. Configure AD via Admin > Settings > Active Directory."}
 
     return _msldap_manager_sync(identifier, ad_config)
 
@@ -245,8 +235,7 @@ def check_group_membership(identifier: str, group_dn: str) -> dict:
 
     ad_config = _get_ad_config()
     if not ad_config:
-        logger.warning("[ad_lookup] AD not configured — assuming '%s' is member of '%s'", identifier, group_dn)
-        return {"success": True, "is_member": True}
+        return {"success": False, "error": "Active Directory is not configured. Configure AD via Admin > Settings > Active Directory."}
 
     return _msldap_check_membership_sync(identifier, group_dn, ad_config)
 
@@ -314,20 +303,6 @@ async def _msldap_check_membership(identifier: str, group_dn: str, ad_config: di
         return {"success": True, "is_member": found}
     finally:
         await client.disconnect()
-
-
-def _accept_without_validation(identifier: str) -> dict:
-    """Accept an identifier when AD is not available. Derive display values from the input."""
-    sam = identifier.split("\\")[-1] if "\\" in identifier else identifier
-    sam = sam.split("@")[0].lower().strip()
-    email = identifier if "@" in identifier else ""
-    display = identifier.replace("\\", " ").replace(".", " ").replace("@", " at ").strip().title()
-    return {
-        "success": True,
-        "email": email or identifier,
-        "display_name": display or identifier,
-        "sam_account": sam,
-    }
 
 
 def _msldap_lookup_sync(identifier: str, ad_config: dict) -> dict:

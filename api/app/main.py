@@ -18,13 +18,11 @@ from app.templates_instance import set_app_title, set_app_logo_config
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 logging.basicConfig(
-    level=logging.DEBUG if settings.is_development else logging.INFO,
+    level=logging.INFO,
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
 )
 structlog.configure(
-    wrapper_class=structlog.make_filtering_bound_logger(
-        logging.DEBUG if settings.is_development else logging.INFO
-    ),
+    wrapper_class=structlog.make_filtering_bound_logger(logging.INFO),
 )
 
 logger = structlog.get_logger(__name__)
@@ -33,13 +31,7 @@ logger = structlog.get_logger(__name__)
 # ── Lifespan ──────────────────────────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    logger.info(
-        "IT Selfservice API starting",
-        environment=settings.ENVIRONMENT,
-        version="0.1.0",
-    )
-    if settings.is_development:
-        logger.info("Mock mode ACTIVE – no real external calls will be made")
+    logger.info("IT Selfservice API starting", version="0.1.0")
 
     # Load configurable app globals from DB into Jinja2 environment
     _APP_KEYS = ("app.title", "app.logo", "app.logo_position", "app.logo_size", "app.logo_show_title", "app.logo_title_size")
@@ -80,7 +72,7 @@ app.add_middleware(
     secret_key=settings.API_SECRET_KEY,
     session_cookie="xp_session",
     max_age=28800,       # 8 hours
-    https_only=False,    # set True behind HTTPS in production
+    https_only=True,
     same_site="lax",
 )
 

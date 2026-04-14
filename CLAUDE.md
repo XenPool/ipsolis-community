@@ -45,11 +45,6 @@ docker compose up --build
 
 ## Development Notes
 
-### Mock Mode
-All external calls (vSphere, XenServer, SCCM, SMTP) are mocked when
-`ENVIRONMENT=development` is set in `.env`. Mocks simulate realistic behavior
-including execution delays and logging. No external infrastructure required.
-
 ### PowerShell Scripts
 Scripts in `scripts/ivanti/` are **read-only reference material** and must not be modified.
 New scripts belong in:
@@ -146,6 +141,6 @@ Instead of `` `{{${p}}}` ``, always use `'{{' + p + '}}'` (string concatenation)
 
 - **Audit logging**: `aaudit()` (async, API) · `waudit()` (sync, Worker)
 - **Step tracking**: `worker/tasks/modules/step_helper.py`
-- **Admin auth**: dev bypass active; production requires `ADMIN_API_KEY` in `.env`
-- **Portal auth**: dev bypass active; production requires Entra ID config (`entra.mode = enabled`)
+- **Admin auth**: requires `ADMIN_API_KEY` in `.env`
+- **Portal auth**: requires Entra ID config (`entra.mode = enabled`); portal returns HTTP 503 when Entra is not configured
 - **`dynamic_runner`** must be listed in `include=[]` in `worker/tasks/__init__.py` or Beat tasks won't register
