@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+
+{% block title %}Run History – {{ runbook.name }} – {{ app_title }}{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+  <a href="/ui/standalone-runbooks" class="text-sm text-gray-500 hover:text-gray-800">← Back to Runbooks</a>
+</div>
+
+<div class="flex items-center justify-between mb-6">
+  <div>
+    <h1 class="text-lg font-semibold text-gray-900">{{ runbook.name }} – Run History</h1>
+    <p class="text-xs text-gray-500 mt-1">{{ runbook.description or 'No description' }}</p>
+  </div>
+  <div class="flex items-center gap-3">
+    <a href="/ui/standalone-runbooks/{{ runbook.id }}/edit"
+       class="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded hover:bg-gray-50">Edit</a>
+    <button onclick="triggerRun()"
+            class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700"
+            {% if not runbook.is_active %}disabled title="Runbook is inactive"{% endif %}>
+      Trigger Now
+    </button>
+  </div>
+</div>
+
+<div class="bg-white rounded-lg border border-gray-200">
+  <table class="w-full text-sm">
+    <thead>
+      <tr class="border-b border-gray-200 bg-gray-50">
+        <th class="px-4 py-3 text-left font-medium text-gray-600">Run #</th>
+        <th class="px-4 py-3 text-left font-medium text-gray-600">Status</th>
+        <th class="px-4 py-3 text-left font-medium text-gray-600">Trigger</th>
+        <th class="px-4 py-3 text-left font-medium text-gray-600">Started</th>
+        <th class="px-4 py-3 text-left font-medium text-gray-600">Duration</th>
+        <th class="px-4 py-3 text-right font-medium text-gray-600">Details</th>
+      </tr>
+    </thead>
+    <tbody id="runs-body">
+      <tr><td colspan="6" class="px-4 py-8 text-center text-gray-400">Loading…</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- Run detail modal -->
+<div id="run-detail-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+  <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] overflow-y-auto">
+    <div class="flex items-center justify-between px-5 py-4 border-b border-gray-200">
+      <h3 class="text-sm font-semibold text-gray-900" id="modal-title">Run Details</h3>
+      <button onclick="closeModal()" class="text-gray-400 hover:text-gray-700 text-lg">&times;</button>
+    </div>
+    <div id="modal-body" class="px-5 py-4">
+      <p class="text-sm text-gray-400">Loading…</p>
+    </div>
+  </div>
+</div>
+
+<script>
+{% raw %}
+var RUNBOOK_ID = {{ runbook.id }};
+
+var STATUS_COLORS = {
+  success: 'bg-green-100 text-green-700',
+  failed:  'bg-red-100 text-red-700',
+  running: 'bg-blue-100 text-blue-700',
+  pending: 'bg-gray-100 text-gray-600',
+  skipped: 'bg-gray-100 text-gray-400',
+};
+
+function _badge(status) {
+  var cls = STATUS_COLORS[status] || 'bg-gray-100 text-gray-600';
+  return '<span class="px-2 py-0.5 rounded-full text-xs font-medium ' + cls + '">' + status + '</span>';
+}
+
+function _fmtTime(iso) {
+  if (!iso) return '–';
+  return new Date(iso).toLocaleString();
+}
+
+function _duration(start, end) {
+  if (!start || !end) return '–';
+  var ms = new Date(end) - new Date(start);
+  if (ms < 1000) return ms + 'ms';
+  return (ms / 1000).toFixed(1) + 's';
+}
+
+async function loadRuns() {
+  var resp = await fetch('/admin/standalone-runbooks/' + RUNBOOK_ID + '/runs');
+  if (!resp.ok) {
+    document.getElementById('runs-body').innerHTML =
+      '<tr><td colspan="6" class="px-4 py-8 text-center text-red-500">Failed to load runs</td></tr>';
+    return;
+  }
+  var runs = await resp.json();
+  if (!runs.length) {
+    document.getElementById('runs-body').innerHTML =
+      '<tr><td colspan="6" class="px-4 py-8 text-center text-gray-400">No runs yet.</td></tr>';
+    return;
+  }
+  var html = runs.map(function(r) {
+    var trigger = r.trigger === 'scheduled'
+      ? '<span class="text-xs text-gray-500">Scheduled</span>'
+      : '<span class="text-xs text-blue-600">Manual</span>';
+    return '<tr class="border-b border-gray-100 last:border-0 hover:bg-gray-50">'
+      + '<td class="px-4 py-3 font-mono text-gray-600">#' + r.id + '</td>'
+      + '<td class="px-4 py-3">' + _badge(r.status)
+      + (r.error_message ? '<span class="text-xs text-red-500 ml-1" title="' + r.error_message.replace(/"/g, '&quot;') + '">!</span>' : '')
+      + '</td>'
+      + '<td class="px-4 py-3">' + trigger + '</td>'
+      + '<td class="px-4 py-3 text-xs text-gray-500">' + _fmtTime(r.started_at || r.created_at) + '</td>'
+      + '<td class="px-4 py-3 text-xs text-gray-500">' + _duration(r.started_at, r.finished_at) + '</td>'
+      + '<td class="px-4 py-3 text-right">'
+      + '  <button onclick="showRunDetail(' + r.id + ')" class="text-xs text-blue-600 hover:underline">View</button>'
+      + '</td>'
+      + '</tr>';
+  }).join('');
+  document.getElementById('runs-body').innerHTML = html;
+}
+
+async function showRunDetail(runId) {
+  document.getElementById('modal-title').textContent = 'Run #' + runId;
+  document.getElementById('modal-body').innerHTML = '<p class="text-sm text-gray-400">Loading…</p>';
+  document.getElementById('run-detail-modal').classList.remove('hidden');
+
+  var resp = await fetch('/admin/standalone-runbooks/' + RUNBOOK_ID + '/runs/' + runId);
+  if (!resp.ok) {
+    document.getElementById('modal-body').innerHTML = '<p class="text-sm text-red-500">Failed to load run details</p>';
+    return;
+  }
+  var run = await resp.json();
+
+  var html = '<div class="mb-4">'
+    + '<div class="flex items-center gap-3 mb-2">'
+    + '  ' + _badge(run.status)
+    + '  <span class="text-xs text-gray-500">' + run.trigger + ' / ' + (run.triggered_by || '–') + '</span>'
+    + '</div>'
+    + '<div class="text-xs text-gray-500">'
+    + '  Created: ' + _fmtTime(run.created_at)
+    + '  · Started: ' + _fmtTime(run.started_at)
+    + '  · Finished: ' + _fmtTime(run.finished_at)
+    + '  · Duration: ' + _duration(run.started_at, run.finished_at)
+    + '</div>'
+    + (run.error_message ? '<div class="text-xs text-red-600 mt-1">' + run.error_message + '</div>' : '')
+    + '</div>';
+
+  if (run.steps && run.steps.length) {
+    html += '<h4 class="text-xs font-semibold text-gray-600 mb-2">Steps</h4>';
+    html += '<div class="border border-gray-200 rounded divide-y divide-gray-100">';
+    run.steps.sort(function(a, b) { return a.position - b.position; });
+    run.steps.forEach(function(s) {
+      html += '<div class="px-3 py-2">'
+        + '<div class="flex items-center gap-2 mb-1">'
+        + '  <span class="w-5 h-5 flex items-center justify-center rounded-full bg-gray-100 text-gray-600 text-xs font-mono">' + s.position + '</span>'
+        + '  <span class="text-sm font-medium text-gray-900">' + s.step_name + '</span>'
+        + '  ' + _badge(s.status)
+        + '  <span class="text-xs text-gray-400 ml-auto">' + _duration(s.started_at, s.finished_at) + '</span>'
+        + '</div>';
+      if (s.error) {
+        html += '<pre class="text-xs text-red-600 bg-red-50 rounded px-2 py-1 mt-1 whitespace-pre-wrap">' + s.error + '</pre>';
+      }
+      if (s.log_output) {
+        html += '<pre class="text-xs text-gray-600 bg-gray-50 rounded px-2 py-1 mt-1 whitespace-pre-wrap max-h-40 overflow-y-auto">' + s.log_output + '</pre>';
+      }
+      html += '</div>';
+    });
+    html += '</div>';
+  } else {
+    html += '<p class="text-xs text-gray-400">No step details available.</p>';
+  }
+
+  document.getElementById('modal-body').innerHTML = html;
+}
+
+function closeModal() {
+  document.getElementById('run-detail-modal').classList.add('hidden');
+}
+
+// Close modal on escape
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') closeModal();
+});
+
+async function triggerRun() {
+  if (!confirm('Trigger this runbook now?')) return;
+  var resp = await fetch('/admin/standalone-runbooks/' + RUNBOOK_ID + '/trigger', {method: 'POST'});
+  if (resp.ok) {
+    var data = await resp.json();
+    alert('Run dispatched (run_id: ' + data.run_id + ')');
+    loadRuns();
+  } else {
+    var err = await resp.json().catch(function() { return {}; });
+    alert('Error: ' + (err.detail || 'Failed to trigger'));
+  }
+}
+
+loadRuns();
+{% endraw %}
+</script>
+{% endblock %}

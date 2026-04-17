@@ -1,0 +1,521 @@
+{% extends "base.html" %}
+
+{% block title %}{% if runbook %}Edit Runbook – {{ app_title }}{% else %}New Runbook – {{ app_title }}{% endif %}{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+  <a href="/ui/standalone-runbooks" class="text-sm text-gray-500 hover:text-gray-800">← Back to Runbooks</a>
+</div>
+
+<h1 class="text-lg font-semibold text-gray-900 mb-6">
+  {% if runbook %}Edit Runbook{% else %}New Runbook{% endif %}
+</h1>
+
+<!-- ── Settings ─────────────────────────────────────────────────────────── -->
+<div class="bg-white rounded-lg border border-gray-200 p-5 mb-6">
+  <h2 class="text-sm font-semibold text-gray-700 mb-4">Settings</h2>
+
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+    <div>
+      <label class="block text-xs font-medium text-gray-600 mb-1">Name <span class="text-red-500">*</span></label>
+      <input type="text" id="rb-name" value="{{ runbook.name if runbook else '' }}"
+             class="w-full rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400">
+    </div>
+    <div>
+      <label class="block text-xs font-medium text-gray-600 mb-1">Description</label>
+      <input type="text" id="rb-description" value="{{ runbook.description if runbook and runbook.description else '' }}"
+             class="w-full rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400">
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-4">
+    <div>
+      <label class="block text-xs font-medium text-gray-600 mb-1">Active</label>
+      <label class="flex items-center gap-2 text-sm cursor-pointer">
+        <input type="checkbox" id="rb-active" {% if not runbook or runbook.is_active %}checked{% endif %} class="w-4 h-4">
+        Enabled
+      </label>
+    </div>
+    <div>
+      <label class="block text-xs font-medium text-gray-600 mb-1">Cron Schedule</label>
+      <input type="text" id="rb-cron" value="{{ runbook.cron_expression if runbook and runbook.cron_expression else '' }}"
+             placeholder="e.g. 0 3 * * *"
+             class="w-full rounded border border-gray-300 text-sm font-mono px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400">
+    </div>
+    <div>
+      <label class="block text-xs font-medium text-gray-600 mb-1">Cron Enabled</label>
+      <label class="flex items-center gap-2 text-sm cursor-pointer">
+        <input type="checkbox" id="rb-cron-enabled" {% if runbook and runbook.cron_enabled %}checked{% endif %} class="w-4 h-4">
+        Run on schedule
+      </label>
+    </div>
+    <div>
+      <label class="block text-xs font-medium text-gray-600 mb-1">Skip if Running</label>
+      <label class="flex items-center gap-2 text-sm cursor-pointer">
+        <input type="checkbox" id="rb-skip-running" {% if not runbook or runbook.skip_if_running %}checked{% endif %} class="w-4 h-4">
+        Prevent overlap
+      </label>
+    </div>
+  </div>
+
+  <div class="flex items-center gap-3">
+    <button type="button" onclick="saveSettings()"
+            class="px-5 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700">
+      {% if runbook %}Save Settings{% else %}Create Runbook{% endif %}
+    </button>
+    <span id="settings-result" class="text-xs"></span>
+  </div>
+</div>
+
+{% if runbook %}
+<!-- ── Steps ──────────────────────────────────────────────────────────── -->
+<div class="bg-white rounded-lg border border-gray-200 mb-6">
+  <div class="px-4 py-3 border-b border-gray-200 flex items-center justify-between bg-gray-50">
+    <h2 class="text-sm font-semibold text-gray-700">Steps</h2>
+    <span class="text-xs text-gray-400" id="step-count">{{ steps | length }} Steps</span>
+  </div>
+
+  <div id="steps-list">
+    {% if steps %}
+    {% for step in steps %}
+    <div class="step-row flex items-center gap-3 px-4 py-3 border-b border-gray-100 last:border-0 hover:bg-gray-50"
+         data-step-id="{{ step.id }}">
+      <span class="w-6 h-6 flex items-center justify-center rounded-full bg-gray-100 text-gray-600 text-xs font-mono font-medium flex-shrink-0">
+        {{ step.position }}
+      </span>
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-2">
+          <span class="text-sm font-medium text-gray-900">{{ step.step_name }}</span>
+          <span class="text-xs font-mono px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">
+            {{ step.script_module_name or '–' }}
+          </span>
+          {% if step.is_critical %}
+          <span class="text-xs px-1 py-0.5 rounded bg-red-100 text-red-600">critical</span>
+          {% else %}
+          <span class="text-xs px-1 py-0.5 rounded bg-gray-100 text-gray-400">optional</span>
+          {% endif %}
+        </div>
+        {% if step.params_template %}
+        <div class="text-xs text-gray-400 mt-0.5 font-mono">
+          {{ step.params_template.keys() | list | join(', ') }}
+        </div>
+        {% endif %}
+      </div>
+      <div class="flex items-center gap-1 flex-shrink-0">
+        <button onclick="moveStep({{ step.id }}, 'up')"
+                class="p-1 text-gray-400 hover:text-gray-700 rounded" title="Move up">↑</button>
+        <button onclick="moveStep({{ step.id }}, 'down')"
+                class="p-1 text-gray-400 hover:text-gray-700 rounded" title="Move down">↓</button>
+        <button onclick='editStep({{ step.id }}, {{ step | tojson | safe }})'
+                class="px-2 py-1 text-xs text-gray-500 hover:text-blue-600 rounded">Edit</button>
+        <button onclick="deleteStep({{ step.id }})"
+                class="px-2 py-1 text-xs text-gray-400 hover:text-red-500 rounded">Remove</button>
+      </div>
+    </div>
+    {% endfor %}
+    {% else %}
+    <div id="no-steps" class="px-4 py-8 text-center text-gray-400 text-sm">
+      No steps defined yet. Add the first step below.
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Add / edit step -->
+<div class="bg-white rounded-lg border border-gray-200 p-5" id="step-form">
+  <h2 class="text-sm font-semibold text-gray-700 mb-4" id="step-form-title">+ Add step</h2>
+
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+    <div>
+      <label class="block text-xs font-medium text-gray-600 mb-1">Step name <span class="text-red-500">*</span></label>
+      <input type="text" id="new-step-name" placeholder="e.g. Cleanup temp files"
+             class="w-full rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400">
+    </div>
+    <div>
+      <label class="block text-xs font-medium text-gray-600 mb-1">Module <span class="text-red-500">*</span></label>
+      <select id="new-step-module" onchange="updateModuleInfo()"
+              class="w-full rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400">
+        <option value="">– Select module –</option>
+        {% for m in script_modules %}
+        <option value="{{ m.id }}"
+                data-params='{{ (m.param_schema | tojson) if m.param_schema else "[]" }}'>
+          {{ m.name }}{% if m.description %} – {{ m.description }}{% endif %}
+        </option>
+        {% else %}
+        <option disabled>No modules available</option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
+
+  <div id="module-info" class="mb-4 hidden">
+    <div class="rounded bg-gray-50 border border-gray-200 px-3 py-2">
+      <p class="text-xs font-medium text-gray-600 mb-1">Expected parameters:</p>
+      <div id="module-param-list" class="text-xs font-mono text-gray-500"></div>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-3 gap-4 mb-4">
+    <div>
+      <label class="block text-xs font-medium text-gray-600 mb-1">Critical</label>
+      <label class="flex items-center gap-2 text-sm cursor-pointer">
+        <input type="checkbox" id="new-step-critical" checked class="w-4 h-4">
+        Abort on error
+      </label>
+    </div>
+    <div>
+      <label class="block text-xs font-medium text-gray-600 mb-1">Retry count</label>
+      <input type="number" id="new-step-retry" value="3" min="0" max="10"
+             class="w-24 rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400">
+    </div>
+    <div>
+      <label class="block text-xs font-medium text-gray-600 mb-1">Timeout (s)</label>
+      <input type="number" id="new-step-timeout" value="120" min="10"
+             class="w-24 rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400">
+    </div>
+  </div>
+
+  <!-- Parameter bindings -->
+  <div class="mb-4">
+    <div class="flex items-center justify-between mb-2">
+      <label class="block text-xs font-medium text-gray-600">
+        Parameter bindings
+        <span class="font-normal text-gray-400 ml-1">– bind to a global variable or literal value</span>
+      </label>
+      <button type="button" onclick="toggleAdvancedJson()"
+              class="text-xs text-blue-600 hover:underline">Advanced (JSON)</button>
+    </div>
+    <div id="param-bindings" class="border border-gray-200 rounded divide-y divide-gray-100 bg-gray-50">
+      <div class="px-3 py-4 text-xs text-gray-400 italic">Select a module to see its parameters.</div>
+    </div>
+    <div id="advanced-json-wrap" class="hidden mt-2">
+      <textarea id="new-step-params" rows="4"
+                placeholder='{"SomeParam": "literal value", "OtherParam": "&#123;&#123;global_var_key&#125;&#125;"}'
+                class="w-full rounded border border-gray-300 text-xs font-mono px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400"></textarea>
+      <p class="text-xs text-gray-400 mt-1">
+        Use <code>&#123;&#123;key&#125;&#125;</code> to reference global variables. Literal values are passed as-is.
+      </p>
+    </div>
+  </div>
+
+  <div class="flex items-center justify-between">
+    <button type="button" id="cancel-edit-btn" onclick="cancelEdit()"
+            class="hidden px-4 py-2 text-sm text-gray-500 border border-gray-300 rounded hover:bg-gray-50">
+      Cancel
+    </button>
+    <button type="button" id="submit-step-btn" onclick="submitStep()"
+            class="ml-auto px-5 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700">
+      Add step
+    </button>
+  </div>
+  <div id="step-result" class="mt-2"></div>
+</div>
+{% endif %}
+
+<script>
+{% raw %}
+var RUNBOOK_ID = {{ runbook.id if runbook else 'null' }};
+var _editingStepId = null;
+
+async function saveSettings() {
+  var name = document.getElementById('rb-name').value.trim();
+  if (!name) { alert('Name is required'); return; }
+
+  var payload = {
+    name: name,
+    description: document.getElementById('rb-description').value.trim() || null,
+    is_active: document.getElementById('rb-active').checked,
+    cron_expression: document.getElementById('rb-cron').value.trim() || null,
+    cron_enabled: document.getElementById('rb-cron-enabled').checked,
+    skip_if_running: document.getElementById('rb-skip-running').checked,
+  };
+
+  var url, method;
+  if (RUNBOOK_ID) {
+    url = '/admin/standalone-runbooks/' + RUNBOOK_ID;
+    method = 'PUT';
+  } else {
+    url = '/admin/standalone-runbooks';
+    method = 'POST';
+  }
+
+  var resp = await fetch(url, {
+    method: method,
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(payload),
+  });
+
+  var resultEl = document.getElementById('settings-result');
+  if (resp.ok) {
+    var data = await resp.json();
+    if (!RUNBOOK_ID) {
+      // New runbook created — redirect to editor
+      window.location.href = '/ui/standalone-runbooks/' + data.id + '/edit';
+    } else {
+      resultEl.className = 'text-xs text-green-600';
+      resultEl.textContent = 'Saved!';
+      setTimeout(function() { resultEl.textContent = ''; }, 3000);
+    }
+  } else {
+    var err = await resp.json().catch(function() { return {}; });
+    resultEl.className = 'text-xs text-red-600';
+    resultEl.textContent = 'Error: ' + (err.detail || JSON.stringify(err));
+  }
+}
+
+// ── Step editor (only for edit mode) ────────────────────────────────────
+
+function _currentModuleParams() {
+  var sel = document.getElementById('new-step-module');
+  if (!sel || !sel.value) return [];
+  var opt = sel.options[sel.selectedIndex];
+  try { return JSON.parse(opt.getAttribute('data-params') || '[]'); }
+  catch(e) { return []; }
+}
+
+function _bindingRow(p, mode, value) {
+  var required = p.required
+    ? '<span class="text-red-500" title="required">*</span> '
+    : '';
+  var typeBadge = '<span class="text-gray-400 font-normal">(' + (p.type || 'string') + ')</span>';
+  var effectiveMode = mode || 'literal';
+  var litVal = effectiveMode === 'literal' ? (value || '') : '';
+  var ctxVal = effectiveMode === 'context' ? (value || '') : '';
+  return ''
+    + '<div class="binding-row grid grid-cols-12 gap-2 items-center px-3 py-2" data-param-name="' + p.name + '">'
+    + '  <div class="col-span-3 text-xs font-mono text-gray-700">' + required + p.name + ' ' + typeBadge + '</div>'
+    + '  <select class="binding-mode col-span-2 rounded border border-gray-300 text-xs px-2 py-1 bg-white" onchange="onBindingModeChange(this)">'
+    + '    <option value="literal"' + (effectiveMode === 'literal' ? ' selected' : '') + '>Literal value</option>'
+    + '    <option value="context"' + (effectiveMode === 'context' ? ' selected' : '') + '>Global var</option>'
+    + '  </select>'
+    + '  <input  class="binding-lit col-span-7 rounded border border-gray-300 text-xs px-2 py-1' + (effectiveMode === 'literal' ? '' : ' hidden') + '" type="text" placeholder="Literal value" value="' + litVal.replace(/"/g, '&quot;') + '">'
+    + '  <input  class="binding-ctx col-span-7 rounded border border-gray-300 text-xs font-mono px-2 py-1' + (effectiveMode === 'context' ? '' : ' hidden') + '" type="text" placeholder="global_var_key" value="' + ctxVal.replace(/"/g, '&quot;') + '">'
+    + '</div>';
+}
+
+function onBindingModeChange(sel) {
+  var row = sel.closest('.binding-row');
+  var mode = sel.value;
+  row.querySelector('.binding-ctx').classList.toggle('hidden', mode !== 'context');
+  row.querySelector('.binding-lit').classList.toggle('hidden', mode !== 'literal');
+}
+
+function renderBindings(existingTemplate) {
+  var container = document.getElementById('param-bindings');
+  if (!container) return;
+  var params = _currentModuleParams();
+  if (!params.length) {
+    container.innerHTML = '<div class="px-3 py-4 text-xs text-gray-400 italic">Selected module has no declared parameters. Use Advanced (JSON) to set values manually.</div>';
+    return;
+  }
+  var tpl = existingTemplate || {};
+  var html = params.map(function(p) {
+    var raw = tpl[p.name];
+    if (raw === undefined || raw === null) {
+      return _bindingRow(p, null, null);
+    }
+    if (typeof raw === 'string' && /^\{\{.+\}\}$/.test(raw.trim())) {
+      var key = raw.trim().slice(2, -2).trim();
+      return _bindingRow(p, 'context', key);
+    }
+    return _bindingRow(p, 'literal', String(raw));
+  }).join('');
+  container.innerHTML = html;
+}
+
+function collectBindings() {
+  var rows = document.querySelectorAll('#param-bindings .binding-row');
+  if (!rows.length) return null;
+  var out = {};
+  for (var i = 0; i < rows.length; i++) {
+    var row = rows[i];
+    var name = row.dataset.paramName;
+    var mode = row.querySelector('.binding-mode').value;
+    if (mode === 'context') {
+      var key = row.querySelector('.binding-ctx').value.trim();
+      if (key) out[name] = '{{' + key + '}}';
+    } else {
+      var lit = row.querySelector('.binding-lit').value;
+      if (lit !== '') out[name] = lit;
+    }
+  }
+  return out;
+}
+
+function toggleAdvancedJson() {
+  var wrap = document.getElementById('advanced-json-wrap');
+  if (!wrap) return;
+  var hidden = wrap.classList.toggle('hidden');
+  if (!hidden) {
+    var ta = document.getElementById('new-step-params');
+    var current = collectBindings();
+    if (current && Object.keys(current).length) {
+      ta.value = JSON.stringify(current, null, 2);
+    }
+  }
+}
+
+function updateModuleInfo() {
+  var sel = document.getElementById('new-step-module');
+  var infoEl = document.getElementById('module-info');
+  var listEl = document.getElementById('module-param-list');
+  if (!sel || !sel.value) {
+    if (infoEl) infoEl.classList.add('hidden');
+    renderBindings(null);
+    return;
+  }
+  var opt = sel.options[sel.selectedIndex];
+  try {
+    var params = JSON.parse(opt.getAttribute('data-params') || '[]');
+    if (!params.length) {
+      infoEl.classList.add('hidden');
+    } else {
+      listEl.innerHTML = params.map(function(p) {
+        return '<span class="inline-block mr-4">'
+          + (p.required ? '<span class="text-red-400">*</span> ' : '')
+          + p.name + ' <span class="text-gray-400">(' + p.type + ')</span>'
+          + (p.default ? ' = ' + p.default : '')
+          + '</span>';
+      }).join('');
+      infoEl.classList.remove('hidden');
+    }
+  } catch(e) { infoEl.classList.add('hidden'); }
+  renderBindings(null);
+}
+
+function _getFormData() {
+  var name = document.getElementById('new-step-name').value.trim();
+  var script_module_id = parseInt(document.getElementById('new-step-module').value);
+  if (!name || !script_module_id) {
+    alert('Step name and module are required');
+    return null;
+  }
+  var params_template = null;
+  var advWrap = document.getElementById('advanced-json-wrap');
+  var advancedVisible = advWrap && !advWrap.classList.contains('hidden');
+  var paramsRaw = document.getElementById('new-step-params').value.trim();
+  if (advancedVisible && paramsRaw) {
+    try { params_template = JSON.parse(paramsRaw); }
+    catch(e) { alert('Params template is not valid JSON'); return null; }
+  } else {
+    params_template = collectBindings();
+    if (params_template && !Object.keys(params_template).length) params_template = null;
+  }
+  return {
+    step_name: name,
+    script_module_id: script_module_id,
+    params_template: params_template,
+    is_critical: document.getElementById('new-step-critical').checked,
+    retry_count: parseInt(document.getElementById('new-step-retry').value),
+    timeout_seconds: parseInt(document.getElementById('new-step-timeout').value),
+  };
+}
+
+async function submitStep() {
+  if (_editingStepId !== null) {
+    await _updateStep(_editingStepId);
+  } else {
+    await _addStep();
+  }
+}
+
+async function _addStep() {
+  var data = _getFormData();
+  if (!data) return;
+  var rows = document.querySelectorAll('.step-row');
+  data.position = rows.length + 1;
+  var resp = await fetch('/admin/standalone-runbooks/' + RUNBOOK_ID + '/steps', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(data),
+  });
+  if (resp.ok) {
+    location.reload();
+  } else {
+    var err = await resp.json().catch(function() { return {}; });
+    document.getElementById('step-result').innerHTML =
+      '<div class="text-xs text-red-600">' + JSON.stringify(err.detail || err) + '</div>';
+  }
+}
+
+async function _updateStep(stepId) {
+  var data = _getFormData();
+  if (!data) return;
+  var resp = await fetch('/admin/standalone-runbooks/' + RUNBOOK_ID + '/steps/' + stepId, {
+    method: 'PUT',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(data),
+  });
+  if (resp.ok) {
+    location.reload();
+  } else {
+    var err = await resp.json().catch(function() { return {}; });
+    document.getElementById('step-result').innerHTML =
+      '<div class="text-xs text-red-600">' + JSON.stringify(err.detail || err) + '</div>';
+  }
+}
+
+async function deleteStep(stepId) {
+  if (!confirm('Remove this step?')) return;
+  var resp = await fetch('/admin/standalone-runbooks/' + RUNBOOK_ID + '/steps/' + stepId, {method: 'DELETE'});
+  if (resp.ok) location.reload();
+}
+
+async function moveStep(stepId, direction) {
+  var rows = Array.from(document.querySelectorAll('.step-row'));
+  var idx = rows.findIndex(function(r) { return r.dataset.stepId == stepId; });
+  if (direction === 'up' && idx === 0) return;
+  if (direction === 'down' && idx === rows.length - 1) return;
+  var swap = direction === 'up' ? idx - 1 : idx + 1;
+  var tmp = rows[idx]; rows[idx] = rows[swap]; rows[swap] = tmp;
+  var newOrder = rows.map(function(r) { return parseInt(r.dataset.stepId); });
+  await fetch('/admin/standalone-runbooks/' + RUNBOOK_ID + '/steps/reorder', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({step_ids: newOrder}),
+  });
+  location.reload();
+}
+
+function editStep(stepId, step) {
+  _editingStepId = stepId;
+  document.getElementById('new-step-name').value = step.step_name;
+  if (step.script_module_id) {
+    document.getElementById('new-step-module').value = step.script_module_id;
+    updateModuleInfo();
+    renderBindings(step.params_template || {});
+  }
+  document.getElementById('new-step-critical').checked = step.is_critical;
+  document.getElementById('new-step-retry').value = step.retry_count;
+  document.getElementById('new-step-timeout').value = step.timeout_seconds;
+  document.getElementById('new-step-params').value =
+    step.params_template ? JSON.stringify(step.params_template, null, 2) : '';
+  document.getElementById('advanced-json-wrap').classList.add('hidden');
+  document.getElementById('step-form-title').textContent = 'Edit step';
+  document.getElementById('submit-step-btn').textContent = 'Save changes';
+  document.getElementById('cancel-edit-btn').classList.remove('hidden');
+  document.getElementById('step-result').innerHTML = '';
+  document.getElementById('step-form').scrollIntoView({behavior: 'smooth', block: 'start'});
+  document.getElementById('new-step-name').focus();
+}
+
+function cancelEdit() {
+  _editingStepId = null;
+  document.getElementById('new-step-name').value = '';
+  document.getElementById('new-step-module').value = '';
+  document.getElementById('new-step-critical').checked = true;
+  document.getElementById('new-step-retry').value = '3';
+  document.getElementById('new-step-timeout').value = '120';
+  document.getElementById('new-step-params').value = '';
+  document.getElementById('advanced-json-wrap').classList.add('hidden');
+  document.getElementById('param-bindings').innerHTML =
+    '<div class="px-3 py-4 text-xs text-gray-400 italic">Select a module to see its parameters.</div>';
+  document.getElementById('module-info').classList.add('hidden');
+  document.getElementById('step-form-title').textContent = '+ Add step';
+  document.getElementById('submit-step-btn').textContent = 'Add step';
+  document.getElementById('cancel-edit-btn').classList.add('hidden');
+  document.getElementById('step-result').innerHTML = '';
+}
+{% endraw %}
+</script>
+{% endblock %}

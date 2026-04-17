@@ -15,6 +15,7 @@ app = Celery(
     include=[
         "tasks.workflows.dynamic_runner",
         "tasks.workflows.ps_module_installer",
+        "tasks.workflows.standalone_runner",
     ],
 )
 
@@ -30,6 +31,7 @@ app.conf.update(
     task_routes={
         "tasks.workflows.dynamic_runner.*": {"queue": "provision"},
         "tasks.workflows.ps_module_installer.*": {"queue": "provision"},
+        "tasks.workflows.standalone_runner.*": {"queue": "provision"},
         "tasks.modules.notifications.*": {"queue": "notifications"},
     },
     beat_schedule={
@@ -43,6 +45,12 @@ app.conf.update(
         "check-scheduled-orders": {
             "task": "tasks.workflows.dynamic_runner.check_scheduled_orders",
             "schedule": crontab(minute=0),  # Every full hour
+            "options": {"queue": "provision"},
+        },
+        # Dispatch cron-scheduled standalone runbooks
+        "dispatch-standalone-cron": {
+            "task": "tasks.workflows.standalone_runner.check_cron_schedules",
+            "schedule": crontab(minute="*"),  # Every minute
             "options": {"queue": "provision"},
         },
     },

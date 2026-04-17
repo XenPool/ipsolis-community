@@ -17,6 +17,7 @@ from app.models.ps_module import PsModule
 from app.models.order import Order, OrderAction, OrderStatus
 from app.models.runbook import RunbookDefinition, RunbookStep
 from app.models.script_module import ScriptModule
+from app.models.standalone_runbook import StandaloneRunbook, StandaloneRunbookStep
 from app.utils.auth import require_admin_session
 from app.templates_instance import templates
 
@@ -632,6 +633,96 @@ async def ps_modules_page(
     return templates.TemplateResponse(
         request, "ui/ps_modules.html",
         {"ps_modules": ps_modules, "active_page": "ps-modules"},
+    )
+
+
+# ── Standalone Runbooks UI ─────────────────────────────────────────────────────
+
+@router.get("/standalone-runbooks", response_class=HTMLResponse)
+async def standalone_runbooks_list(request: Request) -> HTMLResponse:
+    return templates.TemplateResponse(
+        request, "ui/standalone_runbooks.html",
+        {"active_page": "standalone-runbooks"},
+    )
+
+
+@router.get("/standalone-runbooks/new", response_class=HTMLResponse)
+async def standalone_runbook_new(request: Request) -> HTMLResponse:
+    return templates.TemplateResponse(
+        request, "ui/standalone_runbook_editor.html",
+        {
+            "runbook": None,
+            "steps": [],
+            "script_modules": [],
+            "active_page": "standalone-runbooks",
+        },
+    )
+
+
+@router.get("/standalone-runbooks/{runbook_id}/edit", response_class=HTMLResponse)
+async def standalone_runbook_edit(
+    request: Request,
+    runbook_id: int,
+    db: AsyncSession = Depends(get_db),
+) -> HTMLResponse:
+    result = await db.execute(
+        select(StandaloneRunbook)
+        .options(
+            selectinload(StandaloneRunbook.steps)
+            .selectinload(StandaloneRunbookStep.script_module)
+        )
+        .where(StandaloneRunbook.id == runbook_id)
+    )
+    rb = result.scalar_one_or_none()
+    if not rb:
+        raise HTTPException(status.HTTP_404_NOT_FOUND)
+
+    mod_result = await db.execute(
+        select(ScriptModule).where(ScriptModule.is_active.is_(True)).order_by(ScriptModule.name)
+    )
+    script_modules = mod_result.scalars().all()
+
+    steps_data = [
+        {
+            "id": s.id,
+            "position": s.position,
+            "step_name": s.step_name,
+            "script_module_id": s.script_module_id,
+            "script_module_name": s.script_module.name if s.script_module else None,
+            "params_template": s.params_template or {},
+            "is_critical": s.is_critical,
+            "retry_count": s.retry_count,
+            "timeout_seconds": s.timeout_seconds,
+        }
+        for s in sorted(rb.steps, key=lambda x: x.position)
+    ]
+
+    return templates.TemplateResponse(
+        request, "ui/standalone_runbook_editor.html",
+        {
+            "runbook": rb,
+            "steps": steps_data,
+            "script_modules": script_modules,
+            "active_page": "standalone-runbooks",
+        },
+    )
+
+
+@router.get("/standalone-runbooks/{runbook_id}/runs", response_class=HTMLResponse)
+async def standalone_runbook_runs(
+    request: Request,
+    runbook_id: int,
+    db: AsyncSession = Depends(get_db),
+) -> HTMLResponse:
+    rb = await db.get(StandaloneRunbook, runbook_id)
+    if not rb:
+        raise HTTPException(status.HTTP_404_NOT_FOUND)
+    return templates.TemplateResponse(
+        request, "ui/standalone_runbook_runs.html",
+        {
+            "runbook": rb,
+            "active_page": "standalone-runbooks",
+        },
     )
 
 

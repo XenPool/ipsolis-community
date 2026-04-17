@@ -14,7 +14,7 @@ from sqlalchemy import select
 from app.config import settings
 from app.database import AsyncSessionLocal
 from app.models.config import AppConfig
-from app.routes import admin, admin_auth, admin_modules, admin_runbooks, assets, auth, health, orders, portal, ui, webhook
+from app.routes import admin, admin_auth, admin_modules, admin_runbooks, admin_standalone_runbooks, assets, auth, health, orders, portal, ui, webhook
 from app.templates_instance import set_app_title, set_app_logo_config
 
 # ── Logging ───────────────────────────────────────────────────────────────────
@@ -99,6 +99,7 @@ app.include_router(assets.router)
 app.include_router(admin.router)
 app.include_router(admin_modules.router)
 app.include_router(admin_runbooks.router)
+app.include_router(admin_standalone_runbooks.router)
 app.include_router(admin_auth.router)  # admin login/logout — no auth, before ui.router
 app.include_router(ui.router)
 app.include_router(auth.router)   # login / callback / logout — before portal
