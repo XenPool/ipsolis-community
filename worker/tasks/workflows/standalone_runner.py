@@ -54,18 +54,52 @@ def _get_sync_session() -> Session:
     return SyncSession(engine)
 
 
-def _render_params(params_template: dict | None, global_vars: dict) -> dict:
-    """Render params_template: substitute {{key}} from global_vars, pass literals as-is."""
+def _render_params(
+    params_template: dict | None,
+    global_vars: dict,
+    step_vars: dict | None = None,
+) -> dict:
+    """Render params_template: substitute {{key}} from step_vars (preferred) or global_vars.
+
+    step_vars are PS `$global:` values exported by previous steps. They win over
+    global_vars on a key collision so multi-step runbooks can thread per-run data
+    through without having to persist it to the global_vars table. A leading
+    `$global:` in the key is stripped to tolerate users copy-pasting PS syntax.
+    Scalar dotted paths like `RecycleVM.name` are also resolved.
+    """
     if not params_template:
         return {}
+    sv = step_vars or {}
     rendered = {}
     for k, v in params_template.items():
         if isinstance(v, str) and v.startswith("{{") and v.endswith("}}"):
             key = v[2:-2].strip()
-            rendered[k] = global_vars.get(key, "")
+            if key.lower().startswith("$global:"):
+                key = key[len("$global:"):]
+            rendered[k] = _resolve_key(key, sv, global_vars)
         else:
             rendered[k] = v
     return rendered
+
+
+def _resolve_key(key: str, step_vars: dict, global_vars: dict) -> str:
+    """Resolve a `{{key}}` against step_vars (first) then global_vars.
+
+    Supports scalar dotted paths (e.g. `RecycleVM.name`) so a user can bind to a
+    field on an exported PS object without having to export each field separately.
+    """
+    head, _, tail = key.partition(".")
+    for source in (step_vars, global_vars):
+        if head in source:
+            value = source[head]
+            if tail:
+                for part in tail.split("."):
+                    if isinstance(value, dict) and part in value:
+                        value = value[part]
+                    else:
+                        return ""
+            return "" if value is None else str(value)
+    return ""
 
 
 # ── Step variable helpers ────────────────────────────────────────────────────
@@ -368,8 +402,8 @@ def _execute_run(db: Session, run_id: int) -> dict:
                 break
             continue
 
-        # Render params
-        rendered_params = _render_params(params_template or {}, global_vars)
+        # Render params (step_vars override global_vars for the current run)
+        rendered_params = _render_params(params_template or {}, global_vars, step_vars)
 
         # Execute with retries
         result = None
