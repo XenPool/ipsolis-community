@@ -621,9 +621,65 @@
 </div>
 
 <!-- ── Tab: SCCM ─────────────────────────────────────────────────────────── -->
-<div id="tab-sccm" class="hidden">
-  <div class="bg-white rounded-lg border border-gray-200 p-10 text-center text-gray-400 text-sm">
-    SCCM configuration coming soon.
+<div id="tab-sccm" class="hidden space-y-6">
+
+  <div id="sccm-banner" class="hidden mb-2 px-4 py-3 rounded text-sm font-medium"></div>
+
+  <div class="bg-white rounded-lg border border-gray-200 p-6 max-w-2xl">
+    <h2 class="text-sm font-semibold text-gray-700 mb-1">SCCM Administration Service</h2>
+    <p class="text-xs text-gray-400 mb-4">
+      Used by the worker helper
+      <code class="font-mono bg-gray-100 px-1 rounded">tasks/utils/sccm_admin.py</code>
+      (NTLM over HTTPS, replaces the legacy ConfigurationManager PowerShell module).
+    </p>
+    <div class="space-y-4">
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">Base URL</label>
+        <input type="text" id="cfg-sccm-base_url"
+               value="{{ hosting_sccm.get('base_url', '') }}"
+               placeholder="https://sccm.example.com/AdminService"
+               class="w-full rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400 font-mono">
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">Username (DOMAIN\user)</label>
+          <input type="text" id="cfg-sccm-username"
+                 value="{{ hosting_sccm.get('username', '') }}"
+                 placeholder="CORP\\sccm-svc"
+                 class="w-full rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400 font-mono">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">Password</label>
+          <input type="password" id="cfg-sccm-password"
+                 value=""
+                 placeholder="{{ '(set – leave blank to keep)' if hosting_sccm.get('password') == '***' else '(not set)' }}"
+                 class="w-full rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400">
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">Site code</label>
+          <input type="text" id="cfg-sccm-site_code"
+                 value="{{ hosting_sccm.get('site_code', '') }}"
+                 placeholder="P01"
+                 class="w-full rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400 font-mono">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">Verify TLS</label>
+          <select id="cfg-sccm-verify_tls"
+                  class="w-full rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400 font-mono">
+            <option value="true"  {% if hosting_sccm.get('verify_tls', 'true') != 'false' %}selected{% endif %}>true</option>
+            <option value="false" {% if hosting_sccm.get('verify_tls', 'true') == 'false' %}selected{% endif %}>false</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="mt-6">
+      <button onclick="saveHostingConfig('sccm', ['base_url','username','site_code','verify_tls'], 'password')"
+              class="px-5 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700">
+        Save
+      </button>
+    </div>
   </div>
 </div>
 
@@ -974,7 +1030,7 @@ async function saveHostingConfig(prefix, textFields, pwField) {
     if (!ok) errors.push(prefix + '.' + pwField);
   }
 
-  var banner = document.getElementById('hosting-banner');
+  var banner = document.getElementById(prefix + '-banner') || document.getElementById('hosting-banner');
   banner.classList.remove('hidden', 'bg-green-50', 'text-green-800', 'border', 'border-green-200',
                            'bg-red-50', 'text-red-800', 'border-red-200');
   if (errors.length === 0) {

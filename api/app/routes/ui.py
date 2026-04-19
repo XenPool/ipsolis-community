@@ -790,8 +790,12 @@ async def settings_page(
     xenserver_rows = (await db.execute(
         select(AppConfig).where(AppConfig.key.like("xenserver.%")).order_by(AppConfig.key)
     )).scalars().all()
+    sccm_rows = (await db.execute(
+        select(AppConfig).where(AppConfig.key.like("sccm.%")).order_by(AppConfig.key)
+    )).scalars().all()
     hosting_vsphere = _cfg_dict(vsphere_rows)
     hosting_xenserver = _cfg_dict(xenserver_rows)
+    hosting_sccm = _cfg_dict(sccm_rows)
 
     # Load portal.* config keys
     portal_result = await db.execute(
@@ -805,6 +809,7 @@ async def settings_page(
         {"vars": masked_vars, "ad_config": ad_config, "entra_config": entra_config,
          "email_config": email_config, "email_templates": email_templates,
          "hosting_vsphere": hosting_vsphere, "hosting_xenserver": hosting_xenserver,
+         "hosting_sccm": hosting_sccm,
          "portal_config": portal_config,
          "active_page": "settings"},
     )
