@@ -39,11 +39,15 @@ if ($parsed.Count -eq 0) {
     $global:RecycleVmId = $null
     $global:RecycleVmName = $null
     $global:RecycleVmAssetTypeId = $null
+    $msg = "No assets eligible (minimum $DaysInStatus day(s) in status 'Reinstall')."
+    $global:RunNotes = $msg
     Write-Output (@{
         success        = $true
+        stop_run       = $true
+        stop_reason    = $msg
         count          = 0
         days_in_status = $DaysInStatus
-        message        = "No assets eligible (minimum $DaysInStatus day(s) in status 'Reinstall')."
+        message        = $msg
     } | ConvertTo-Json -Compress)
     exit 0
 }

@@ -534,6 +534,8 @@ def _execute_run(db: Session, run_id: int) -> dict:
 
     all_ok = True
     run_failed = False
+    run_stopped = False                      # set when a step returns stop_run=True
+    stop_reason: str | None = None
     first_failed_step: str | None = None
 
     for step_row in steps:
@@ -543,9 +545,9 @@ def _execute_run(db: Session, run_id: int) -> dict:
         is_critical, retry_count, timeout_seconds = step_row[5], step_row[6], step_row[7]
         always_run = step_row[8] if len(step_row) > 8 else False
 
-        # After a critical-step failure, only `always_run` steps execute (the
-        # rest get marked 'skipped' here so the DB reflects the final state).
-        if run_failed and not always_run:
+        # After a critical-step failure OR an early stop_run signal, only
+        # `always_run` steps execute (the rest are marked 'skipped').
+        if (run_failed or run_stopped) and not always_run:
             db.execute(
                 text("""
                     INSERT INTO standalone_runbook_run_steps
@@ -558,8 +560,9 @@ def _execute_run(db: Session, run_id: int) -> dict:
             continue
 
         # Expose run state to `always_run` finalization steps via step_vars so
-        # they can branch on whether the run is already in a failed state.
+        # they can branch on whether the run is already in a failed/stopped state.
         step_vars["RunbookFailed"] = bool(run_failed)
+        step_vars["RunbookStopped"] = bool(run_stopped)
         step_vars["RunbookFirstFailedStep"] = first_failed_step or ""
 
         step_start = datetime.now(timezone.utc)
@@ -636,6 +639,20 @@ def _execute_run(db: Session, run_id: int) -> dict:
         if result and result.get("success"):
             _finalize_run_step(db, run_step_id, "success", finished_at=step_end)
             logger.info("standalone_runner: step '%s' succeeded", step_name)
+            # Early-stop signal: step succeeded but wants to halt the run.
+            # Remaining non-always_run steps will be marked 'skipped'; the
+            # run is still reported as 'success'.
+            if result.get("stop_run"):
+                run_stopped = True
+                stop_reason = (
+                    result.get("stop_reason")
+                    or result.get("message")
+                    or f"Step '{step_name}' requested run stop"
+                )
+                logger.info(
+                    "standalone_runner: stop_run requested by step '%s' – skipping remaining steps (%s)",
+                    step_name, stop_reason,
+                )
         else:
             _finalize_run_step(
                 db, run_step_id, "failed",
@@ -653,6 +670,15 @@ def _execute_run(db: Session, run_id: int) -> dict:
     finished_at = datetime.now(timezone.utc)
     final_status = "success" if all_ok else "failed"
     error_msg = None if all_ok else "One or more critical steps failed"
+
+    # On a clean early-stop, surface the reason via the run notes so the run
+    # list shows *why* nothing happened.
+    if all_ok and run_stopped and stop_reason:
+        db.execute(
+            text("UPDATE standalone_runbook_runs SET notes = :n WHERE id = :id"),
+            {"id": run_id, "n": str(stop_reason)[:500]},
+        )
+        db.commit()
 
     db.execute(
         text("""
