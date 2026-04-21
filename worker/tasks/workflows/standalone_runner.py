@@ -618,6 +618,17 @@ def _execute_run(db: Session, run_id: int) -> dict:
                     step_name, attempt, attempts, last_error,
                 )
 
+        # Persist $global:RunNotes exported by the step so the run row in the
+        # list view carries a human-readable label (e.g. target hostname).
+        # The value accumulates across steps — last writer wins.
+        notes_val = step_vars.get("RunNotes")
+        if notes_val is not None and str(notes_val) != "":
+            db.execute(
+                text("UPDATE standalone_runbook_runs SET notes = :n WHERE id = :id"),
+                {"id": run_id, "n": str(notes_val)[:500]},
+            )
+            db.commit()
+
         step_end = datetime.now(timezone.utc)
 
         # log_output is already streamed into the row by _run_script_with_step_vars;

@@ -37,11 +37,12 @@
         <th class="px-4 py-3 text-left font-medium text-gray-600">Trigger</th>
         <th class="px-4 py-3 text-left font-medium text-gray-600">Started</th>
         <th class="px-4 py-3 text-left font-medium text-gray-600">Duration</th>
+        <th class="px-4 py-3 text-left font-medium text-gray-600">Notes</th>
         <th class="px-4 py-3 text-right font-medium text-gray-600">Details</th>
       </tr>
     </thead>
     <tbody id="runs-body">
-      <tr><td colspan="6" class="px-4 py-8 text-center text-gray-400">Loading…</td></tr>
+      <tr><td colspan="7" class="px-4 py-8 text-center text-gray-400">Loading…</td></tr>
     </tbody>
   </table>
 </div>
@@ -107,19 +108,22 @@ async function loadRuns() {
   var resp = await fetch('/admin/standalone-runbooks/' + RUNBOOK_ID + '/runs');
   if (!resp.ok) {
     document.getElementById('runs-body').innerHTML =
-      '<tr><td colspan="6" class="px-4 py-8 text-center text-red-500">Failed to load runs</td></tr>';
+      '<tr><td colspan="7" class="px-4 py-8 text-center text-red-500">Failed to load runs</td></tr>';
     return;
   }
   var runs = await resp.json();
   if (!runs.length) {
     document.getElementById('runs-body').innerHTML =
-      '<tr><td colspan="6" class="px-4 py-8 text-center text-gray-400">No runs yet.</td></tr>';
+      '<tr><td colspan="7" class="px-4 py-8 text-center text-gray-400">No runs yet.</td></tr>';
     return;
   }
   var html = runs.map(function(r) {
     var trigger = r.trigger === 'scheduled'
       ? '<span class="text-xs text-gray-500">Scheduled</span>'
       : '<span class="text-xs text-blue-600">Manual</span>';
+    var notesCell = r.notes
+      ? '<span class="text-xs text-gray-700" title="' + String(r.notes).replace(/"/g, '&quot;') + '">' + String(r.notes) + '</span>'
+      : '<span class="text-xs text-gray-300">–</span>';
     return '<tr class="border-b border-gray-100 last:border-0 hover:bg-gray-50">'
       + '<td class="px-4 py-3 font-mono text-gray-600">#' + r.id + '</td>'
       + '<td class="px-4 py-3">' + _badge(r.status)
@@ -128,6 +132,7 @@ async function loadRuns() {
       + '<td class="px-4 py-3">' + trigger + '</td>'
       + '<td class="px-4 py-3 text-xs text-gray-500">' + _fmtTime(r.started_at || r.created_at) + '</td>'
       + '<td class="px-4 py-3 text-xs text-gray-500">' + _duration(r.started_at, r.finished_at) + '</td>'
+      + '<td class="px-4 py-3">' + notesCell + '</td>'
       + '<td class="px-4 py-3 text-right">'
       + '  <button onclick="showRunDetail(' + r.id + ')" class="text-xs text-blue-600 hover:underline">View</button>'
       + '</td>'

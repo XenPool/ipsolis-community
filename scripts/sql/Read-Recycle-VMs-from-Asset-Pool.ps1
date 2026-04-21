@@ -53,6 +53,7 @@ $global:RecycleVM = $vm
 $global:RecycleVmId = $vm.id
 $global:RecycleVmName = $vm.name
 $global:RecycleVmAssetTypeId = $vm.asset_type_id
+$global:RunNotes = $vm.name
 
 Write-Output (@{
     success         = $true

@@ -371,6 +371,7 @@ async def list_runs(runbook_id: int, db: AsyncSession = Depends(get_db)) -> list
             "started_at": r.started_at.isoformat() if r.started_at else None,
             "finished_at": r.finished_at.isoformat() if r.finished_at else None,
             "error_message": r.error_message,
+            "notes": r.notes,
             "created_at": r.created_at.isoformat() if r.created_at else None,
         }
         for r in result.scalars().all()
@@ -395,6 +396,7 @@ async def get_run(runbook_id: int, run_id: int, db: AsyncSession = Depends(get_d
         "started_at": r.started_at.isoformat() if r.started_at else None,
         "finished_at": r.finished_at.isoformat() if r.finished_at else None,
         "error_message": r.error_message,
+        "notes": r.notes,
         "created_at": r.created_at.isoformat() if r.created_at else None,
         "steps": [
             {
