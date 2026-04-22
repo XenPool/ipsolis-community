@@ -32,31 +32,31 @@ router = APIRouter(
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 _STATUS_COLORS = {
-    "pending":    "bg-gray-100 text-gray-700",
-    "processing": "bg-blue-100 text-blue-700",
-    "delivered":  "bg-green-100 text-green-700",
-    "failed":     "bg-red-100 text-red-700",
-    "expired":    "bg-orange-100 text-orange-700",
-    "cancelled":  "bg-gray-100 text-gray-500",
+    "pending":    "bg-gray-100 text-gray-700 dark:bg-slate-700 dark:text-slate-200",
+    "processing": "bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300",
+    "delivered":  "bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-300",
+    "failed":     "bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300",
+    "expired":    "bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300",
+    "cancelled":  "bg-gray-100 text-gray-500 dark:bg-slate-700 dark:text-slate-400",
 }
 
 _STEP_COLORS = {
-    "pending": "bg-gray-100 text-gray-600",
-    "running": "bg-blue-100 text-blue-700",
-    "success": "bg-green-100 text-green-700",
-    "failed":  "bg-red-100 text-red-700",
-    "skipped": "bg-gray-100 text-gray-400",
+    "pending": "bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-slate-300",
+    "running": "bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300",
+    "success": "bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-300",
+    "failed":  "bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300",
+    "skipped": "bg-gray-100 text-gray-400 dark:bg-slate-700 dark:text-slate-500",
 }
 
 _ASSET_STATUS_COLORS = {
-    "Free":         "bg-green-100 text-green-700",
-    "reserved":     "bg-yellow-100 text-yellow-700",
-    "busy":         "bg-blue-100 text-blue-700",
-    "reclaiming":   "bg-orange-100 text-orange-700",
-    "maintenance":  "bg-gray-100 text-gray-600",
-    "Reinstall":    "bg-orange-100 text-orange-700",
-    "Reinstalling": "bg-blue-100 text-blue-700",
-    "Failed":       "bg-red-100 text-red-700",
+    "Free":         "bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-300",
+    "reserved":     "bg-yellow-100 text-yellow-700 dark:bg-yellow-500/15 dark:text-yellow-300",
+    "busy":         "bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300",
+    "reclaiming":   "bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300",
+    "maintenance":  "bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-slate-300",
+    "Reinstall":    "bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300",
+    "Reinstalling": "bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300",
+    "Failed":       "bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300",
 }
 
 
@@ -451,7 +451,13 @@ async def asset_pool_page(
     asset_type_id: int | None = None,
     db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
-    types_result = await db.execute(select(AssetType).order_by(AssetType.name))
+    # Exclude capacity_pooled types — their capacity is managed on the asset
+    # type itself (pool_capacity + active orders), not via per-row pool entries.
+    types_result = await db.execute(
+        select(AssetType)
+        .where(AssetType.assignment_model != "capacity_pooled")
+        .order_by(AssetType.name)
+    )
     asset_types = types_result.scalars().all()
     return templates.TemplateResponse(
         request, "ui/asset_pool.html",

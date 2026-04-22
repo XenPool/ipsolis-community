@@ -4,55 +4,55 @@
 
 {% block content %}
 <div class="mb-6">
-  <h1 class="text-lg font-semibold text-gray-900">Global Variables</h1>
-  <p class="text-xs text-gray-500 mt-1">
+  <h1 class="text-lg font-semibold text-heading">Global Variables</h1>
+  <p class="text-xs text-muted mt-1">
     Central configuration values for scripts. Available in scripts as
-    <code class="font-mono bg-gray-100 px-1 rounded text-xs">$VARS.key</code> (e.g. hostnames, DN paths, credentials).
+    <code class="font-mono bg-surface-raised px-1 rounded text-xs">$VARS.key</code> (e.g. hostnames, DN paths, credentials).
   </p>
 </div>
 
-<div class="bg-white rounded-lg border border-gray-200 overflow-hidden mb-6">
-  <table class="min-w-full divide-y divide-gray-200 text-sm" id="vars-table">
-    <thead class="bg-gray-50">
+<div class="bg-surface rounded-lg border border-token-border overflow-hidden mb-6">
+  <table class="min-w-full divide-y divide-token-border text-sm" id="vars-table">
+    <thead class="bg-surface-raised">
       <tr>
-        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide w-48">Key</th>
-        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Value</th>
-        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Description</th>
-        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide w-20 text-center">Secret</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wide w-48">Key</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wide">Value</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wide">Description</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wide w-20 text-center">Secret</th>
         <th class="px-4 py-3 w-32"></th>
       </tr>
     </thead>
-    <tbody class="divide-y divide-gray-100">
+    <tbody class="divide-y divide-token-border">
       {% for v in vars %}
-      <tr data-var-id="{{ v.id }}" class="hover:bg-gray-50">
+      <tr data-var-id="{{ v.id }}" class="hover:bg-surface-raised">
         <td class="px-4 py-2.5">
-          <code class="font-mono text-sm text-gray-800">{{ v.key }}</code>
+          <code class="font-mono text-sm text-heading">{{ v.key }}</code>
         </td>
         <td class="px-4 py-2.5">
           {% if v.is_secret %}
-          <span class="text-gray-400 font-mono text-xs">***</span>
+          <span class="text-muted/70 font-mono text-xs">***</span>
           {% else %}
-          <span class="font-mono text-xs text-gray-700">{{ v.value or '–' }}</span>
+          <span class="font-mono text-xs text-body">{{ v.value or '–' }}</span>
           {% endif %}
         </td>
-        <td class="px-4 py-2.5 text-xs text-gray-500">{{ v.description or '–' }}</td>
+        <td class="px-4 py-2.5 text-xs text-muted">{{ v.description or '–' }}</td>
         <td class="px-4 py-2.5 text-center">
           {% if v.is_secret %}
           <span class="inline-block w-4 h-4 bg-orange-400 rounded-full" title="Secret"></span>
           {% else %}
-          <span class="inline-block w-4 h-4 bg-gray-200 rounded-full" title="Not a secret"></span>
+          <span class="inline-block w-4 h-4 bg-surface-raised rounded-full" title="Not a secret"></span>
           {% endif %}
         </td>
         <td class="px-4 py-2.5 text-right text-xs">
           <button onclick="editVar({{ v.id }}, '{{ v.key }}', '{{ v.is_secret | lower }}')"
-                  class="text-gray-500 hover:text-blue-600 mr-2">Edit</button>
+                  class="text-muted hover:text-blue-600 mr-2">Edit</button>
           <button onclick="deleteVar({{ v.id }}, '{{ v.key }}')"
                   class="text-red-400 hover:text-red-600">Delete</button>
         </td>
       </tr>
       {% else %}
       <tr id="empty-row">
-        <td colspan="5" class="px-4 py-10 text-center text-gray-400 text-sm">
+        <td colspan="5" class="px-4 py-10 text-center text-muted/70 text-sm">
           No variables defined yet.
         </td>
       </tr>
@@ -62,27 +62,27 @@
 </div>
 
 <!-- Add new variable form -->
-<div class="bg-white rounded-lg border border-gray-200 p-5">
-  <h2 class="text-sm font-semibold text-gray-700 mb-4">New Variable</h2>
+<div class="bg-surface rounded-lg border border-token-border p-5">
+  <h2 class="text-sm font-semibold text-body mb-4">New Variable</h2>
   <div class="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
     <div>
-      <label class="block text-xs font-medium text-gray-600 mb-1">Key <span class="text-red-500">*</span></label>
+      <label class="block text-xs font-medium text-muted mb-1">Key <span class="text-red-500">*</span></label>
       <input type="text" id="new-key" placeholder="e.g. smtp_host"
-             class="w-full rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400 font-mono">
+             class="w-full rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono">
     </div>
     <div>
-      <label class="block text-xs font-medium text-gray-600 mb-1">Value</label>
+      <label class="block text-xs font-medium text-muted mb-1">Value</label>
       <input type="text" id="new-value" placeholder="Value"
-             class="w-full rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400">
+             class="w-full rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500">
     </div>
     <div>
-      <label class="block text-xs font-medium text-gray-600 mb-1">Description</label>
+      <label class="block text-xs font-medium text-muted mb-1">Description</label>
       <input type="text" id="new-desc" placeholder="optional"
-             class="w-full rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400">
+             class="w-full rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500">
     </div>
     <div class="flex items-end gap-3 pb-0.5">
-      <label class="flex items-center gap-1.5 text-sm text-gray-700 cursor-pointer">
-        <input type="checkbox" id="new-secret" class="rounded border-gray-300">
+      <label class="flex items-center gap-1.5 text-sm text-body cursor-pointer">
+        <input type="checkbox" id="new-secret" class="rounded border-token-border">
         Secret
       </label>
       <button onclick="createVar()"
@@ -96,32 +96,32 @@
 
 <!-- Edit modal -->
 <div id="edit-modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-  <div class="bg-white rounded-lg p-6 w-96 shadow-xl">
-    <h3 class="text-sm font-semibold text-gray-900 mb-4">Edit Variable</h3>
+  <div class="bg-surface rounded-lg p-6 w-96 shadow-xl">
+    <h3 class="text-sm font-semibold text-heading mb-4">Edit Variable</h3>
     <input type="hidden" id="edit-var-id">
     <div class="space-y-3">
       <div>
-        <label class="block text-xs font-medium text-gray-600 mb-1">Key</label>
-        <code id="edit-key-display" class="font-mono text-sm text-gray-800"></code>
+        <label class="block text-xs font-medium text-muted mb-1">Key</label>
+        <code id="edit-key-display" class="font-mono text-sm text-heading"></code>
       </div>
       <div>
-        <label class="block text-xs font-medium text-gray-600 mb-1">Value</label>
+        <label class="block text-xs font-medium text-muted mb-1">Value</label>
         <input type="text" id="edit-value"
-               class="w-full rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400">
+               class="w-full rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500">
       </div>
       <div>
-        <label class="block text-xs font-medium text-gray-600 mb-1">Description</label>
+        <label class="block text-xs font-medium text-muted mb-1">Description</label>
         <input type="text" id="edit-desc"
-               class="w-full rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400">
+               class="w-full rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500">
       </div>
-      <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-        <input type="checkbox" id="edit-secret" class="rounded border-gray-300">
+      <label class="flex items-center gap-2 text-sm text-body cursor-pointer">
+        <input type="checkbox" id="edit-secret" class="rounded border-token-border">
         Secret (value will be masked)
       </label>
     </div>
     <div class="flex gap-2 mt-4">
       <button onclick="document.getElementById('edit-modal').classList.add('hidden')"
-              class="flex-1 py-2 text-sm text-gray-500 border border-gray-300 rounded hover:bg-gray-50">
+              class="flex-1 py-2 text-sm text-muted border border-token-border rounded hover:bg-surface-raised">
         Cancel
       </button>
       <button onclick="saveEdit()"

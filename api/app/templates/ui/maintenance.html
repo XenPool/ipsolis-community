@@ -4,29 +4,29 @@
 
 {% block content %}
 <div class="mb-6">
-  <h1 class="text-lg font-semibold text-gray-900">Maintenance</h1>
-  <p class="text-xs text-gray-500 mt-1">
+  <h1 class="text-lg font-semibold text-heading">Maintenance</h1>
+  <p class="text-xs text-muted mt-1">
     Database backups, retention cleanup, service health, and Celery queue inspection.
   </p>
 </div>
 
 <!-- Tab bar -->
-<div class="border-b border-gray-200 mb-6">
+<div class="border-b border-token-border mb-6">
   <nav class="flex gap-1" id="tab-nav">
     <button onclick="showTab('health')" id="tab-btn-health"
             class="tab-btn px-4 py-2 text-sm font-medium border-b-2 border-blue-600 text-blue-700">
       Health
     </button>
     <button onclick="showTab('backups')" id="tab-btn-backups"
-            class="tab-btn px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">
+            class="tab-btn px-4 py-2 text-sm font-medium border-b-2 border-transparent text-muted hover:text-body">
       Backups
     </button>
     <button onclick="showTab('queue')" id="tab-btn-queue"
-            class="tab-btn px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">
+            class="tab-btn px-4 py-2 text-sm font-medium border-b-2 border-transparent text-muted hover:text-body">
       Queue
     </button>
     <button onclick="showTab('retention')" id="tab-btn-retention"
-            class="tab-btn px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">
+            class="tab-btn px-4 py-2 text-sm font-medium border-b-2 border-transparent text-muted hover:text-body">
       Retention
     </button>
   </nav>
@@ -38,42 +38,42 @@
 <!-- ── Tab: Health ──────────────────────────────────────────────────────── -->
 <div id="tab-health">
   <div class="flex items-center justify-between mb-3">
-    <h2 class="text-sm font-semibold text-gray-700">Service Health</h2>
+    <h2 class="text-sm font-semibold text-body">Service Health</h2>
     <div class="flex items-center gap-3">
-      <span id="health-checked-at" class="text-xs text-gray-400"></span>
+      <span id="health-checked-at" class="text-xs text-muted/70"></span>
       <button onclick="loadHealth()"
-              class="px-3 py-1.5 text-xs font-medium rounded border border-gray-300 text-gray-700 hover:bg-gray-50">
+              class="px-3 py-1.5 text-xs font-medium rounded border border-token-border text-body hover:bg-surface-raised">
         Refresh
       </button>
     </div>
   </div>
   <div id="health-grid" class="grid grid-cols-1 md:grid-cols-2 gap-3">
-    <div class="text-sm text-gray-400">Loading…</div>
+    <div class="text-sm text-muted/70">Loading…</div>
   </div>
 
   <!-- Alert settings -->
-  <div class="bg-white rounded-lg border border-gray-200 p-5 mt-6 max-w-3xl">
+  <div class="bg-surface rounded-lg border border-token-border p-5 mt-6 max-w-3xl">
     <div class="flex items-center justify-between mb-3">
-      <h3 class="text-sm font-semibold text-gray-700">Email alerts on probe failures</h3>
-      <label class="flex items-center gap-2 text-xs text-gray-600">
-        <input type="checkbox" id="alert-enabled" class="rounded border-gray-300">
+      <h3 class="text-sm font-semibold text-body">Email alerts on probe failures</h3>
+      <label class="flex items-center gap-2 text-xs text-muted">
+        <input type="checkbox" id="alert-enabled" class="rounded border-token-border">
         Enabled
       </label>
     </div>
-    <p class="text-xs text-gray-500 mb-4">
+    <p class="text-xs text-muted mb-4">
       When a service flips from OK to FAILED (or back), an email is sent to the recipient below.
       Beat checks every 5&nbsp;minutes. Repeat failure alerts are suppressed for the cooldown window.
     </p>
     <div class="grid grid-cols-2 gap-4">
       <div class="col-span-2">
-        <label class="block text-xs text-gray-500 mb-1">Recipient email</label>
+        <label class="block text-xs text-muted mb-1">Recipient email</label>
         <input type="email" id="alert-email" placeholder="ops@example.com"
-               class="w-full rounded border border-gray-300 text-sm px-3 py-1.5">
+               class="w-full rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-1.5">
       </div>
       <div>
-        <label class="block text-xs text-gray-500 mb-1">Cooldown (minutes)</label>
+        <label class="block text-xs text-muted mb-1">Cooldown (minutes)</label>
         <input type="number" min="0" id="alert-cooldown"
-               class="w-full rounded border border-gray-300 text-sm px-3 py-1.5">
+               class="w-full rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-1.5">
       </div>
     </div>
     <div class="mt-4 flex items-center gap-2">
@@ -82,7 +82,7 @@
         Save
       </button>
       <button onclick="testAlert()"
-              class="px-4 py-1.5 text-sm rounded border border-gray-300 text-gray-700 hover:bg-gray-50">
+              class="px-4 py-1.5 text-sm rounded border border-token-border text-body hover:bg-surface-raised">
         Send test email
       </button>
     </div>
@@ -92,24 +92,24 @@
 <!-- ── Tab: Backups ─────────────────────────────────────────────────────── -->
 <div id="tab-backups" class="hidden">
   <!-- Schedule panel -->
-  <div class="bg-white rounded-lg border border-gray-200 p-5 mb-6 max-w-3xl">
+  <div class="bg-surface rounded-lg border border-token-border p-5 mb-6 max-w-3xl">
     <div class="flex items-center justify-between mb-3">
-      <h3 class="text-sm font-semibold text-gray-700">Scheduled backups</h3>
-      <label class="flex items-center gap-2 text-xs text-gray-600">
-        <input type="checkbox" id="schedule-enabled" class="rounded border-gray-300">
+      <h3 class="text-sm font-semibold text-body">Scheduled backups</h3>
+      <label class="flex items-center gap-2 text-xs text-muted">
+        <input type="checkbox" id="schedule-enabled" class="rounded border-token-border">
         Enabled
       </label>
     </div>
-    <p class="text-xs text-gray-500 mb-4">
+    <p class="text-xs text-muted mb-4">
       Celery Beat checks every minute. Times are in UTC.
     </p>
 
     <!-- Frequency selector -->
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
       <div>
-        <label class="block text-xs text-gray-500 mb-1">Frequency</label>
+        <label class="block text-xs text-muted mb-1">Frequency</label>
         <select id="schedule-mode" onchange="onScheduleModeChange()"
-                class="w-full rounded border border-gray-300 text-sm px-3 py-1.5">
+                class="w-full rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-1.5">
           <option value="daily">Daily</option>
           <option value="weekly">Weekly</option>
           <option value="monthly">Monthly</option>
@@ -120,17 +120,17 @@
 
       <!-- Time (daily/weekly/monthly) -->
       <div id="schedule-time-wrap">
-        <label class="block text-xs text-gray-500 mb-1">Time (UTC)</label>
+        <label class="block text-xs text-muted mb-1">Time (UTC)</label>
         <input type="time" id="schedule-time" value="02:00" step="60"
                onchange="rebuildCron()"
-               class="w-full rounded border border-gray-300 text-sm px-3 py-1.5">
+               class="w-full rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-1.5">
       </div>
 
       <!-- Weekday (weekly) -->
       <div id="schedule-dow-wrap" class="hidden">
-        <label class="block text-xs text-gray-500 mb-1">Weekday</label>
+        <label class="block text-xs text-muted mb-1">Weekday</label>
         <select id="schedule-dow" onchange="rebuildCron()"
-                class="w-full rounded border border-gray-300 text-sm px-3 py-1.5">
+                class="w-full rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-1.5">
           <option value="0">Sunday</option>
           <option value="1" selected>Monday</option>
           <option value="2">Tuesday</option>
@@ -143,31 +143,31 @@
 
       <!-- Day of month (monthly) -->
       <div id="schedule-dom-wrap" class="hidden">
-        <label class="block text-xs text-gray-500 mb-1">Day of month (1–28)</label>
+        <label class="block text-xs text-muted mb-1">Day of month (1–28)</label>
         <input type="number" id="schedule-dom" min="1" max="28" value="1"
                onchange="rebuildCron()"
-               class="w-full rounded border border-gray-300 text-sm px-3 py-1.5">
+               class="w-full rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-1.5">
       </div>
 
       <!-- Every N hours -->
       <div id="schedule-every-hours-wrap" class="hidden">
-        <label class="block text-xs text-gray-500 mb-1">Run every N hours</label>
+        <label class="block text-xs text-muted mb-1">Run every N hours</label>
         <input type="number" id="schedule-every-hours" min="1" max="23" value="6"
                onchange="rebuildCron()"
-               class="w-full rounded border border-gray-300 text-sm px-3 py-1.5">
+               class="w-full rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-1.5">
       </div>
     </div>
 
     <!-- Resulting cron expression -->
     <div>
       <div class="flex items-center justify-between mb-1">
-        <label class="block text-xs text-gray-500">Cron expression (UTC)</label>
-        <span id="schedule-cron-human" class="text-[11px] text-gray-400"></span>
+        <label class="block text-xs text-muted">Cron expression (UTC)</label>
+        <span id="schedule-cron-human" class="text-[11px] text-muted/70"></span>
       </div>
       <input type="text" id="schedule-cron" placeholder="0 2 * * *"
              oninput="onCronManualEdit()"
-             class="w-full rounded border border-gray-300 text-sm px-3 py-1.5 font-mono bg-gray-50">
-      <p class="text-[11px] text-gray-400 mt-1">
+             class="w-full rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-1.5 font-mono bg-surface-raised">
+      <p class="text-[11px] text-muted/70 mt-1">
         Format: <code>min hour day-of-month month day-of-week</code>
       </p>
     </div>
@@ -181,23 +181,23 @@
   </div>
 
   <div class="flex items-center justify-between mb-3">
-    <h2 class="text-sm font-semibold text-gray-700">Database Backups</h2>
+    <h2 class="text-sm font-semibold text-body">Database Backups</h2>
     <div class="flex items-center gap-2">
       <input type="text" id="backup-note" placeholder="Optional note"
-             class="px-3 py-1.5 text-xs rounded border border-gray-300 w-64">
+             class="px-3 py-1.5 text-xs rounded border border-token-border w-64">
       <button onclick="createBackup()"
               class="px-3 py-1.5 text-xs font-medium rounded bg-blue-600 text-white hover:bg-blue-700">
         Create backup now
       </button>
       <button onclick="loadBackups()"
-              class="px-3 py-1.5 text-xs font-medium rounded border border-gray-300 text-gray-700 hover:bg-gray-50">
+              class="px-3 py-1.5 text-xs font-medium rounded border border-token-border text-body hover:bg-surface-raised">
         Refresh
       </button>
     </div>
   </div>
-  <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+  <div class="bg-surface rounded-lg border border-token-border overflow-hidden">
     <table class="w-full text-sm">
-      <thead class="bg-gray-50 text-xs uppercase text-gray-500">
+      <thead class="bg-surface-raised text-xs uppercase text-muted">
         <tr>
           <th class="px-4 py-3 text-left font-medium">Created</th>
           <th class="px-4 py-3 text-left font-medium">Filename</th>
@@ -209,12 +209,12 @@
           <th class="px-4 py-3 text-right font-medium">Actions</th>
         </tr>
       </thead>
-      <tbody id="backup-rows" class="divide-y divide-gray-100">
-        <tr><td colspan="8" class="px-4 py-8 text-center text-gray-400">Loading…</td></tr>
+      <tbody id="backup-rows" class="divide-y divide-token-border">
+        <tr><td colspan="8" class="px-4 py-8 text-center text-muted/70">Loading…</td></tr>
       </tbody>
     </table>
   </div>
-  <p class="text-xs text-gray-400 mt-3">
+  <p class="text-xs text-muted/70 mt-3">
     Backups are stored on the host under <code>./backups/</code>. Restore is not yet
     available via the UI — use <code>psql</code> or <code>pg_restore</code> manually.
   </p>
@@ -223,23 +223,23 @@
 <!-- ── Tab: Queue ───────────────────────────────────────────────────────── -->
 <div id="tab-queue" class="hidden">
   <div class="flex items-center justify-between mb-3">
-    <h2 class="text-sm font-semibold text-gray-700">Celery Queues &amp; Workers</h2>
+    <h2 class="text-sm font-semibold text-body">Celery Queues &amp; Workers</h2>
     <button onclick="loadQueue()"
-            class="px-3 py-1.5 text-xs font-medium rounded border border-gray-300 text-gray-700 hover:bg-gray-50">
+            class="px-3 py-1.5 text-xs font-medium rounded border border-token-border text-body hover:bg-surface-raised">
       Refresh
     </button>
   </div>
   <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-    <div class="bg-white rounded-lg border border-gray-200 p-4">
-      <h3 class="text-xs font-semibold text-gray-600 mb-3">Queue depth (Redis)</h3>
+    <div class="bg-surface rounded-lg border border-token-border p-4">
+      <h3 class="text-xs font-semibold text-muted mb-3">Queue depth (Redis)</h3>
       <div id="queue-depths" class="space-y-2 text-sm">
-        <div class="text-gray-400">Loading…</div>
+        <div class="text-muted/70">Loading…</div>
       </div>
     </div>
-    <div class="bg-white rounded-lg border border-gray-200 p-4">
-      <h3 class="text-xs font-semibold text-gray-600 mb-3">Workers</h3>
+    <div class="bg-surface rounded-lg border border-token-border p-4">
+      <h3 class="text-xs font-semibold text-muted mb-3">Workers</h3>
       <div id="queue-workers" class="space-y-2 text-sm">
-        <div class="text-gray-400">Loading…</div>
+        <div class="text-muted/70">Loading…</div>
       </div>
     </div>
   </div>
@@ -248,10 +248,10 @@
 <!-- ── Tab: Retention ───────────────────────────────────────────────────── -->
 <div id="tab-retention" class="hidden">
   <div class="flex items-center justify-between mb-3">
-    <h2 class="text-sm font-semibold text-gray-700">Retention &amp; Cleanup</h2>
+    <h2 class="text-sm font-semibold text-body">Retention &amp; Cleanup</h2>
     <div class="flex items-center gap-2">
       <button onclick="runCleanup(true)"
-              class="px-3 py-1.5 text-xs font-medium rounded border border-gray-300 text-gray-700 hover:bg-gray-50">
+              class="px-3 py-1.5 text-xs font-medium rounded border border-token-border text-body hover:bg-surface-raised">
         Dry-run preview
       </button>
       <button onclick="runCleanup(false)"
@@ -261,28 +261,28 @@
     </div>
   </div>
 
-  <div class="bg-white rounded-lg border border-gray-200 p-6 mb-4 max-w-3xl">
-    <h3 class="text-xs font-semibold text-gray-600 mb-3">Retention windows (days — 0 disables cleanup)</h3>
+  <div class="bg-surface rounded-lg border border-token-border p-6 mb-4 max-w-3xl">
+    <h3 class="text-xs font-semibold text-muted mb-3">Retention windows (days — 0 disables cleanup)</h3>
     <div class="grid grid-cols-2 gap-4">
       <div>
-        <label class="block text-xs text-gray-500 mb-1">orders</label>
+        <label class="block text-xs text-muted mb-1">orders</label>
         <input type="number" min="0" id="ret-orders"
-               class="w-full rounded border border-gray-300 text-sm px-3 py-1.5">
+               class="w-full rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-1.5">
       </div>
       <div>
-        <label class="block text-xs text-gray-500 mb-1">audit_log</label>
+        <label class="block text-xs text-muted mb-1">audit_log</label>
         <input type="number" min="0" id="ret-audit"
-               class="w-full rounded border border-gray-300 text-sm px-3 py-1.5">
+               class="w-full rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-1.5">
       </div>
       <div>
-        <label class="block text-xs text-gray-500 mb-1">standalone_runbook_runs</label>
+        <label class="block text-xs text-muted mb-1">standalone_runbook_runs</label>
         <input type="number" min="0" id="ret-runs"
-               class="w-full rounded border border-gray-300 text-sm px-3 py-1.5">
+               class="w-full rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-1.5">
       </div>
       <div>
-        <label class="block text-xs text-gray-500 mb-1">Keep last N backups (0 = unlimited)</label>
+        <label class="block text-xs text-muted mb-1">Keep last N backups (0 = unlimited)</label>
         <input type="number" min="0" id="ret-keep"
-               class="w-full rounded border border-gray-300 text-sm px-3 py-1.5">
+               class="w-full rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-1.5">
       </div>
     </div>
     <div class="mt-4">
@@ -293,9 +293,9 @@
     </div>
   </div>
 
-  <div class="bg-white rounded-lg border border-gray-200 overflow-hidden max-w-3xl">
+  <div class="bg-surface rounded-lg border border-token-border overflow-hidden max-w-3xl">
     <table class="w-full text-sm">
-      <thead class="bg-gray-50 text-xs uppercase text-gray-500">
+      <thead class="bg-surface-raised text-xs uppercase text-muted">
         <tr>
           <th class="px-4 py-3 text-left font-medium">Table</th>
           <th class="px-4 py-3 text-right font-medium">Rows</th>
@@ -303,8 +303,8 @@
           <th class="px-4 py-3 text-left font-medium">Newest</th>
         </tr>
       </thead>
-      <tbody id="ret-rows" class="divide-y divide-gray-100">
-        <tr><td colspan="4" class="px-4 py-6 text-center text-gray-400">Loading…</td></tr>
+      <tbody id="ret-rows" class="divide-y divide-token-border">
+        <tr><td colspan="4" class="px-4 py-6 text-center text-muted/70">Loading…</td></tr>
       </tbody>
     </table>
   </div>
@@ -323,11 +323,11 @@
       if (n === name) {
         panel.classList.remove('hidden');
         btn.classList.add('border-blue-600', 'text-blue-700');
-        btn.classList.remove('border-transparent', 'text-gray-500');
+        btn.classList.remove('border-transparent', 'text-muted');
       } else {
         panel.classList.add('hidden');
         btn.classList.remove('border-blue-600', 'text-blue-700');
-        btn.classList.add('border-transparent', 'text-gray-500');
+        btn.classList.add('border-transparent', 'text-muted');
       }
     });
     if (name === 'health')    { loadHealth(); loadAlerts(); }
@@ -363,7 +363,7 @@
   // ── Health ─────────────────────────────────────────────────────────────
   async function loadHealth() {
     var grid = document.getElementById('health-grid');
-    grid.innerHTML = '<div class="text-sm text-gray-400">Loading…</div>';
+    grid.innerHTML = '<div class="text-sm text-muted/70">Loading…</div>';
     try {
       var resp = await fetch('/admin/maintenance/health');
       if (!resp.ok) throw new Error('HTTP ' + resp.status);
@@ -379,15 +379,15 @@
         var label = ok === true ? 'OK' : ok === false ? 'FAILED' : 'N/A';
         var pill = ok === true ? 'bg-green-100 text-green-700'
                  : ok === false ? 'bg-red-100 text-red-700'
-                 : 'bg-gray-100 text-gray-500';
-        html += '<div class="bg-white rounded-lg border border-gray-200 p-4 flex items-start gap-3">'
+                 : 'bg-surface-raised text-muted';
+        html += '<div class="bg-surface rounded-lg border border-token-border p-4 flex items-start gap-3">'
               + '  <div class="w-2.5 h-2.5 rounded-full mt-1.5 ' + dot + '"></div>'
               + '  <div class="flex-1 min-w-0">'
               + '    <div class="flex items-center justify-between">'
-              + '      <div class="text-sm font-medium text-gray-700">' + labels[key] + '</div>'
+              + '      <div class="text-sm font-medium text-body">' + labels[key] + '</div>'
               + '      <span class="text-[10px] px-2 py-0.5 rounded ' + pill + '">' + label + '</span>'
               + '    </div>'
-              + '    <div class="text-xs text-gray-500 mt-1 break-all">' + (p.detail || '') + '</div>'
+              + '    <div class="text-xs text-muted mt-1 break-all">' + (p.detail || '') + '</div>'
               + '  </div>'
               + '</div>';
       });
@@ -402,13 +402,13 @@
   // ── Backups ────────────────────────────────────────────────────────────
   async function loadBackups() {
     var tbody = document.getElementById('backup-rows');
-    tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-8 text-center text-gray-400">Loading…</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-8 text-center text-muted/70">Loading…</td></tr>';
     try {
       var resp = await fetch('/admin/maintenance/backups');
       if (!resp.ok) throw new Error('HTTP ' + resp.status);
       var rows = await resp.json();
       if (!rows.length) {
-        tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-8 text-center text-gray-400">No backups yet.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-8 text-center text-muted/70">No backups yet.</td></tr>';
         return;
       }
       var html = '';
@@ -416,21 +416,21 @@
         var statusPill = b.status === 'success' ? 'bg-green-100 text-green-700'
                       : b.status === 'running' ? 'bg-blue-100 text-blue-700'
                       : b.status === 'failed'  ? 'bg-red-100 text-red-700'
-                      : 'bg-gray-100 text-gray-600';
+                      : 'bg-surface-raised text-muted';
         var dl = b.status === 'success'
           ? '<a href="/admin/maintenance/backups/' + b.id + '/download" class="text-xs text-blue-600 hover:underline">Download</a>'
-          : '<span class="text-xs text-gray-300">–</span>';
+          : '<span class="text-xs text-muted/50">–</span>';
         var err = b.error
           ? '<div class="text-[10px] text-red-500 mt-1 break-all">' + b.error + '</div>'
           : '';
         html += '<tr>'
-              + '<td class="px-4 py-3 text-gray-600 whitespace-nowrap">' + fmtTs(b.created_at) + '</td>'
-              + '<td class="px-4 py-3 text-gray-700 font-mono text-xs break-all">' + b.filename + '</td>'
-              + '<td class="px-4 py-3 text-right text-gray-600">' + fmtBytes(b.size_bytes) + '</td>'
+              + '<td class="px-4 py-3 text-muted whitespace-nowrap">' + fmtTs(b.created_at) + '</td>'
+              + '<td class="px-4 py-3 text-body font-mono text-xs break-all">' + b.filename + '</td>'
+              + '<td class="px-4 py-3 text-right text-muted">' + fmtBytes(b.size_bytes) + '</td>'
               + '<td class="px-4 py-3"><span class="px-2 py-0.5 text-[10px] rounded ' + statusPill + '">' + b.status + '</span>' + err + '</td>'
-              + '<td class="px-4 py-3 text-gray-500 text-xs">' + (b.trigger || '–') + '</td>'
-              + '<td class="px-4 py-3 text-gray-500 text-xs">' + (b.created_by || '–') + '</td>'
-              + '<td class="px-4 py-3 text-gray-500 text-xs">' + (b.note || '') + '</td>'
+              + '<td class="px-4 py-3 text-muted text-xs">' + (b.trigger || '–') + '</td>'
+              + '<td class="px-4 py-3 text-muted text-xs">' + (b.created_by || '–') + '</td>'
+              + '<td class="px-4 py-3 text-muted text-xs">' + (b.note || '') + '</td>'
               + '<td class="px-4 py-3 text-right whitespace-nowrap">'
               + '  ' + dl
               + '  <button onclick="deleteBackup(' + b.id + ')" class="ml-3 text-xs text-red-600 hover:underline">Delete</button>'
@@ -487,14 +487,14 @@
         Object.keys(qs).forEach(function(q) {
           var n = qs[q];
           html += '<div class="flex items-center justify-between">'
-                + '  <div class="text-xs text-gray-600 font-mono">' + q + '</div>'
+                + '  <div class="text-xs text-muted font-mono">' + q + '</div>'
                 + '  <div class="flex items-center gap-2">'
-                + '    <span class="px-2 py-0.5 text-xs rounded bg-gray-100 text-gray-700">' + n + '</span>'
+                + '    <span class="px-2 py-0.5 text-xs rounded bg-surface-raised text-body">' + n + '</span>'
                 + '    <button onclick="purgeQueue(\'' + q + '\')" class="text-[10px] text-red-600 hover:underline">purge</button>'
                 + '  </div>'
                 + '</div>';
         });
-        dEl.innerHTML = html || '<div class="text-xs text-gray-400">(no queues)</div>';
+        dEl.innerHTML = html || '<div class="text-xs text-muted/70">(no queues)</div>';
       }
 
       var wEl = document.getElementById('queue-workers');
@@ -504,14 +504,14 @@
       } else {
         var wNames = Object.keys(ws);
         if (!wNames.length) {
-          wEl.innerHTML = '<div class="text-xs text-gray-400">No workers responded to ping.</div>';
+          wEl.innerHTML = '<div class="text-xs text-muted/70">No workers responded to ping.</div>';
         } else {
           var html2 = '';
           wNames.forEach(function(name) {
             var w = ws[name];
             html2 += '<div>'
-                  + '  <div class="text-xs font-mono text-gray-700">' + name + '</div>'
-                  + '  <div class="text-[10px] text-gray-500 mt-0.5">'
+                  + '  <div class="text-xs font-mono text-body">' + name + '</div>'
+                  + '  <div class="text-[10px] text-muted mt-0.5">'
                   + '    active: ' + w.active + ' · reserved: ' + w.reserved
                   + '  </div>'
                   + '</div>';
@@ -554,16 +554,16 @@
 
       var tbody = document.getElementById('ret-rows');
       if (!data.tables || !data.tables.length) {
-        tbody.innerHTML = '<tr><td colspan="4" class="px-4 py-6 text-center text-gray-400">No tables.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="4" class="px-4 py-6 text-center text-muted/70">No tables.</td></tr>';
         return;
       }
       var html = '';
       data.tables.forEach(function(t) {
         html += '<tr>'
-              + '<td class="px-4 py-3 text-gray-700 font-mono text-xs">' + t.table + '</td>'
-              + '<td class="px-4 py-3 text-right text-gray-600">' + t.count + '</td>'
-              + '<td class="px-4 py-3 text-gray-500 text-xs">' + fmtTs(t.oldest) + '</td>'
-              + '<td class="px-4 py-3 text-gray-500 text-xs">' + fmtTs(t.newest) + '</td>'
+              + '<td class="px-4 py-3 text-body font-mono text-xs">' + t.table + '</td>'
+              + '<td class="px-4 py-3 text-right text-muted">' + t.count + '</td>'
+              + '<td class="px-4 py-3 text-muted text-xs">' + fmtTs(t.oldest) + '</td>'
+              + '<td class="px-4 py-3 text-muted text-xs">' + fmtTs(t.newest) + '</td>'
               + '</tr>';
       });
       tbody.innerHTML = html;
@@ -595,7 +595,7 @@
 
   async function runCleanup(dryRun) {
     var target = document.getElementById('cleanup-result');
-    target.innerHTML = '<div class="text-xs text-gray-400 mt-2">Running…</div>';
+    target.innerHTML = '<div class="text-xs text-muted/70 mt-2">Running…</div>';
     var url = '/admin/maintenance/cleanup' + (dryRun ? '?dry_run=true' : '');
     if (!dryRun && !confirm('Delete rows older than the configured retention? This cannot be undone.')) {
       target.innerHTML = '';
@@ -623,7 +623,7 @@
       if ('deleted' in e) return table + ': deleted ' + e.deleted + ' (>= ' + e.days + ' d)';
       return table + ': ' + JSON.stringify(e);
     }).join('<br>');
-    target.innerHTML = '<div class="bg-gray-50 border border-gray-200 rounded p-3 text-xs text-gray-700 mt-2">' + rows + '</div>';
+    target.innerHTML = '<div class="bg-surface-raised border border-token-border rounded p-3 text-xs text-body mt-2">' + rows + '</div>';
     loadRetention();
   }
 
@@ -651,12 +651,12 @@
     // Disable direct editing unless custom mode
     if (mode === 'custom') {
       cronInput.readOnly = false;
-      cronInput.classList.remove('bg-gray-50');
-      cronInput.classList.add('bg-white');
+      cronInput.classList.remove('bg-surface-raised');
+      cronInput.classList.add('bg-surface');
     } else {
       cronInput.readOnly = true;
-      cronInput.classList.add('bg-gray-50');
-      cronInput.classList.remove('bg-white');
+      cronInput.classList.add('bg-surface-raised');
+      cronInput.classList.remove('bg-surface');
     }
   }
 

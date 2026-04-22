@@ -5,8 +5,8 @@
 {% block content %}
 <div class="mb-6 flex items-center justify-between">
   <div>
-    <h1 class="text-lg font-semibold text-gray-900">Script Modules</h1>
-    <p class="text-xs text-gray-500 mt-1">Admin-created scripts used as steps in runbooks.</p>
+    <h1 class="text-lg font-semibold text-heading">Script Modules</h1>
+    <p class="text-xs text-muted mt-1">Admin-created scripts used as steps in runbooks.</p>
   </div>
   <a href="/ui/modules/new"
      class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700">
@@ -14,25 +14,25 @@
   </a>
 </div>
 
-<div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
-  <table class="min-w-full divide-y divide-gray-200 text-sm">
-    <thead class="bg-gray-50">
+<div class="bg-surface rounded-lg border border-token-border overflow-hidden">
+  <table class="min-w-full divide-y divide-token-border text-sm">
+    <thead class="bg-surface-raised">
       <tr>
-        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Name</th>
-        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Type</th>
-        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Parameter</th>
-        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Status</th>
-        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Last modified</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wide">Name</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wide">Type</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wide">Parameter</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wide">Status</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wide">Last modified</th>
         <th class="px-4 py-3"></th>
       </tr>
     </thead>
-    <tbody class="divide-y divide-gray-100">
+    <tbody class="divide-y divide-token-border">
       {% for m in modules %}
-      <tr class="hover:bg-gray-50" data-module-id="{{ m.id }}">
+      <tr class="hover:bg-surface-raised" data-module-id="{{ m.id }}">
         <td class="px-4 py-3">
-          <div class="font-medium text-gray-900">{{ m.name }}</div>
+          <div class="font-medium text-heading">{{ m.name }}</div>
           {% if m.description %}
-          <div class="text-xs text-gray-500">{{ m.description }}</div>
+          <div class="text-xs text-muted">{{ m.description }}</div>
           {% endif %}
         </td>
         <td class="px-4 py-3">
@@ -42,33 +42,33 @@
           <span class="inline-block px-2 py-0.5 rounded text-xs font-medium bg-yellow-50 text-yellow-700">{{ m.script_type }}</span>
           {% endif %}
         </td>
-        <td class="px-4 py-3 text-xs text-gray-500">
+        <td class="px-4 py-3 text-xs text-muted">
           {% if m.param_schema %}
             {{ m.param_schema | length }} Parameter
           {% else %}
-            <span class="text-gray-300">–</span>
+            <span class="text-muted/50">–</span>
           {% endif %}
         </td>
         <td class="px-4 py-3">
           {% if m.is_active %}
           <span class="inline-block px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">Active</span>
           {% else %}
-          <span class="inline-block px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-500">Inactive</span>
+          <span class="inline-block px-2 py-0.5 rounded text-xs font-medium bg-surface-raised text-muted">Inactive</span>
           {% endif %}
         </td>
-        <td class="px-4 py-3 text-xs text-gray-400">
+        <td class="px-4 py-3 text-xs text-muted/70">
           {{ m.updated_at.strftime('%Y-%m-%d %H:%M') if m.updated_at else '–' }}
         </td>
         <td class="px-4 py-3 text-right text-xs">
           <a href="/ui/modules/{{ m.id }}/edit"
-             class="text-gray-500 hover:text-blue-600 mr-3">Edit</a>
+             class="text-muted hover:text-blue-600 mr-3">Edit</a>
           <button onclick="deleteModule({{ m.id }}, '{{ m.name | replace("'", "\\'") }}')"
                   class="text-red-400 hover:text-red-600">Delete</button>
         </td>
       </tr>
       {% else %}
       <tr>
-        <td colspan="6" class="px-4 py-12 text-center text-gray-400 text-sm">
+        <td colspan="6" class="px-4 py-12 text-center text-muted/70 text-sm">
           No modules defined yet.
           <a href="/ui/modules/new" class="ml-1 text-blue-600 hover:underline">Create first module →</a>
         </td>

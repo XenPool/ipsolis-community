@@ -4,19 +4,19 @@
 
 {% block content %}
 <div class="mb-5">
-  <a href="/portal/" class="text-sm text-gray-500 hover:text-gray-800">← Orders</a>
+  <a href="/portal/" class="text-sm text-muted hover:text-heading">← Orders</a>
 </div>
 
 <!-- Header -->
 <div class="flex items-start justify-between mb-6">
   <div>
-    <h1 class="text-xl font-semibold text-gray-900">Order #{{ order.id }}</h1>
-    <p class="text-sm text-gray-500 mt-0.5">
+    <h1 class="text-xl font-semibold text-heading">Order #{{ order.id }}</h1>
+    <p class="text-sm text-muted mt-0.5">
       {{ order.action.value | upper }} ·
       Created: {{ order.created_at.strftime("%d.%m.%Y %H:%M") }} UTC
     </p>
   </div>
-  <span class="inline-block px-3 py-1 rounded-full text-sm font-semibold {{ status_colors.get(order.status.value, 'bg-gray-100 text-gray-700') }}">
+  <span class="inline-block px-3 py-1 rounded-full text-sm font-semibold {{ status_colors.get(order.status.value, 'bg-surface-raised text-body') }}">
     {{ order.status.value }}
   </span>
 </div>
@@ -60,8 +60,8 @@
     {% for a in approvals %}
     <div class="flex items-center gap-2 text-xs">
       <span class="inline-block w-2 h-2 rounded-full {% if a.status == 'approved' %}bg-green-500{% elif a.status == 'declined' %}bg-red-500{% else %}bg-amber-400{% endif %}"></span>
-      <span class="text-gray-700">{{ a.approver_name }} ({{ 'Manager' if a.approver_type == 'manager' else 'App Owner' }})</span>
-      <span class="text-gray-400">– {{ a.status }}</span>
+      <span class="text-body">{{ a.approver_name }} ({{ 'Manager' if a.approver_type == 'manager' else 'App Owner' }})</span>
+      <span class="text-muted/70">– {{ a.status }}</span>
     </div>
     {% endfor %}
   </div>
@@ -83,8 +83,8 @@
     {% for a in approvals %}
     <div class="flex items-center gap-2 text-xs">
       <span class="inline-block w-2 h-2 rounded-full {% if a.status == 'approved' %}bg-green-500{% elif a.status == 'declined' %}bg-red-500{% else %}bg-gray-400{% endif %}"></span>
-      <span class="text-gray-700">{{ a.approver_name }} ({{ 'Manager' if a.approver_type == 'manager' else 'App Owner' }})</span>
-      <span class="text-gray-400">– {{ a.status }}{% if a.comment %}: {{ a.comment }}{% endif %}</span>
+      <span class="text-body">{{ a.approver_name }} ({{ 'Manager' if a.approver_type == 'manager' else 'App Owner' }})</span>
+      <span class="text-muted/70">– {{ a.status }}{% if a.comment %}: {{ a.comment }}{% endif %}</span>
     </div>
     {% endfor %}
   </div>
@@ -102,57 +102,57 @@
 
 <!-- Metadata -->
 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-  <div class="bg-white rounded-lg border border-gray-200 p-4">
-    <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Requester</h2>
+  <div class="bg-surface rounded-lg border border-token-border p-4">
+    <h2 class="text-xs font-semibold text-muted/70 uppercase tracking-wide mb-3">Requester</h2>
     <dl class="space-y-2 text-sm">
       <div class="flex justify-between">
-        <dt class="text-gray-500">Name</dt>
-        <dd class="font-medium text-gray-900">{{ order.user_name }}</dd>
+        <dt class="text-muted">Name</dt>
+        <dd class="font-medium text-heading">{{ order.user_name }}</dd>
       </div>
       <div class="flex justify-between">
-        <dt class="text-gray-500">E-Mail</dt>
-        <dd class="text-gray-900">{{ order.user_email }}</dd>
+        <dt class="text-muted">E-Mail</dt>
+        <dd class="text-heading">{{ order.user_email }}</dd>
       </div>
       {% if order.owner_name or order.owner_email %}
       <div class="flex justify-between">
-        <dt class="text-gray-500">Owner</dt>
-        <dd class="text-gray-900">{{ order.owner_name or order.owner_email }}</dd>
+        <dt class="text-muted">Owner</dt>
+        <dd class="text-heading">{{ order.owner_name or order.owner_email }}</dd>
       </div>
       {% endif %}
       {% if order.rdp_users %}
       <div class="flex justify-between gap-4">
-        <dt class="text-gray-500 shrink-0">RDP-User</dt>
-        <dd class="text-gray-900 text-right text-xs">{{ order.rdp_users | join(", ") }}</dd>
+        <dt class="text-muted shrink-0">RDP-User</dt>
+        <dd class="text-heading text-right text-xs">{{ order.rdp_users | join(", ") }}</dd>
       </div>
       {% endif %}
       {% if order.admin_users %}
       <div class="flex justify-between gap-4">
-        <dt class="text-gray-500 shrink-0">Admin-User</dt>
-        <dd class="text-gray-900 text-right text-xs">{{ order.admin_users | join(", ") }}</dd>
+        <dt class="text-muted shrink-0">Admin-User</dt>
+        <dd class="text-heading text-right text-xs">{{ order.admin_users | join(", ") }}</dd>
       </div>
       {% endif %}
     </dl>
   </div>
 
-  <div class="bg-white rounded-lg border border-gray-200 p-4">
-    <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Access &amp; Duration</h2>
+  <div class="bg-surface rounded-lg border border-token-border p-4">
+    <h2 class="text-xs font-semibold text-muted/70 uppercase tracking-wide mb-3">Access &amp; Duration</h2>
     <dl class="space-y-2 text-sm">
       <div class="flex justify-between">
-        <dt class="text-gray-500">Asset Type</dt>
-        <dd class="font-medium text-gray-900">{{ asset_type_name or "–" }}</dd>
+        <dt class="text-muted">Asset Type</dt>
+        <dd class="font-medium text-heading">{{ asset_type_name or "–" }}</dd>
       </div>
       <div class="flex justify-between">
-        <dt class="text-gray-500">From</dt>
-        <dd class="text-gray-900">{{ order.requested_from.strftime("%d.%m.%Y") }}</dd>
+        <dt class="text-muted">From</dt>
+        <dd class="text-heading">{{ order.requested_from.strftime("%d.%m.%Y") }}</dd>
       </div>
       <div class="flex justify-between">
-        <dt class="text-gray-500">Until</dt>
-        <dd class="text-gray-900">{{ order.requested_until.strftime("%d.%m.%Y") }}</dd>
+        <dt class="text-muted">Until</dt>
+        <dd class="text-heading">{{ order.requested_until.strftime("%d.%m.%Y") }}</dd>
       </div>
       {% if asset_name %}
       <div class="flex justify-between">
-        <dt class="text-gray-500">Hostname</dt>
-        <dd class="font-mono font-medium text-gray-900">{{ asset_name }}</dd>
+        <dt class="text-muted">Hostname</dt>
+        <dd class="font-mono font-medium text-heading">{{ asset_name }}</dd>
       </div>
       {% endif %}
     </dl>
@@ -161,39 +161,36 @@
 
 <!-- Steps Timeline -->
 <div class="mb-8">
-  <h2 class="text-sm font-semibold text-gray-700 mb-3">
+  <h2 class="text-sm font-semibold text-body mb-3">
     Execution Steps
-    <span class="font-normal text-gray-400">({{ order.steps | length }})</span>
+    <span class="font-normal text-muted/70">({{ order.steps | length }})</span>
   </h2>
 
   {% if order.steps %}
   <div class="space-y-2">
     {% for item in steps_with_duration %}
     {% set step = item.step %}
-    <div class="bg-white rounded-lg border border-gray-200 px-4 py-3 flex items-start gap-4">
+    <div class="bg-surface rounded-lg border border-token-border px-4 py-3 flex items-start gap-4">
       <div class="flex-shrink-0 mt-0.5">
-        <span class="inline-block w-16 text-center px-2 py-0.5 rounded text-xs font-semibold {{ step_colors.get(step.status.value, 'bg-gray-100 text-gray-600') }}">
+        <span class="inline-block w-16 text-center px-2 py-0.5 rounded text-xs font-semibold {{ step_colors.get(step.status.value, 'bg-surface-raised text-muted') }}">
           {{ step.status.value }}
         </span>
       </div>
       <div class="flex-1 min-w-0">
-        <p class="text-sm font-medium text-gray-900 font-mono">{{ step.step_name }}</p>
-        <div class="flex flex-wrap gap-x-4 gap-y-0.5 mt-1 text-xs text-gray-500">
+        <p class="text-sm font-medium text-heading font-mono">{{ step.step_name }}</p>
+        <div class="flex flex-wrap gap-x-4 gap-y-0.5 mt-1 text-xs text-muted">
           {% if step.started_at %}<span>Start: {{ step.started_at.strftime("%H:%M:%S") }}</span>{% endif %}
           {% if item.duration %}<span>Duration: {{ item.duration }}</span>{% endif %}
         </div>
-        {% if step.log_output %}
-        <p class="mt-1.5 text-xs text-gray-600 bg-gray-50 rounded px-2 py-1 font-mono break-all">{{ step.log_output }}</p>
-        {% endif %}
         {% if step.error %}
-        <p class="mt-1.5 text-xs text-red-700 bg-red-50 rounded px-2 py-1 font-mono break-all">{{ step.error }}</p>
+        <p class="mt-1.5 text-xs text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-500/10 rounded px-2 py-1 font-mono break-all">{{ step.error }}</p>
         {% endif %}
       </div>
     </div>
     {% endfor %}
   </div>
   {% else %}
-  <div class="bg-white rounded-lg border border-gray-200 px-4 py-6 text-center text-sm text-gray-400">
+  <div class="bg-surface rounded-lg border border-token-border px-4 py-6 text-center text-sm text-muted/70">
     No steps recorded yet.
   </div>
   {% endif %}

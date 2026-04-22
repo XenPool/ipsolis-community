@@ -1,4 +1,4 @@
-# XenPool IT Selfservice – Claude Code Context
+# Ipsolis – Claude Code Context
 
 ## Task Backlog
 Open and completed tasks: see [`TASKS.md`](TASKS.md)

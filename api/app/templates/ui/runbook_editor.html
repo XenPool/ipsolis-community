@@ -4,13 +4,13 @@
 
 {% block content %}
 <div class="mb-6">
-  <a href="/ui/asset-types/{{ runbook.asset_type_id }}/edit#runbook-slots" class="text-sm text-gray-500 hover:text-gray-800">← Back to Asset Type</a>
+  <a href="/ui/asset-types/{{ runbook.asset_type_id }}/edit#runbook-slots" class="text-sm text-muted hover:text-heading">← Back to Asset Type</a>
 </div>
 
 <div class="mb-6 flex items-start justify-between">
   <div>
-    <h1 class="text-lg font-semibold text-gray-900">{{ runbook.name }}</h1>
-    <p class="text-xs text-gray-500 mt-1">
+    <h1 class="text-lg font-semibold text-heading">{{ runbook.name }}</h1>
+    <p class="text-xs text-muted mt-1">
       Asset type: <strong>{{ asset_type.name if asset_type else runbook.asset_type_id }}</strong> ·
       Action: <strong class="font-mono">{{ runbook.action }}</strong>
     </p>
@@ -20,43 +20,43 @@
            {% if runbook.is_active %}checked{% endif %}
            onchange="toggleActive()"
            class="w-4 h-4 rounded">
-    <span class="text-sm text-gray-600">Aktiv</span>
+    <span class="text-sm text-muted">Aktiv</span>
   </label>
 </div>
 
 <!-- Steps Liste -->
-<div class="bg-white rounded-lg border border-gray-200 mb-6">
-  <div class="px-4 py-3 border-b border-gray-200 flex items-center justify-between bg-gray-50">
-    <h2 class="text-sm font-semibold text-gray-700">Steps</h2>
-    <span class="text-xs text-gray-400">{{ steps | length }} Steps</span>
+<div class="bg-surface rounded-lg border border-token-border mb-6">
+  <div class="px-4 py-3 border-b border-token-border flex items-center justify-between bg-surface-raised">
+    <h2 class="text-sm font-semibold text-body">Steps</h2>
+    <span class="text-xs text-muted/70">{{ steps | length }} Steps</span>
   </div>
 
   <div id="steps-list">
     {% if steps %}
     {% for step in steps %}
-    <div class="step-row flex items-center gap-3 px-4 py-3 border-b border-gray-100 last:border-0 hover:bg-gray-50"
+    <div class="step-row flex items-center gap-3 px-4 py-3 border-b border-token-border last:border-0 hover:bg-surface-raised"
          data-step-id="{{ step.id }}">
       <!-- Position Badge -->
-      <span class="w-6 h-6 flex items-center justify-center rounded-full bg-gray-100 text-gray-600 text-xs font-mono font-medium flex-shrink-0">
+      <span class="w-6 h-6 flex items-center justify-center rounded-full bg-surface-raised text-muted text-xs font-mono font-medium flex-shrink-0">
         {{ step.position }}
       </span>
 
       <!-- Step-Info -->
       <div class="flex-1 min-w-0">
         <div class="flex items-center gap-2">
-          <span class="text-sm font-medium text-gray-900">{{ step.step_name }}</span>
-          <span class="text-xs font-mono px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">
+          <span class="text-sm font-medium text-heading">{{ step.step_name }}</span>
+          <span class="text-xs font-mono px-1.5 py-0.5 rounded bg-surface-raised text-muted">
             {% set mod = script_modules | selectattr('id', 'equalto', step.script_module_id) | first | default(None) %}
             {% if mod %}{{ mod.name }}{% else %}{{ step.module_key or '–' }}{% endif %}
           </span>
           {% if step.is_critical %}
           <span class="text-xs px-1 py-0.5 rounded bg-red-100 text-red-600">kritisch</span>
           {% else %}
-          <span class="text-xs px-1 py-0.5 rounded bg-gray-100 text-gray-400">optional</span>
+          <span class="text-xs px-1 py-0.5 rounded bg-surface-raised text-muted/70">optional</span>
           {% endif %}
         </div>
         {% if step.params_template %}
-        <div class="text-xs text-gray-400 mt-0.5 font-mono">
+        <div class="text-xs text-muted/70 mt-0.5 font-mono">
           {{ step.params_template.keys() | list | join(', ') }}
         </div>
         {% endif %}
@@ -65,18 +65,18 @@
       <!-- Aktionen -->
       <div class="flex items-center gap-1 flex-shrink-0">
         <button onclick="moveStep({{ step.id }}, 'up')"
-                class="p-1 text-gray-400 hover:text-gray-700 rounded" title="Nach oben">↑</button>
+                class="p-1 text-muted/70 hover:text-body rounded" title="Nach oben">↑</button>
         <button onclick="moveStep({{ step.id }}, 'down')"
-                class="p-1 text-gray-400 hover:text-gray-700 rounded" title="Nach unten">↓</button>
+                class="p-1 text-muted/70 hover:text-body rounded" title="Nach unten">↓</button>
         <button onclick='editStep({{ step.id }}, {{ step | tojson | safe }})'
-                class="px-2 py-1 text-xs text-gray-500 hover:text-blue-600 rounded">Bearbeiten</button>
+                class="px-2 py-1 text-xs text-muted hover:text-blue-600 rounded">Bearbeiten</button>
         <button onclick="deleteStep({{ step.id }})"
-                class="px-2 py-1 text-xs text-gray-400 hover:text-red-500 rounded">Entfernen</button>
+                class="px-2 py-1 text-xs text-muted/70 hover:text-red-500 rounded">Entfernen</button>
       </div>
     </div>
     {% endfor %}
     {% else %}
-    <div id="no-steps" class="px-4 py-8 text-center text-gray-400 text-sm">
+    <div id="no-steps" class="px-4 py-8 text-center text-muted/70 text-sm">
       No steps defined yet. Add the first step below.
     </div>
     {% endif %}
@@ -84,19 +84,19 @@
 </div>
 
 <!-- Add / edit step -->
-<div class="bg-white rounded-lg border border-gray-200 p-5" id="step-form">
-  <h2 class="text-sm font-semibold text-gray-700 mb-4" id="step-form-title">+ Add step</h2>
+<div class="bg-surface rounded-lg border border-token-border p-5" id="step-form">
+  <h2 class="text-sm font-semibold text-body mb-4" id="step-form-title">+ Add step</h2>
 
   <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
     <div>
-      <label class="block text-xs font-medium text-gray-600 mb-1">Step name <span class="text-red-500">*</span></label>
+      <label class="block text-xs font-medium text-muted mb-1">Step name <span class="text-red-500">*</span></label>
       <input type="text" id="new-step-name" placeholder="e.g. Configure RDP group"
-             class="w-full rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400">
+             class="w-full rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500">
     </div>
     <div>
-      <label class="block text-xs font-medium text-gray-600 mb-1">Module <span class="text-red-500">*</span></label>
+      <label class="block text-xs font-medium text-muted mb-1">Module <span class="text-red-500">*</span></label>
       <select id="new-step-module" onchange="updateModuleInfo()"
-              class="w-full rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400">
+              class="w-full rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500">
         <option value="">– Select module –</option>
         {% for m in script_modules %}
         <option value="{{ m.id }}"
@@ -118,50 +118,50 @@
 
   <!-- Module param hints -->
   <div id="module-info" class="mb-4 hidden">
-    <div class="rounded bg-gray-50 border border-gray-200 px-3 py-2">
-      <p class="text-xs font-medium text-gray-600 mb-1">Expected parameters for this module:</p>
-      <div id="module-param-list" class="text-xs font-mono text-gray-500"></div>
+    <div class="rounded bg-surface-raised border border-token-border px-3 py-2">
+      <p class="text-xs font-medium text-muted mb-1">Expected parameters for this module:</p>
+      <div id="module-param-list" class="text-xs font-mono text-muted"></div>
     </div>
   </div>
 
   <div class="grid grid-cols-3 gap-4 mb-4">
     <div>
-      <label class="block text-xs font-medium text-gray-600 mb-1">Kritisch</label>
+      <label class="block text-xs font-medium text-muted mb-1">Kritisch</label>
       <label class="flex items-center gap-2 text-sm cursor-pointer">
         <input type="checkbox" id="new-step-critical" checked class="w-4 h-4">
         Yes (abort on error)
       </label>
     </div>
     <div>
-      <label class="block text-xs font-medium text-gray-600 mb-1">Retry-Count</label>
+      <label class="block text-xs font-medium text-muted mb-1">Retry-Count</label>
       <input type="number" id="new-step-retry" value="3" min="0" max="10"
-             class="w-24 rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400">
+             class="w-24 rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500">
     </div>
     <div>
-      <label class="block text-xs font-medium text-gray-600 mb-1">Timeout (s)</label>
+      <label class="block text-xs font-medium text-muted mb-1">Timeout (s)</label>
       <input type="number" id="new-step-timeout" value="120" min="10"
-             class="w-24 rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400">
+             class="w-24 rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500">
     </div>
   </div>
 
   <!-- Parameter bindings (auto-built from script's param_schema) -->
   <div class="mb-4">
     <div class="flex items-center justify-between mb-2">
-      <label class="block text-xs font-medium text-gray-600">
+      <label class="block text-xs font-medium text-muted">
         Parameter bindings
-        <span class="font-normal text-gray-400 ml-1">– bind each script parameter to a context variable or literal value</span>
+        <span class="font-normal text-muted/70 ml-1">– bind each script parameter to a context variable or literal value</span>
       </label>
       <button type="button" onclick="toggleAdvancedJson()"
               class="text-xs text-blue-600 hover:underline">⚙ Advanced (JSON)</button>
     </div>
-    <div id="param-bindings" class="border border-gray-200 rounded divide-y divide-gray-100 bg-gray-50">
-      <div class="px-3 py-4 text-xs text-gray-400 italic">Select a module to see its parameters.</div>
+    <div id="param-bindings" class="border border-token-border rounded divide-y divide-token-border bg-surface-raised">
+      <div class="px-3 py-4 text-xs text-muted/70 italic">Select a module to see its parameters.</div>
     </div>
     <div id="advanced-json-wrap" class="hidden mt-2">
       <textarea id="new-step-params" rows="4"
                 placeholder='{"VMName": "&#123;&#123;asset_name&#125;&#125;"}'
-                class="w-full rounded border border-gray-300 text-xs font-mono px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400"></textarea>
-      <p class="text-xs text-gray-400 mt-1">
+                class="w-full rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-xs font-mono px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500"></textarea>
+      <p class="text-xs text-muted/70 mt-1">
         Edits here override the bindings above. Use <code>&#123;&#123;key&#125;&#125;</code> for context variables.
       </p>
     </div>
@@ -169,7 +169,7 @@
 
   <div class="flex items-center justify-between">
     <button type="button" id="cancel-edit-btn" onclick="cancelEdit()"
-            class="hidden px-4 py-2 text-sm text-gray-500 border border-gray-300 rounded hover:bg-gray-50">
+            class="hidden px-4 py-2 text-sm text-muted border border-token-border rounded hover:bg-surface-raised">
       Cancel
     </button>
     <button type="button" id="submit-step-btn" onclick="submitStep()"
@@ -268,16 +268,16 @@ function _bindingRow(p, mode, value) {
   var required = p.required
     ? '<span class="text-red-500" title="required">*</span> '
     : '';
-  var typeBadge = '<span class="text-gray-400 font-normal">(' + (p.type || 'string') + ')</span>';
+  var typeBadge = '<span class="text-muted/70 font-normal">(' + (p.type || 'string') + ')</span>';
   return ''
     + '<div class="binding-row grid grid-cols-12 gap-2 items-center px-3 py-2" data-param-name="' + p.name + '">'
-    + '  <div class="col-span-3 text-xs font-mono text-gray-700">' + required + p.name + ' ' + typeBadge + '</div>'
-    + '  <select class="binding-mode col-span-2 rounded border border-gray-300 text-xs px-2 py-1 bg-white" onchange="onBindingModeChange(this)">'
+    + '  <div class="col-span-3 text-xs font-mono text-body">' + required + p.name + ' ' + typeBadge + '</div>'
+    + '  <select class="binding-mode col-span-2 rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-xs px-2 py-1 bg-surface" onchange="onBindingModeChange(this)">'
     + '    <option value="context"' + (effectiveMode === 'context' ? ' selected' : '') + '>Context var</option>'
     + '    <option value="literal"' + (effectiveMode === 'literal' ? ' selected' : '') + '>Literal value</option>'
     + '  </select>'
-    + '  <select class="binding-ctx col-span-7 rounded border border-gray-300 text-xs px-2 py-1 bg-white' + (effectiveMode === 'context' ? '' : ' hidden') + '">' + _ctxOptions(ctxSel) + '</select>'
-    + '  <input  class="binding-lit col-span-7 rounded border border-gray-300 text-xs px-2 py-1' + (effectiveMode === 'literal' ? '' : ' hidden') + '" type="text" placeholder="Literal value" value="' + (litVal || '').replace(/"/g, '&quot;') + '">'
+    + '  <select class="binding-ctx col-span-7 rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-xs px-2 py-1 bg-surface' + (effectiveMode === 'context' ? '' : ' hidden') + '">' + _ctxOptions(ctxSel) + '</select>'
+    + '  <input  class="binding-lit col-span-7 rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-xs px-2 py-1' + (effectiveMode === 'literal' ? '' : ' hidden') + '" type="text" placeholder="Literal value" value="' + (litVal || '').replace(/"/g, '&quot;') + '">'
     + '</div>';
 }
 
@@ -300,7 +300,7 @@ function renderBindings(existingTemplate) {
   var container = document.getElementById('param-bindings');
   var params = _currentModuleParams();
   if (!params.length) {
-    container.innerHTML = '<div class="px-3 py-4 text-xs text-gray-400 italic">Selected module has no declared parameters. Use Advanced (JSON) to set values manually.</div>';
+    container.innerHTML = '<div class="px-3 py-4 text-xs text-muted/70 italic">Selected module has no declared parameters. Use Advanced (JSON) to set values manually.</div>';
     return;
   }
   var tpl = existingTemplate || {};
@@ -369,7 +369,7 @@ function updateModuleInfo() {
         return '<span class="inline-block mr-4">'
           + (p.required ? '<span class="text-red-400">*</span> ' : '')
           + p.name
-          + ' <span class="text-gray-400">(' + p.type + ')</span>'
+          + ' <span class="text-muted/70">(' + p.type + ')</span>'
           + (p.default ? ' = ' + p.default : '')
           + '</span>';
       }).join('');
@@ -507,7 +507,7 @@ function cancelEdit() {
   document.getElementById('new-step-params').value = '';
   document.getElementById('advanced-json-wrap').classList.add('hidden');
   document.getElementById('param-bindings').innerHTML =
-    '<div class="px-3 py-4 text-xs text-gray-400 italic">Select a module to see its parameters.</div>';
+    '<div class="px-3 py-4 text-xs text-muted/70 italic">Select a module to see its parameters.</div>';
   document.getElementById('module-info').classList.add('hidden');
   document.getElementById('step-form-title').textContent = '+ Add step';
   document.getElementById('submit-step-btn').textContent = 'Add step';

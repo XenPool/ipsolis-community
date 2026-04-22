@@ -15,7 +15,7 @@ from app.config import settings
 from app.database import AsyncSessionLocal
 from app.models.config import AppConfig
 from app.routes import admin, admin_auth, admin_maintenance, admin_modules, admin_runbooks, admin_standalone_runbooks, assets, auth, health, orders, portal, ui, webhook
-from app.templates_instance import set_app_title, set_app_logo_config
+from app.templates_instance import set_app_title, set_app_logo_config, refresh_app_config_if_stale
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -34,7 +34,7 @@ APP_VERSION = os.environ.get("APP_VERSION", "0.0.0")
 # ── Lifespan ──────────────────────────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    logger.info("IT Selfservice API starting", version=APP_VERSION)
+    logger.info("Application starting", version=APP_VERSION)
 
     # Load configurable app globals from DB into Jinja2 environment
     _APP_KEYS = ("app.title", "app.logo", "app.logo_position", "app.logo_size", "app.logo_show_title", "app.logo_title_size")
@@ -52,12 +52,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         logger.warning("Could not load app config globals from DB at startup: %s", exc)
 
     yield
-    logger.info("IT Selfservice API shutting down")
+    logger.info("Application shutting down")
 
 
 # ── App ───────────────────────────────────────────────────────────────────────
 app = FastAPI(
-    title="IT Selfservice API",
+    title="Ipsolis API",
     description=(
         "Dispatcher and REST API for IT asset lifecycle orchestration. "
         "Receives webhooks from ServiceNow and self-service portal requests, "
@@ -87,6 +87,18 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ── App-config refresh (per-worker TTL, keeps multi-worker setups in sync) ────
+_CONFIG_SYNC_PATHS = ("/ui", "/portal", "/admin")
+
+
+@app.middleware("http")
+async def sync_app_config_globals(request, call_next):
+    path = request.url.path
+    if any(path == p or path.startswith(p + "/") for p in _CONFIG_SYNC_PATHS):
+        await refresh_app_config_if_stale()
+    return await call_next(request)
+
 
 # ── Static Files ──────────────────────────────────────────────────────────────
 app.mount("/static", StaticFiles(directory="/app/app/static"), name="static")

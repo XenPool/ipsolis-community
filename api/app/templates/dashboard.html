@@ -7,8 +7,8 @@
 <!-- Pool Summary -->
 <div class="mb-8">
   <div class="flex items-center justify-between mb-3">
-    <h1 class="text-lg font-semibold text-gray-900">VM Pool Status</h1>
-    <span class="text-xs text-gray-400" id="pool-last-updated">
+    <h1 class="text-lg font-semibold text-heading">VM Pool Status</h1>
+    <span class="text-xs text-muted" id="pool-last-updated">
       Updated: {{ now.strftime("%H:%M:%S") }} UTC
     </span>
   </div>
@@ -26,60 +26,61 @@
 <!-- Recent Orders -->
 <div>
   <div class="flex items-center justify-between mb-3">
-    <h2 class="text-lg font-semibold text-gray-900">Recent Orders</h2>
-    <a href="/ui/orders" class="text-sm text-blue-600 hover:underline">Show all →</a>
+    <h2 class="text-lg font-semibold text-heading">Recent Orders</h2>
+    <a href="/ui/orders" class="text-sm text-blue-600 dark:text-blue-400 hover:underline">Show all →</a>
   </div>
 
-  <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
-    <table class="min-w-full divide-y divide-gray-200 text-sm">
-      <thead class="bg-gray-50">
+  <div class="bg-surface rounded-xl border border-token-border shadow-sm shadow-slate-900/5 dark:shadow-black/20 overflow-hidden">
+    <table class="min-w-full divide-y divide-token-border text-sm">
+      <thead class="bg-surface-raised">
         <tr>
-          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">ID</th>
-          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">User</th>
-          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Asset</th>
-          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Action</th>
-          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Status</th>
-          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Created</th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wide">ID</th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wide">User</th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wide">Asset</th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wide">Action</th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wide">Status</th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wide">Created</th>
           <th class="px-4 py-3"></th>
         </tr>
       </thead>
-      <tbody class="divide-y divide-gray-100">
+      <tbody class="divide-y divide-token-border">
         {% for order in recent_orders %}
-        <tr class="hover:bg-gray-50">
-          <td class="px-4 py-3 font-mono text-gray-600">#{{ order.id }}</td>
+        <tr class="hover:bg-surface-raised transition-colors">
+          <td class="px-4 py-3 font-mono text-muted">#{{ order.id }}</td>
           <td class="px-4 py-3">
-            <div class="font-medium text-gray-900">{{ order.user_name }}</div>
-            <div class="text-xs text-gray-500">{{ order.user_email }}</div>
+            <div class="font-medium text-heading">{{ order.user_name }}</div>
+            <div class="text-xs text-muted">{{ order.user_email }}</div>
           </td>
-          <td class="px-4 py-3 text-gray-700">
+          <td class="px-4 py-3 text-body">
             {% if order.assigned_asset_id %}
               {{ asset_names.get(order.assigned_asset_id, "–") }}
             {% elif asset_type_models.get(order.asset_type_id) == "dedicated_shared" %}
-              <span class="text-xs text-gray-500">Shared</span>
+              <span class="text-xs text-muted">Shared</span>
             {% elif asset_type_models.get(order.asset_type_id) == "capacity_pooled" %}
-              <span class="text-xs text-gray-500">Pooled</span>
+              <span class="text-xs text-muted">Pooled</span>
             {% else %}–{% endif %}
           </td>
           <td class="px-4 py-3">
-            <span class="inline-block px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">
+            <span class="inline-block px-2 py-0.5 rounded-md text-xs font-medium bg-surface-raised text-body border border-token-border">
               {{ order.action.value }}
             </span>
           </td>
           <td class="px-4 py-3">
-            <span class="inline-block px-2 py-0.5 rounded text-xs font-semibold {{ status_colors.get(order.status.value, 'bg-gray-100 text-gray-700') }}">
+            <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold {{ status_colors.get(order.status.value, 'bg-slate-100 dark:bg-slate-700 text-body') }}">
+              <span class="w-1.5 h-1.5 rounded-full bg-current opacity-70"></span>
               {{ order.status.value }}
             </span>
           </td>
-          <td class="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">
+          <td class="px-4 py-3 text-muted text-xs whitespace-nowrap">
             {{ order.created_at.strftime("%d.%m.%Y %H:%M") }}
           </td>
           <td class="px-4 py-3 text-right">
-            <a href="/ui/orders/{{ order.id }}" class="text-blue-600 hover:underline text-xs">Detail</a>
+            <a href="/ui/orders/{{ order.id }}" class="text-blue-600 dark:text-blue-400 hover:underline text-xs">Detail</a>
           </td>
         </tr>
         {% else %}
         <tr>
-          <td colspan="7" class="px-4 py-8 text-center text-gray-400 text-sm">No orders found.</td>
+          <td colspan="7" class="px-4 py-8 text-center text-muted text-sm">No orders found.</td>
         </tr>
         {% endfor %}
       </tbody>

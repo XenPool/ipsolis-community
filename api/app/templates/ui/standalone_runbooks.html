@@ -5,8 +5,8 @@
 {% block content %}
 <div class="flex items-center justify-between mb-6">
   <div>
-    <h1 class="text-lg font-semibold text-gray-900">Standalone Runbooks</h1>
-    <p class="text-xs text-gray-500 mt-1">Automation tasks independent of asset types</p>
+    <h1 class="text-lg font-semibold text-heading">Standalone Runbooks</h1>
+    <p class="text-xs text-muted mt-1">Automation tasks independent of asset types</p>
   </div>
   <a href="/ui/standalone-runbooks/new"
      class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700">
@@ -14,20 +14,20 @@
   </a>
 </div>
 
-<div class="bg-white rounded-lg border border-gray-200">
+<div class="bg-surface rounded-lg border border-token-border">
   <table class="w-full text-sm">
     <thead>
-      <tr class="border-b border-gray-200 bg-gray-50">
-        <th class="px-4 py-3 text-left font-medium text-gray-600">Name</th>
-        <th class="px-4 py-3 text-left font-medium text-gray-600">Active</th>
-        <th class="px-4 py-3 text-left font-medium text-gray-600">Schedule</th>
-        <th class="px-4 py-3 text-center font-medium text-gray-600">Steps</th>
-        <th class="px-4 py-3 text-left font-medium text-gray-600">Last Run</th>
-        <th class="px-4 py-3 text-right font-medium text-gray-600">Actions</th>
+      <tr class="border-b border-token-border bg-surface-raised">
+        <th class="px-4 py-3 text-left font-medium text-muted">Name</th>
+        <th class="px-4 py-3 text-left font-medium text-muted">Active</th>
+        <th class="px-4 py-3 text-left font-medium text-muted">Schedule</th>
+        <th class="px-4 py-3 text-center font-medium text-muted">Steps</th>
+        <th class="px-4 py-3 text-left font-medium text-muted">Last Run</th>
+        <th class="px-4 py-3 text-right font-medium text-muted">Actions</th>
       </tr>
     </thead>
     <tbody id="rb-table-body">
-      <tr><td colspan="6" class="px-4 py-8 text-center text-gray-400">Loading…</td></tr>
+      <tr><td colspan="6" class="px-4 py-8 text-center text-muted/70">Loading…</td></tr>
     </tbody>
   </table>
 </div>
@@ -38,11 +38,11 @@ var STATUS_COLORS = {
   success: 'bg-green-100 text-green-700',
   failed:  'bg-red-100 text-red-700',
   running: 'bg-blue-100 text-blue-700',
-  pending: 'bg-gray-100 text-gray-600',
+  pending: 'bg-surface-raised text-muted',
 };
 
 function _badge(status) {
-  var cls = STATUS_COLORS[status] || 'bg-gray-100 text-gray-600';
+  var cls = STATUS_COLORS[status] || 'bg-surface-raised text-muted';
   return '<span class="px-2 py-0.5 rounded-full text-xs font-medium ' + cls + '">' + status + '</span>';
 }
 
@@ -66,36 +66,36 @@ async function loadRunbooks() {
   var runbooks = await resp.json();
   if (!runbooks.length) {
     document.getElementById('rb-table-body').innerHTML =
-      '<tr><td colspan="6" class="px-4 py-8 text-center text-gray-400">No standalone runbooks yet. Click "+ New Runbook" to create one.</td></tr>';
+      '<tr><td colspan="6" class="px-4 py-8 text-center text-muted/70">No standalone runbooks yet. Click "+ New Runbook" to create one.</td></tr>';
     return;
   }
   var html = runbooks.map(function(rb) {
     var activeBadge = rb.is_active
       ? '<span class="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">Active</span>'
-      : '<span class="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-400">Inactive</span>';
+      : '<span class="px-2 py-0.5 rounded-full text-xs font-medium bg-surface-raised text-muted/70">Inactive</span>';
     var schedule = rb.cron_enabled && rb.cron_expression
-      ? '<span class="font-mono text-xs text-gray-600">' + rb.cron_expression + '</span>'
-      : '<span class="text-xs text-gray-400">Manual only</span>';
+      ? '<span class="font-mono text-xs text-muted">' + rb.cron_expression + '</span>'
+      : '<span class="text-xs text-muted/70">Manual only</span>';
     var lastRun = '';
     if (rb.last_run) {
       lastRun = _badge(rb.last_run.status)
-        + ' <span class="text-xs text-gray-400 ml-1">' + _timeAgo(rb.last_run.created_at) + '</span>';
+        + ' <span class="text-xs text-muted/70 ml-1">' + _timeAgo(rb.last_run.created_at) + '</span>';
     } else {
-      lastRun = '<span class="text-xs text-gray-400">Never</span>';
+      lastRun = '<span class="text-xs text-muted/70">Never</span>';
     }
-    return '<tr class="border-b border-gray-100 last:border-0 hover:bg-gray-50">'
+    return '<tr class="border-b border-token-border last:border-0 hover:bg-surface-raised">'
       + '<td class="px-4 py-3">'
-      + '  <div class="font-medium text-gray-900">' + rb.name + '</div>'
-      + (rb.description ? '<div class="text-xs text-gray-400 mt-0.5">' + rb.description + '</div>' : '')
+      + '  <div class="font-medium text-heading">' + rb.name + '</div>'
+      + (rb.description ? '<div class="text-xs text-muted/70 mt-0.5">' + rb.description + '</div>' : '')
       + '</td>'
       + '<td class="px-4 py-3">' + activeBadge + '</td>'
       + '<td class="px-4 py-3">' + schedule + '</td>'
-      + '<td class="px-4 py-3 text-center text-gray-600">' + rb.step_count + '</td>'
+      + '<td class="px-4 py-3 text-center text-muted">' + rb.step_count + '</td>'
       + '<td class="px-4 py-3">' + lastRun + '</td>'
       + '<td class="px-4 py-3 text-right">'
       + '  <div class="flex items-center justify-end gap-2">'
       + '    <a href="/ui/standalone-runbooks/' + rb.id + '/edit" class="text-xs text-blue-600 hover:underline">Edit</a>'
-      + '    <a href="/ui/standalone-runbooks/' + rb.id + '/runs" class="text-xs text-gray-500 hover:underline">Runs</a>'
+      + '    <a href="/ui/standalone-runbooks/' + rb.id + '/runs" class="text-xs text-muted hover:underline">Runs</a>'
       + '    <button onclick="triggerRunbook(' + rb.id + ', \'' + rb.name.replace(/'/g, "\\'") + '\')" class="text-xs text-green-600 hover:underline"' + (rb.is_active ? '' : ' disabled title="Runbook is inactive"') + '>Trigger</button>'
       + '    <button onclick="deleteRunbook(' + rb.id + ', \'' + rb.name.replace(/'/g, "\\'") + '\')" class="text-xs text-red-500 hover:underline">Delete</button>'
       + '  </div>'

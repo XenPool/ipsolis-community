@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="110" viewBox="0 0 300 110">
+  <g transform="translate(55, 55) rotate(-90)">
+    <path d="M 30 0 A 30 30 0 0 1 0 30" fill="none" stroke="#3b82f6" stroke-width="5" stroke-linecap="round"/>
+    <path d="M 0 30 A 30 30 0 0 1 -30 0" fill="none" stroke="#8b5cf6" stroke-width="5" stroke-linecap="round"/>
+    <path d="M -30 0 A 30 30 0 0 1 0 -30" fill="none" stroke="#ec4899" stroke-width="5" stroke-linecap="round"/>
+    <path d="M 0 -30 A 30 30 0 0 1 30 0" fill="none" stroke="#f59e0b" stroke-width="5" stroke-linecap="round"/>
+  </g>
+  <circle cx="55" cy="55" r="3" fill="#e8ecf4"/>
+  <text x="105" y="65" font-family="Inter, -apple-system, sans-serif" font-size="32" font-weight="600" fill="#e8ecf4" letter-spacing="-0.5">Ipsolis</text>
+  <text x="105" y="82" font-family="Inter, -apple-system, sans-serif" font-size="10" font-weight="500" fill="#8b95a8" letter-spacing="3">IT ASSET LIFECYCLE</text>
+</svg>

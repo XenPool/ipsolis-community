@@ -6,19 +6,19 @@
 {% block content %}
 <!-- Back link -->
 <div class="mb-5">
-  <a href="/ui/orders" class="text-sm text-gray-500 hover:text-gray-800">← Orders</a>
+  <a href="/ui/orders" class="text-sm text-muted hover:text-heading">← Orders</a>
 </div>
 
 <!-- Header -->
 <div class="flex items-start justify-between mb-6">
   <div>
-    <h1 class="text-xl font-semibold text-gray-900">Order #{{ order.id }}</h1>
-    <p class="text-sm text-gray-500 mt-0.5">
+    <h1 class="text-xl font-semibold text-heading">Order #{{ order.id }}</h1>
+    <p class="text-sm text-muted mt-0.5">
       {{ order.action.value | upper }} ·
       Created: {{ order.created_at.strftime("%d.%m.%Y %H:%M") }} UTC
     </p>
   </div>
-  <span class="inline-block px-3 py-1 rounded-full text-sm font-semibold {{ status_colors.get(order.status.value, 'bg-gray-100 text-gray-700') }}">
+  <span class="inline-block px-3 py-1 rounded-full text-sm font-semibold {{ status_colors.get(order.status.value, 'bg-surface-raised text-body') }}">
     {{ order.status.value }}
   </span>
 </div>
@@ -45,61 +45,61 @@
 
 <!-- Metadata Grid -->
 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-  <div class="bg-white rounded-lg border border-gray-200 p-4">
-    <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">User</h2>
+  <div class="bg-surface rounded-lg border border-token-border p-4">
+    <h2 class="text-xs font-semibold text-muted/70 uppercase tracking-wide mb-3">User</h2>
     <dl class="space-y-2 text-sm">
       <div class="flex justify-between">
-        <dt class="text-gray-500">Name</dt>
-        <dd class="font-medium text-gray-900">{{ order.user_name }}</dd>
+        <dt class="text-muted">Name</dt>
+        <dd class="font-medium text-heading">{{ order.user_name }}</dd>
       </div>
       <div class="flex justify-between">
-        <dt class="text-gray-500">E-Mail</dt>
-        <dd class="text-gray-900">{{ order.user_email }}</dd>
+        <dt class="text-muted">E-Mail</dt>
+        <dd class="text-heading">{{ order.user_email }}</dd>
       </div>
       {% if order.owner_name or order.owner_email %}
       <div class="flex justify-between">
-        <dt class="text-gray-500">Owner</dt>
-        <dd class="text-gray-900">{{ order.owner_name or order.owner_email }}</dd>
+        <dt class="text-muted">Owner</dt>
+        <dd class="text-heading">{{ order.owner_name or order.owner_email }}</dd>
       </div>
       {% endif %}
       {% if order.rdp_users %}
       <div class="flex justify-between">
-        <dt class="text-gray-500">RDP-User</dt>
-        <dd class="text-gray-900 text-right">{{ order.rdp_users | join(", ") }}</dd>
+        <dt class="text-muted">RDP-User</dt>
+        <dd class="text-heading text-right">{{ order.rdp_users | join(", ") }}</dd>
       </div>
       {% endif %}
     </dl>
   </div>
 
-  <div class="bg-white rounded-lg border border-gray-200 p-4">
-    <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Asset &amp; Duration</h2>
+  <div class="bg-surface rounded-lg border border-token-border p-4">
+    <h2 class="text-xs font-semibold text-muted/70 uppercase tracking-wide mb-3">Asset &amp; Duration</h2>
     <dl class="space-y-2 text-sm">
       <div class="flex justify-between">
-        <dt class="text-gray-500">VM</dt>
-        <dd class="font-medium text-gray-900">{{ asset_name or "–" }}</dd>
+        <dt class="text-muted">VM</dt>
+        <dd class="font-medium text-heading">{{ asset_name or "–" }}</dd>
       </div>
       <div class="flex justify-between">
-        <dt class="text-gray-500">Asset ID</dt>
-        <dd class="text-gray-900">{{ order.assigned_asset_id or "–" }}</dd>
+        <dt class="text-muted">Asset ID</dt>
+        <dd class="text-heading">{{ order.assigned_asset_id or "–" }}</dd>
       </div>
       <div class="flex justify-between">
-        <dt class="text-gray-500">From</dt>
-        <dd class="text-gray-900">{{ order.requested_from.strftime("%d.%m.%Y") }}</dd>
+        <dt class="text-muted">From</dt>
+        <dd class="text-heading">{{ order.requested_from.strftime("%d.%m.%Y") }}</dd>
       </div>
       <div class="flex justify-between">
-        <dt class="text-gray-500">Until</dt>
-        <dd class="text-gray-900">{{ order.requested_until.strftime("%d.%m.%Y") }}</dd>
+        <dt class="text-muted">Until</dt>
+        <dd class="text-heading">{{ order.requested_until.strftime("%d.%m.%Y") }}</dd>
       </div>
       {% if order.servicenow_ref %}
       <div class="flex justify-between">
-        <dt class="text-gray-500">ServiceNow-Ref</dt>
-        <dd class="font-mono text-gray-900 text-xs">{{ order.servicenow_ref }}</dd>
+        <dt class="text-muted">ServiceNow-Ref</dt>
+        <dd class="font-mono text-heading text-xs">{{ order.servicenow_ref }}</dd>
       </div>
       {% endif %}
       {% if order.snow_req %}
       <div class="flex justify-between">
-        <dt class="text-gray-500">Snow-REQ</dt>
-        <dd class="font-mono text-gray-900 text-xs">{{ order.snow_req }}</dd>
+        <dt class="text-muted">Snow-REQ</dt>
+        <dd class="font-mono text-heading text-xs">{{ order.snow_req }}</dd>
       </div>
       {% endif %}
     </dl>
@@ -108,28 +108,28 @@
 
 <!-- Steps Timeline -->
 <div>
-  <h2 class="text-sm font-semibold text-gray-700 mb-3">
+  <h2 class="text-sm font-semibold text-body mb-3">
     Execution Steps
-    <span class="font-normal text-gray-400">({{ order.steps | length }} Steps)</span>
+    <span class="font-normal text-muted/70">({{ order.steps | length }} Steps)</span>
   </h2>
 
   {% if order.steps %}
   <div class="space-y-2">
     {% for item in steps_with_duration %}
     {% set step = item.step %}
-    <div class="bg-white rounded-lg border border-gray-200 px-4 py-3 flex items-start gap-4">
+    <div class="bg-surface rounded-lg border border-token-border px-4 py-3 flex items-start gap-4">
       <!-- Status badge -->
       <div class="flex-shrink-0 mt-0.5">
-        <span class="inline-block w-20 text-center px-2 py-0.5 rounded text-xs font-semibold {{ step_colors.get(step.status.value, 'bg-gray-100 text-gray-600') }}">
+        <span class="inline-block w-20 text-center px-2 py-0.5 rounded text-xs font-semibold {{ step_colors.get(step.status.value, 'bg-surface-raised text-muted') }}">
           {{ step.status.value }}
         </span>
       </div>
 
       <!-- Step name + details -->
       <div class="flex-1 min-w-0">
-        <p class="text-sm font-medium text-gray-900 font-mono">{{ step.step_name }}</p>
+        <p class="text-sm font-medium text-heading font-mono">{{ step.step_name }}</p>
 
-        <div class="flex flex-wrap gap-x-4 gap-y-0.5 mt-1 text-xs text-gray-500">
+        <div class="flex flex-wrap gap-x-4 gap-y-0.5 mt-1 text-xs text-muted">
           {% if step.started_at %}
           <span>Start: {{ step.started_at.strftime("%H:%M:%S") }}</span>
           {% endif %}
@@ -142,11 +142,11 @@
         {% set log = step.log_output %}
         {% if log.startswith('{') %}
         <!-- Structured JSON Log -->
-        <div class="mt-1.5 rounded bg-gray-50 border border-gray-100 px-2 py-1.5 text-xs">
+        <div class="mt-1.5 rounded bg-surface-raised border border-token-border px-2 py-1.5 text-xs">
           <div class="step-log-structured" data-log="{{ log | e }}"></div>
         </div>
         {% else %}
-        <p class="mt-1.5 text-xs text-gray-600 bg-gray-50 rounded px-2 py-1 font-mono break-all">
+        <p class="mt-1.5 text-xs text-muted bg-surface-raised rounded px-2 py-1 font-mono break-all">
           {{ log }}
         </p>
         {% endif %}
@@ -162,7 +162,7 @@
     {% endfor %}
   </div>
   {% else %}
-  <div class="bg-white rounded-lg border border-gray-200 px-4 py-6 text-center text-sm text-gray-400">
+  <div class="bg-surface rounded-lg border border-token-border px-4 py-6 text-center text-sm text-muted/70">
     No steps recorded.
   </div>
   {% endif %}
@@ -170,34 +170,34 @@
 
 <!-- Admin Actions -->
 {% if order.status.value in ("delivered", "provisioned") %}
-<div id="admin-actions" class="mt-8 bg-white rounded-lg border border-gray-200 p-5">
-  <h2 class="text-sm font-semibold text-gray-700 mb-5">Admin Actions</h2>
+<div id="admin-actions" class="mt-8 bg-surface rounded-lg border border-token-border p-5">
+  <h2 class="text-sm font-semibold text-body mb-5">Admin Actions</h2>
 
   <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 
     <!-- Extend / Modify -->
     <div>
-      <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Extend / Modify</h3>
+      <h3 class="text-xs font-semibold text-muted uppercase tracking-wide mb-3">Extend / Modify</h3>
       <form method="post" action="/ui/orders/{{ order.id }}/change" class="space-y-3">
 
         <div>
-          <label class="block text-xs font-medium text-gray-600 mb-1">Valid until</label>
+          <label class="block text-xs font-medium text-muted mb-1">Valid until</label>
           <input type="date" name="new_until"
                  value="{{ order.requested_until.strftime('%Y-%m-%d') if order.requested_until else '' }}"
-                 class="rounded border border-gray-300 text-sm px-3 py-1.5 w-full focus:outline-none focus:ring-1 focus:ring-blue-400">
+                 class="rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-1.5 w-full focus:outline-none focus:ring-1 focus:ring-blue-500">
         </div>
 
         {% if asset_type and asset_type.allow_user_lists %}
         <div>
-          <label class="block text-xs font-medium text-gray-600 mb-1">RDP Users <span class="text-gray-400">(one per line)</span></label>
+          <label class="block text-xs font-medium text-muted mb-1">RDP Users <span class="text-muted/70">(one per line)</span></label>
           <textarea name="rdp_users" rows="3"
-                    class="rounded border border-gray-300 text-sm px-3 py-1.5 w-full font-mono focus:outline-none focus:ring-1 focus:ring-blue-400"
+                    class="rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-1.5 w-full font-mono focus:outline-none focus:ring-1 focus:ring-blue-500"
                     >{{ order.rdp_users | join('\n') if order.rdp_users else '' }}</textarea>
         </div>
         <div>
-          <label class="block text-xs font-medium text-gray-600 mb-1">Admin Users <span class="text-gray-400">(one per line)</span></label>
+          <label class="block text-xs font-medium text-muted mb-1">Admin Users <span class="text-muted/70">(one per line)</span></label>
           <textarea name="admin_users" rows="3"
-                    class="rounded border border-gray-300 text-sm px-3 py-1.5 w-full font-mono focus:outline-none focus:ring-1 focus:ring-blue-400"
+                    class="rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-1.5 w-full font-mono focus:outline-none focus:ring-1 focus:ring-blue-500"
                     >{{ order.admin_users | join('\n') if order.admin_users else '' }}</textarea>
         </div>
         {% endif %}
@@ -211,8 +211,8 @@
 
     <!-- Cancel -->
     <div>
-      <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Cancel</h3>
-      <p class="text-xs text-gray-500 mb-3">
+      <h3 class="text-xs font-semibold text-muted uppercase tracking-wide mb-3">Cancel</h3>
+      <p class="text-xs text-muted mb-3">
         Removes the assignment and returns the asset to the pool (per deprovision policy).
       </p>
       <form method="post" action="/ui/orders/{{ order.id }}/cancel"
@@ -238,8 +238,8 @@ document.querySelectorAll('.step-log-structured').forEach(el => {
 
     // ── Header bar ──────────────────────────────────────────────────────────
     let html = `<div class="flex items-center gap-2 mb-2 text-xs">`;
-    html += `<span class="font-mono font-semibold text-gray-700">${esc(moduleName)}</span>`;
-    if (dur)     html += `<span class="text-gray-400 font-sans">${esc(dur)}</span>`;
+    html += `<span class="font-mono font-semibold text-body">${esc(moduleName)}</span>`;
+    if (dur)     html += `<span class="text-muted/70 font-sans">${esc(dur)}</span>`;
     const statusCls = success ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700';
     const statusTxt = success ? 'success' : 'failed';
     html += `<span class="ml-auto px-1.5 py-0.5 rounded ${statusCls} font-sans">${statusTxt}</span>`;
@@ -248,11 +248,11 @@ document.querySelectorAll('.step-log-structured').forEach(el => {
     // ── Input params ─────────────────────────────────────────────────────────
     if (log.input && Object.keys(log.input).length) {
       html += `<div class="mb-1.5">`;
-      html += `<div class="text-xs text-gray-400 mb-0.5 font-sans uppercase tracking-wide">Parameter</div>`;
+      html += `<div class="text-xs text-muted/70 mb-0.5 font-sans uppercase tracking-wide">Parameter</div>`;
       html += `<div class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-xs font-mono">`;
       for (const [k, v] of Object.entries(log.input)) {
         const val = Array.isArray(v) ? (v.length ? v.join(', ') : '[ ]') : String(v ?? '');
-        html += `<span class="text-gray-400">${esc(k)}</span><span class="text-gray-700 truncate">${esc(val)}</span>`;
+        html += `<span class="text-muted/70">${esc(k)}</span><span class="text-body truncate">${esc(val)}</span>`;
       }
       html += `</div></div>`;
     }
@@ -261,7 +261,7 @@ document.querySelectorAll('.step-log-structured').forEach(el => {
     const stdout = log.stdout || log.output?.output || '';
     if (stdout) {
       html += `<div class="mt-1.5 rounded bg-gray-900 px-3 py-2">`;
-      html += `<div class="text-xs text-gray-500 mb-1 font-sans uppercase tracking-wide">stdout</div>`;
+      html += `<div class="text-xs text-muted mb-1 font-sans uppercase tracking-wide">stdout</div>`;
       html += `<pre class="text-green-400 text-xs font-mono whitespace-pre-wrap break-all leading-relaxed">${esc(stdout)}</pre>`;
       html += `</div>`;
     }

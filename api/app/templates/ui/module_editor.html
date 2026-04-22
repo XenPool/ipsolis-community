@@ -4,10 +4,10 @@
 
 {% block content %}
 <div class="mb-4">
-  <a href="/ui/modules" class="text-sm text-gray-500 hover:text-gray-800">← Module</a>
+  <a href="/ui/modules" class="text-sm text-muted hover:text-heading">← Module</a>
 </div>
 
-<h1 class="text-lg font-semibold text-gray-900 mb-4">
+<h1 class="text-lg font-semibold text-heading mb-4">
   {% if module %}Edit module: {{ module.name }}{% else %}New module{% endif %}
 </h1>
 
@@ -17,25 +17,25 @@
   <div class="space-y-4">
 
     <!-- Basic info -->
-    <div class="bg-white rounded-lg border border-gray-200 p-4 space-y-3">
+    <div class="bg-surface rounded-lg border border-token-border p-4 space-y-3">
       <div>
-        <label class="block text-xs font-medium text-gray-600 mb-1">Name <span class="text-red-500">*</span></label>
+        <label class="block text-xs font-medium text-muted mb-1">Name <span class="text-red-500">*</span></label>
         <input type="text" id="mod-name" required
                value="{{ module.name if module else '' }}"
                placeholder="z.B. Set-RDPGroup"
-               class="w-full rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400">
+               class="w-full rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500">
       </div>
       <div>
-        <label class="block text-xs font-medium text-gray-600 mb-1">Beschreibung</label>
+        <label class="block text-xs font-medium text-muted mb-1">Beschreibung</label>
         <input type="text" id="mod-desc"
                value="{{ module.description if module and module.description else '' }}"
                placeholder="Was macht dieses Modul?"
-               class="w-full rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400">
+               class="w-full rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500">
       </div>
       <div>
-        <label class="block text-xs font-medium text-gray-600 mb-1">Script-Typ</label>
+        <label class="block text-xs font-medium text-muted mb-1">Script-Typ</label>
         <select id="mod-type"
-                class="w-full rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400">
+                class="w-full rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500">
           <option value="powershell" {% if not module or module.script_type == 'powershell' %}selected{% endif %}>PowerShell</option>
           <option value="python" {% if module and module.script_type == 'python' %}selected{% endif %}>Python</option>
           <option value="bash" {% if module and module.script_type == 'bash' %}selected{% endif %}>Bash</option>
@@ -44,15 +44,15 @@
       <div class="flex items-center gap-2">
         <input type="checkbox" id="mod-active"
                {% if not module or module.is_active %}checked{% endif %}
-               class="rounded border-gray-300">
-        <label for="mod-active" class="text-sm text-gray-700 cursor-pointer">Aktiv</label>
+               class="rounded border-token-border">
+        <label for="mod-active" class="text-sm text-body cursor-pointer">Aktiv</label>
       </div>
     </div>
 
     <!-- Parameter schema -->
-    <div class="bg-white rounded-lg border border-gray-200 p-4">
+    <div class="bg-surface rounded-lg border border-token-border p-4">
       <div class="flex items-center justify-between mb-3">
-        <label class="text-xs font-semibold text-gray-700">Parameter</label>
+        <label class="text-xs font-semibold text-body">Parameter</label>
         <div class="flex items-center gap-3">
           <button type="button" onclick="parseParamsFromScript()"
                   class="text-xs text-blue-600 hover:underline" title="Parse param() block from script">↻ Parse from script</button>
@@ -61,7 +61,7 @@
         </div>
       </div>
       <div id="parse-result" class="text-xs mb-2"></div>
-      <div class="space-y-1 text-xs text-gray-400 grid grid-cols-12 gap-1 mb-1 px-0.5">
+      <div class="space-y-1 text-xs text-muted/70 grid grid-cols-12 gap-1 mb-1 px-0.5">
         <span class="col-span-4">Name</span>
         <span class="col-span-3">Typ</span>
         <span class="col-span-2 text-center">Pflicht</span>
@@ -72,9 +72,9 @@
           {% for p in module.param_schema %}
           <div class="param-row grid grid-cols-12 gap-1 items-center">
             <input type="text" name="param_name[]" value="{{ p.name }}" placeholder="Name"
-                   class="col-span-4 rounded border border-gray-300 text-xs px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400">
+                   class="col-span-4 rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-xs px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500">
             <select name="param_type[]"
-                    class="col-span-3 rounded border border-gray-300 text-xs px-1 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400">
+                    class="col-span-3 rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-xs px-1 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500">
               <option value="string" {% if p.type == 'string' %}selected{% endif %}>string</option>
               <option value="int" {% if p.type == 'int' %}selected{% endif %}>int</option>
               <option value="bool" {% if p.type == 'bool' %}selected{% endif %}>bool</option>
@@ -83,19 +83,19 @@
             <div class="col-span-2 flex justify-center">
               <input type="checkbox" name="param_required[]" value="1"
                      {% if p.required %}checked{% endif %}
-                     class="rounded border-gray-300">
+                     class="rounded border-token-border">
             </div>
             <input type="text" name="param_default[]" value="{{ p.default or '' }}" placeholder="–"
-                   class="col-span-2 rounded border border-gray-300 text-xs px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400">
+                   class="col-span-2 rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-xs px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500">
             <button type="button" onclick="this.closest('.param-row').remove()"
                     class="col-span-1 text-red-400 hover:text-red-600 text-base leading-none text-center">×</button>
           </div>
           {% endfor %}
         {% endif %}
       </div>
-      <p class="mt-2 text-xs text-gray-400">
-        Parameters are available as <code class="font-mono bg-gray-100 px-1 rounded">$PARAMS.name</code> or via <code class="font-mono bg-gray-100 px-1 rounded">param()</code> block.
-        Global variables and hosting config are accessible as <code class="font-mono bg-gray-100 px-1 rounded">$VARS.'key'</code>.
+      <p class="mt-2 text-xs text-muted/70">
+        Parameters are available as <code class="font-mono bg-surface-raised px-1 rounded">$PARAMS.name</code> or via <code class="font-mono bg-surface-raised px-1 rounded">param()</code> block.
+        Global variables and hosting config are accessible as <code class="font-mono bg-surface-raised px-1 rounded">$VARS.'key'</code>.
       </p>
     </div>
 
@@ -113,16 +113,16 @@
   <div class="lg:col-span-2 flex flex-col gap-3" style="min-height: 600px;">
 
     <!-- Editor header -->
-    <div class="flex items-center justify-between bg-white rounded border border-gray-200 px-3 py-2">
+    <div class="flex items-center justify-between bg-surface rounded border border-token-border px-3 py-2">
       <div class="flex items-center gap-2">
-        <span class="text-sm text-gray-600 font-mono" id="editor-lang-label">
+        <span class="text-sm text-muted font-mono" id="editor-lang-label">
           {% if module %}{{ module.script_type | title }}{% else %}PowerShell{% endif %}
         </span>
         <span id="editor-dirty-dot" class="hidden w-2 h-2 rounded-full bg-orange-400" title="Unsaved changes"></span>
         <button onclick="editorUndo()" title="Undo (Ctrl+Z)"
-                class="px-1.5 py-0.5 rounded text-gray-500 hover:bg-gray-100 hover:text-gray-800 text-sm leading-none">↩</button>
+                class="px-1.5 py-0.5 rounded text-muted hover:bg-surface-raised hover:text-heading text-sm leading-none">↩</button>
         <button onclick="editorRedo()" title="Wiederholen (Ctrl+Y)"
-                class="px-1.5 py-0.5 rounded text-gray-500 hover:bg-gray-100 hover:text-gray-800 text-sm leading-none">↪</button>
+                class="px-1.5 py-0.5 rounded text-muted hover:bg-surface-raised hover:text-heading text-sm leading-none">↪</button>
       </div>
       <div class="relative flex items-center gap-3">
         <button onclick="toggleVarPicker(event)"
@@ -130,40 +130,40 @@
           <span>§</span> Insert variables
         </button>
         <!-- Variable picker dropdown -->
-        <div id="var-picker" class="hidden absolute right-0 top-8 w-72 bg-white border border-gray-200 rounded-lg shadow-xl z-20 text-xs overflow-hidden">
-          <div class="px-3 py-2 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
-            <span class="font-semibold text-gray-700">Insert variable</span>
+        <div id="var-picker" class="hidden absolute right-0 top-8 w-72 bg-surface border border-token-border rounded-lg shadow-xl z-20 text-xs overflow-hidden">
+          <div class="px-3 py-2 bg-surface-raised border-b border-token-border flex justify-between items-center">
+            <span class="font-semibold text-body">Insert variable</span>
             <button onclick="document.getElementById('var-picker').classList.add('hidden')"
-                    class="text-gray-400 hover:text-gray-600 text-base leading-none">×</button>
+                    class="text-muted/70 hover:text-muted text-base leading-none">×</button>
           </div>
-          <div id="var-picker-params" class="border-b border-gray-100">
-            <div class="px-3 py-1.5 bg-gray-50 text-xs text-gray-500 uppercase tracking-wide font-medium">PARAMS (lokal)</div>
+          <div id="var-picker-params" class="border-b border-token-border">
+            <div class="px-3 py-1.5 bg-surface-raised text-xs text-muted uppercase tracking-wide font-medium">PARAMS (lokal)</div>
             <div id="var-picker-params-list" class="py-1"></div>
           </div>
-          <div id="var-picker-vars" class="border-b border-gray-100">
-            <div class="px-3 py-1.5 bg-gray-50 text-xs text-gray-500 uppercase tracking-wide font-medium">VARS (global)</div>
+          <div id="var-picker-vars" class="border-b border-token-border">
+            <div class="px-3 py-1.5 bg-surface-raised text-xs text-muted uppercase tracking-wide font-medium">VARS (global)</div>
             <div id="var-picker-vars-list" class="py-1 max-h-48 overflow-y-auto"></div>
           </div>
           <div id="var-picker-ctx">
-            <div class="px-3 py-1.5 bg-gray-50 text-xs text-gray-500 uppercase tracking-wide font-medium">CTX (Runbook-Kontext)</div>
+            <div class="px-3 py-1.5 bg-surface-raised text-xs text-muted uppercase tracking-wide font-medium">CTX (Runbook-Kontext)</div>
             <div id="var-picker-ctx-list" class="py-1 max-h-48 overflow-y-auto"></div>
           </div>
         </div>
-        <span class="text-xs text-gray-400">Script-Inhalt</span>
+        <span class="text-xs text-muted/70">Script-Inhalt</span>
       </div>
     </div>
 
     <!-- Monaco editor -->
-    <div class="flex-1 rounded border border-gray-200 overflow-hidden bg-gray-900" style="min-height:400px;">
+    <div class="flex-1 rounded border border-token-border overflow-hidden bg-gray-900" style="min-height:400px;">
       <div id="monaco-editor" class="w-full h-full" style="min-height:400px;"></div>
     </div>
 
     <!-- Test runner -->
-    <div class="bg-white rounded border border-gray-200 p-3">
+    <div class="bg-surface rounded border border-token-border p-3">
       <div class="flex items-center gap-3 mb-2">
-        <span class="text-xs font-semibold text-gray-700">Testlauf</span>
+        <span class="text-xs font-semibold text-body">Testlauf</span>
         <input id="test-params-input" type="text" placeholder='{"param1": "value1"}'
-               class="flex-1 rounded border border-gray-300 text-xs font-mono px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400">
+               class="flex-1 rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-xs font-mono px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500">
         <button onclick="runTest()"
                 class="px-3 py-1.5 bg-green-600 text-white text-xs font-medium rounded hover:bg-green-700 whitespace-nowrap">
           ▶ Run
@@ -172,7 +172,7 @@
       <div id="test-result-panel" class="hidden mt-3 rounded overflow-hidden border border-gray-700 text-xs font-mono">
         <div id="test-result-status" class="px-3 py-1.5 flex items-center gap-3 bg-gray-800 text-gray-200 text-xs"></div>
         <div id="test-stdout-wrap">
-          <div class="px-2 py-1 bg-gray-700 text-gray-400 text-xs uppercase tracking-wide">stdout</div>
+          <div class="px-2 py-1 bg-gray-700 text-muted/70 text-xs uppercase tracking-wide">stdout</div>
           <pre id="test-stdout" class="bg-gray-900 text-green-300 px-3 py-2 overflow-auto max-h-64 whitespace-pre-wrap"></pre>
         </div>
         <div id="test-stderr-wrap" class="hidden">
@@ -260,7 +260,7 @@ async function parseParamsFromScript() {
     resultEl.innerHTML = '<span class="text-amber-600">Editor is empty.</span>';
     return;
   }
-  resultEl.innerHTML = '<span class="text-gray-400">Parsing…</span>';
+  resultEl.innerHTML = '<span class="text-muted/70">Parsing…</span>';
   try {
     var resp = await fetch('/admin/script-modules/parse-params', {
       method: 'POST',
@@ -304,19 +304,19 @@ function addParamRow() {
   row.className = 'param-row grid grid-cols-12 gap-1 items-center';
   row.innerHTML =
     '<input type="text" name="param_name[]" placeholder="Name"'
-    + ' class="col-span-4 rounded border border-gray-300 text-xs px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400">'
+    + ' class="col-span-4 rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-xs px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500">'
     + '<select name="param_type[]"'
-    + ' class="col-span-3 rounded border border-gray-300 text-xs px-1 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400">'
+    + ' class="col-span-3 rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-xs px-1 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500">'
     + '<option value="string">string</option>'
     + '<option value="int">int</option>'
     + '<option value="bool">bool</option>'
     + '<option value="json">json</option>'
     + '</select>'
     + '<div class="col-span-2 flex justify-center">'
-    + '<input type="checkbox" name="param_required[]" value="1" class="rounded border-gray-300">'
+    + '<input type="checkbox" name="param_required[]" value="1" class="rounded border-token-border">'
     + '</div>'
     + '<input type="text" name="param_default[]" placeholder="\u2013"'
-    + ' class="col-span-2 rounded border border-gray-300 text-xs px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400">'
+    + ' class="col-span-2 rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-xs px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500">'
     + '<button type="button" onclick="this.closest(\'.param-row\').remove()"'
     + ' class="col-span-1 text-red-400 hover:text-red-600 text-base leading-none text-center">\xd7</button>';
   document.getElementById('param-rows').appendChild(row);
@@ -402,7 +402,7 @@ function _renderTestResult(data) {
   document.getElementById('test-result-status').innerHTML =
     (ok ? '<span class="text-green-400 font-semibold">✓ Erfolg</span>'
         : '<span class="text-red-400 font-semibold">✗ Error</span>')
-    + '<span class="text-gray-500">' + ms + ' ms</span>';
+    + '<span class="text-muted">' + ms + ' ms</span>';
 
   // Stdout: prefer out.stdout, then string output field, then error message
   var stdout = (out.stdout != null ? out.stdout : null)
@@ -435,7 +435,7 @@ function _varRow(label, snippet, title) {
   return '<button type="button" onclick="insertVar(' + escaped + ')"'
     + ' class="w-full text-left px-3 py-1.5 hover:bg-blue-50 flex items-center gap-2 group">'
     + '<code class="text-blue-700 font-mono bg-blue-50 group-hover:bg-blue-100 px-1 rounded flex-1 truncate">' + snippet + '</code>'
-    + '<span class="text-gray-400 text-xs shrink-0">' + label + '</span>'
+    + '<span class="text-muted/70 text-xs shrink-0">' + label + '</span>'
     + '</button>';
 }
 
@@ -450,7 +450,7 @@ function buildVarPicker() {
     var snippet = isPs ? ('$PARAMS.' + name) : ("PARAMS['" + name + "']");
     html += _varRow(name, snippet, 'param');
   });
-  paramsList.innerHTML = html || '<div class="px-3 py-1.5 text-gray-400 italic">Keine Parameter definiert</div>';
+  paramsList.innerHTML = html || '<div class="px-3 py-1.5 text-muted/70 italic">Keine Parameter definiert</div>';
 
   // VARS (global) — user-defined global_vars + hosting infrastructure from app_config
   var hostingVars = [
@@ -472,7 +472,7 @@ function buildVarPicker() {
     var snippet = isPs ? ("$VARS.'" + v.key + "'") : ("VARS['" + v.key + "']");
     html += _varRow(v.label, snippet, 'global');
   });
-  varsList.innerHTML = html || '<div class="px-3 py-1.5 text-gray-400 italic">Keine globalen Variablen</div>';
+  varsList.innerHTML = html || '<div class="px-3 py-1.5 text-muted/70 italic">Keine globalen Variablen</div>';
 
   var ctxVars = [
     'asset_name', 'asset_id', 'order_id',
@@ -529,7 +529,7 @@ async function runTest() {
 
   // Show panel with running indicator
   document.getElementById('test-result-panel').classList.remove('hidden');
-  document.getElementById('test-result-status').innerHTML = '<span class="text-gray-400 animate-pulse">⏳ Running…</span>';
+  document.getElementById('test-result-status').innerHTML = '<span class="text-muted/70 animate-pulse">⏳ Running…</span>';
   document.getElementById('test-stdout').textContent = '';
   document.getElementById('test-stderr-wrap').classList.add('hidden');
 
@@ -565,7 +565,7 @@ async function runTest() {
       return;
     }
     document.getElementById('test-result-status').innerHTML =
-      '<span class="text-gray-400 animate-pulse">⏳ ' + pollData.status + '…</span>';
+      '<span class="text-muted/70 animate-pulse">⏳ ' + pollData.status + '…</span>';
   }
   _renderTestResult({ success: false, output: { success: false, error: 'Timeout – task still running. Check Flower.' } });
 }

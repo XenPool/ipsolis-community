@@ -4,56 +4,56 @@
 
 {% block content %}
 <div class="mb-6">
-  <a href="/ui/asset-types" class="text-sm text-gray-500 hover:text-gray-800">← Asset Types</a>
+  <a href="/ui/asset-types" class="text-sm text-muted hover:text-heading">← Asset Types</a>
 </div>
 
-<h1 class="text-lg font-semibold text-gray-900 mb-6">
+<h1 class="text-lg font-semibold text-heading mb-6">
   {% if asset_type %}Edit Asset Type: {{ asset_type.name }}{% else %}New Asset Type{% endif %}
 </h1>
 
-<div class="bg-white rounded-lg border border-gray-200 p-6 max-w-2xl">
+<div class="bg-surface rounded-lg border border-token-border p-6 max-w-2xl">
   <form id="at-form" class="space-y-6">
 
     <!-- Name + Description -->
     <div class="grid grid-cols-1 gap-4">
       <div>
-        <label class="block text-xs font-medium text-gray-600 mb-1">Name <span class="text-red-500">*</span></label>
+        <label class="block text-xs font-medium text-muted mb-1">Name <span class="text-red-500">*</span></label>
         <input type="text" name="name" required
                value="{{ asset_type.name if asset_type else '' }}"
                placeholder="e.g. Business VDI"
-               class="w-full rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400">
+               class="w-full rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500">
       </div>
       <div>
-        <label class="block text-xs font-medium text-gray-600 mb-1">Description</label>
+        <label class="block text-xs font-medium text-muted mb-1">Description</label>
         <input type="text" name="description"
                value="{{ asset_type.description if asset_type else '' }}"
                placeholder="Short description"
-               class="w-full rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400">
+               class="w-full rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500">
       </div>
     </div>
 
     <!-- Logo -->
     <div>
-      <label class="block text-xs font-medium text-gray-600 mb-1">Tile Logo</label>
-      <p class="text-xs text-gray-400 mb-2">
+      <label class="block text-xs font-medium text-muted mb-1">Tile Logo</label>
+      <p class="text-xs text-muted/70 mb-2">
         Shown on the portal "Request Access" tile. Optimal size: 160 x 40 px (landscape). PNG or SVG with transparent background, max 500 KB.
       </p>
-      <div id="at-logo-preview" class="mb-2 p-2 rounded border border-gray-200 bg-gray-50 min-h-[48px] flex items-center {% if not (asset_type and asset_type.logo) %}hidden{% endif %}">
+      <div id="at-logo-preview" class="mb-2 p-2 rounded border border-token-border bg-surface-raised min-h-[48px] flex items-center {% if not (asset_type and asset_type.logo) %}hidden{% endif %}">
         <img id="at-logo-img"
              src="{% if asset_type and asset_type.logo %}/admin/asset-types/{{ asset_type.id }}/logo?v={{ range(1, 999999) | random }}{% endif %}"
              style="max-height: 40px; max-width: 200px;" alt="Logo">
         <button type="button" onclick="removeAtLogo()" class="ml-3 text-xs text-red-500 hover:text-red-700">Remove</button>
       </div>
       <input type="file" id="at-logo-file" accept="image/png,image/jpeg,image/gif,image/svg+xml,image/webp"
-             class="block text-sm text-gray-600
-                    file:mr-3 file:py-1 file:px-3 file:rounded file:border file:border-gray-300
-                    file:text-xs file:font-medium file:bg-white file:text-gray-700 hover:file:bg-gray-50 file:cursor-pointer">
+             class="block text-sm text-muted
+                    file:mr-3 file:py-1 file:px-3 file:rounded file:border file:border-token-border
+                    file:text-xs file:font-medium file:bg-surface file:text-body hover:file:bg-surface-raised file:cursor-pointer">
       <input type="hidden" id="at-logo-data" name="logo" value="">
     </div>
 
     <!-- Category -->
     <div>
-      <label class="block text-xs font-medium text-gray-600 mb-2">Category</label>
+      <label class="block text-xs font-medium text-muted mb-2">Category</label>
       {% set categories = [
         ("platform_access",       "VDI / Server / Cloud",          "VDI, Server, Cloud Workloads"),
         ("application_access",    "Business & SaaS Apps",          "Business & SaaS applications"),
@@ -63,15 +63,15 @@
       ] %}
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
         {% for cat_val, cat_short, cat_desc in categories %}
-        <label class="relative flex cursor-pointer rounded-lg border border-gray-200 p-3 hover:border-blue-400 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50"
+        <label class="relative flex cursor-pointer rounded-lg border border-token-border p-3 hover:border-blue-400 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50 dark:has-[:checked]:bg-blue-500/20 has-[:checked]:[&_p]:text-blue-900 dark:has-[:checked]:[&_p]:text-blue-200"
                title="{{ cat_desc }}">
           <input type="radio" name="category" value="{{ cat_val }}"
                  {% if asset_type and (asset_type.category.value == cat_val or asset_type.category == cat_val) %}checked
                  {% elif not asset_type and cat_val == 'platform_access' %}checked{% endif %}
                  class="sr-only" onchange="onCategoryChange()">
           <div>
-            <p class="text-sm font-medium text-gray-900">{{ cat_short }}</p>
-            <p class="text-xs text-gray-400 mt-0.5">{{ cat_desc }}</p>
+            <p class="text-sm font-medium text-heading">{{ cat_short }}</p>
+            <p class="text-xs text-muted/70 mt-0.5">{{ cat_desc }}</p>
           </div>
         </label>
         {% endfor %}
@@ -80,36 +80,36 @@
 
     <!-- Assignment Model -->
     <div>
-      <label class="block text-xs font-medium text-gray-600 mb-2">Assignment Model</label>
+      <label class="block text-xs font-medium text-muted mb-2">Assignment Model</label>
       <div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
 
-        <label class="relative flex cursor-pointer rounded-lg border border-gray-200 p-3 hover:border-blue-400 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
+        <label class="relative flex cursor-pointer rounded-lg border border-token-border p-3 hover:border-blue-400 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50 dark:has-[:checked]:bg-blue-500/20 has-[:checked]:[&_p]:text-blue-900 dark:has-[:checked]:[&_p]:text-blue-200">
           <input type="radio" name="assignment_model" value="assigned_personal"
                  {% if not asset_type or asset_type.assignment_model == 'assigned_personal' %}checked{% endif %}
                  class="sr-only">
           <div>
-            <p class="text-sm font-medium text-gray-900">Personal</p>
-            <p class="text-xs text-gray-400 mt-0.5">Unique instance, 1:1 assigned (personal VDI, laptop)</p>
+            <p class="text-sm font-medium text-heading">Personal</p>
+            <p class="text-xs text-muted/70 mt-0.5">Unique instance, 1:1 assigned (personal VDI, laptop)</p>
           </div>
         </label>
 
-        <label class="relative flex cursor-pointer rounded-lg border border-gray-200 p-3 hover:border-blue-400 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
+        <label class="relative flex cursor-pointer rounded-lg border border-token-border p-3 hover:border-blue-400 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50 dark:has-[:checked]:bg-blue-500/20 has-[:checked]:[&_p]:text-blue-900 dark:has-[:checked]:[&_p]:text-blue-200">
           <input type="radio" name="assignment_model" value="dedicated_shared"
                  {% if asset_type and asset_type.assignment_model == 'dedicated_shared' %}checked{% endif %}
                  class="sr-only">
           <div>
-            <p class="text-sm font-medium text-gray-900">Shared</p>
-            <p class="text-xs text-gray-400 mt-0.5">Instance exists, no fixed owner (jump host, shared workstation)</p>
+            <p class="text-sm font-medium text-heading">Shared</p>
+            <p class="text-xs text-muted/70 mt-0.5">Instance exists, no fixed owner (jump host, shared workstation)</p>
           </div>
         </label>
 
-        <label class="relative flex cursor-pointer rounded-lg border border-gray-200 p-3 hover:border-blue-400 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
+        <label class="relative flex cursor-pointer rounded-lg border border-token-border p-3 hover:border-blue-400 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50 dark:has-[:checked]:bg-blue-500/20 has-[:checked]:[&_p]:text-blue-900 dark:has-[:checked]:[&_p]:text-blue-200">
           <input type="radio" name="assignment_model" value="capacity_pooled"
                  {% if asset_type and asset_type.assignment_model == 'capacity_pooled' %}checked{% endif %}
                  class="sr-only">
           <div>
-            <p class="text-sm font-medium text-gray-900">Pooled</p>
-            <p class="text-xs text-gray-400 mt-0.5">Pool / license slot without dedicated instance (RDS, SaaS)</p>
+            <p class="text-sm font-medium text-heading">Pooled</p>
+            <p class="text-xs text-muted/70 mt-0.5">Pool / license slot without dedicated instance (RDS, SaaS)</p>
           </div>
         </label>
 
@@ -117,27 +117,27 @@
     </div>
 
     <!-- Personal assignment (only for assigned_personal) -->
-    <div id="personal-provision-section" class="{% if not asset_type or asset_type.assignment_model != 'assigned_personal' %}hidden{% endif %} border border-blue-100 rounded-lg p-4 bg-blue-50/40">
-      <label class="block text-xs font-semibold text-blue-700 mb-3">Personal Assignment
-        <span class="font-normal text-blue-500 ml-1">– only for assignment model "Personal"</span>
+    <div id="personal-provision-section" class="{% if not asset_type or asset_type.assignment_model != 'assigned_personal' %}hidden{% endif %} border border-blue-100 dark:border-blue-500/30 rounded-lg p-4 bg-blue-50/40 dark:bg-blue-500/10">
+      <label class="block text-xs font-semibold text-blue-700 dark:text-blue-300 mb-3">Personal Assignment
+        <span class="font-normal text-blue-500 dark:text-blue-400 ml-1">– only for assignment model "Personal"</span>
       </label>
 
       <div class="mb-3">
-        <label class="block text-xs font-medium text-gray-600 mb-2">Provisioning Strategy</label>
+        <label class="block text-xs font-medium text-muted mb-2">Provisioning Strategy</label>
         {% set ps_opts = [
           ("assign_existing_free",     "Assign free instance",    "Reserve the first available instance from the pool"),
           ("create_new",               "Create new instance",     "Create a new VM (stub – implement via runbook)"),
         ] %}
         <div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
           {% for ps_val, ps_short, ps_desc in ps_opts %}
-          <label class="relative flex cursor-pointer rounded-lg border border-gray-200 bg-white p-3 hover:border-blue-400 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
+          <label class="relative flex cursor-pointer rounded-lg border border-token-border bg-surface p-3 hover:border-blue-400 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50 dark:has-[:checked]:bg-blue-500/20 has-[:checked]:[&_p]:text-blue-900 dark:has-[:checked]:[&_p]:text-blue-200">
             <input type="radio" name="personal_provisioning_strategy" value="{{ ps_val }}"
                    {% if asset_type and asset_type.personal_provisioning_strategy == ps_val %}checked
                    {% elif not asset_type and ps_val == 'assign_existing_free' %}checked{% endif %}
                    class="sr-only" onchange="onProvisioningStrategyChange()">
             <div>
-              <p class="text-sm font-medium text-gray-900">{{ ps_short }}</p>
-              <p class="text-xs text-gray-400 mt-0.5">{{ ps_desc }}</p>
+              <p class="text-sm font-medium text-heading">{{ ps_short }}</p>
+              <p class="text-xs text-muted/70 mt-0.5">{{ ps_desc }}</p>
             </div>
           </label>
           {% endfor %}
@@ -146,135 +146,135 @@
 
       <div class="flex flex-wrap gap-4 items-end">
         <div id="naming-pattern-row" class="{% if not asset_type or asset_type.personal_provisioning_strategy != 'create_new' %}hidden{% endif %}">
-          <label class="block text-xs text-gray-500 mb-1">Naming Pattern
-            <span class="text-gray-400">(optional)</span>
+          <label class="block text-xs text-muted mb-1">Naming Pattern
+            <span class="text-muted/70">(optional)</span>
             <span class="ml-1 text-blue-500" title="Available as {{asset_type.naming_pattern}} in runbook step parameters">– used in runbook as <code class="font-mono">{{'{{'}}asset_type.naming_pattern{{'}}'}}</code></span>
           </label>
           <input type="text" name="naming_pattern"
                  value="{{ asset_type.naming_pattern if asset_type and asset_type.naming_pattern else '' }}"
                  placeholder="e.g. VDI-{sam} or LAP-{employeeId}"
-                 class="w-64 rounded border border-gray-300 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400">
+                 class="w-64 rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500">
         </div>
         <div>
-          <label class="block text-xs text-gray-500 mb-1">Max. Instances/User</label>
+          <label class="block text-xs text-muted mb-1">Max. Instances/User</label>
           <input type="number" name="max_per_user" min="1"
                  value="{{ asset_type.max_per_user if asset_type else 1 }}"
-                 class="w-20 rounded border border-gray-300 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400">
+                 class="w-20 rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500">
         </div>
       </div>
     </div>
 
     <!-- Pool capacity (only for capacity_pooled) -->
     <div id="capacity-row" class="{% if not asset_type or asset_type.assignment_model != 'capacity_pooled' %}hidden{% endif %}">
-      <label class="block text-xs font-medium text-gray-600 mb-1">Pool Capacity (max. concurrent access slots)</label>
+      <label class="block text-xs font-medium text-muted mb-1">Pool Capacity (max. concurrent access slots)</label>
       <input type="number" name="pool_capacity" min="1"
              value="{{ asset_type.pool_capacity if asset_type else '' }}"
              placeholder="e.g. 20"
-             class="w-32 rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400">
+             class="w-32 rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500">
     </div>
 
     <!-- Lifecycle -->
     <div>
-      <label class="block text-xs font-medium text-gray-600 mb-2">Lifecycle Settings (optional)</label>
+      <label class="block text-xs font-medium text-muted mb-2">Lifecycle Settings (optional)</label>
       <div class="flex flex-wrap gap-4 items-end">
         <div>
-          <label class="block text-xs text-gray-500 mb-1">Default Duration (days)</label>
+          <label class="block text-xs text-muted mb-1">Default Duration (days)</label>
           <input type="number" name="lifecycle_ttl_days" min="1"
                  value="{{ asset_type.lifecycle_ttl_days if asset_type and asset_type.lifecycle_ttl_days else '' }}"
                  placeholder="e.g. 90"
-                 class="w-28 rounded border border-gray-300 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400">
+                 class="w-28 rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500">
         </div>
         <div>
-          <label class="block text-xs text-gray-500 mb-1" title="Days before expiry to email the user. Empty = no reminder.">
+          <label class="block text-xs text-muted mb-1" title="Days before expiry to email the user. Empty = no reminder.">
             Reminder (days before expiry)
           </label>
           <input type="number" name="lifecycle_reminder_days" min="1"
                  value="{{ asset_type.lifecycle_reminder_days if asset_type and asset_type.lifecycle_reminder_days else '' }}"
                  placeholder="e.g. 7"
-                 class="w-28 rounded border border-gray-300 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400">
+                 class="w-28 rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500">
         </div>
-        <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer pb-1">
+        <label class="flex items-center gap-2 text-sm text-body cursor-pointer pb-1">
           <input type="checkbox" name="lifecycle_renewable"
                  {% if not asset_type or asset_type.lifecycle_renewable %}checked{% endif %}
-                 class="rounded border-gray-300">
+                 class="rounded border-token-border">
           Renewable
         </label>
         <div id="allow-user-lists-row" class="flex flex-col gap-1">
-          <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer pb-1">
+          <label class="flex items-center gap-2 text-sm text-body cursor-pointer pb-1">
             <input type="checkbox" id="allow-rdp-users-cb" name="allow_rdp_users"
                    {% if asset_type and asset_type.allow_rdp_users %}checked{% endif %}
                    onchange="updatePrincipalSourceOptions()"
-                   class="rounded border-gray-300">
+                   class="rounded border-token-border">
             Enable RDP user list
-            <span class="text-xs text-gray-400">(users added to RDP group)</span>
+            <span class="text-xs text-muted/70">(users added to RDP group)</span>
           </label>
-          <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer pb-1">
+          <label class="flex items-center gap-2 text-sm text-body cursor-pointer pb-1">
             <input type="checkbox" id="allow-admin-users-cb" name="allow_admin_users"
                    {% if asset_type and asset_type.allow_admin_users %}checked{% endif %}
                    onchange="updatePrincipalSourceOptions()"
-                   class="rounded border-gray-300">
+                   class="rounded border-token-border">
             Enable Admin user list
-            <span class="text-xs text-gray-400">(users added to local admin group)</span>
+            <span class="text-xs text-muted/70">(users added to local admin group)</span>
           </label>
         </div>
       </div>
     </div>
 
     <!-- RDS Gateway URL -->
-    <div class="border-t border-gray-100 pt-5">
-      <label class="block text-xs font-medium text-gray-600 mb-1">RDS Gateway URL</label>
-      <p class="text-xs text-gray-400 mb-2">
+    <div class="border-t border-token-border pt-5">
+      <label class="block text-xs font-medium text-muted mb-1">RDS Gateway URL</label>
+      <p class="text-xs text-muted/70 mb-2">
         Included in the provisioning confirmation email so users know how to connect.
         Leave blank if not applicable.
       </p>
       <input type="text" id="rds-gateway-url"
              value="{{ asset_type.rds_gateway_url if asset_type and asset_type.rds_gateway_url else '' }}"
              placeholder="https://rdgateway.example.com/RDWeb"
-             class="w-full max-w-lg rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400 font-mono">
+             class="w-full max-w-lg rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono">
     </div>
 
     <!-- Eligible Requestors -->
-    <div class="border-t border-gray-100 pt-5">
-      <label class="block text-xs font-medium text-gray-600 mb-2">Eligible Requestors</label>
-      <p class="text-xs text-gray-400 mb-2">
+    <div class="border-t border-token-border pt-5">
+      <label class="block text-xs font-medium text-muted mb-2">Eligible Requestors</label>
+      <p class="text-xs text-muted/70 mb-2">
         Optional AD group (as Distinguished Name) whose members may request this asset type.
         Leave empty to allow all domain users.
       </p>
       <input type="text" id="eligible-requestors-dn"
              value="{{ asset_type.eligible_requestors_dn or '' if asset_type else '' }}"
              placeholder="CN=VDI-Users,OU=Groups,DC=example,DC=com"
-             class="w-full max-w-lg rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400 font-mono">
+             class="w-full max-w-lg rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono">
     </div>
 
     <!-- Approval Workflow -->
-    <div class="border-t border-gray-100 pt-5">
-      <label class="block text-xs font-medium text-gray-600 mb-2">Approval Workflow</label>
-      <p class="text-xs text-gray-400 mb-3">
+    <div class="border-t border-token-border pt-5">
+      <label class="block text-xs font-medium text-muted mb-2">Approval Workflow</label>
+      <p class="text-xs text-muted/70 mb-3">
         When enabled, new orders require approval before provisioning begins.
       </p>
       <div class="flex flex-col gap-3">
         <!-- Manager Approval Toggle -->
-        <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+        <label class="flex items-center gap-2 text-sm text-body cursor-pointer">
           <input type="checkbox" id="requires-manager-approval-cb"
                  {% if asset_type and asset_type.requires_manager_approval %}checked{% endif %}
-                 class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                 class="rounded border-token-border text-blue-600 focus:ring-blue-500">
           Requires Manager Approval
-          <span class="text-xs text-gray-400">(looked up from the user's AD manager attribute)</span>
+          <span class="text-xs text-muted/70">(looked up from the user's AD manager attribute)</span>
         </label>
 
         <!-- Application Owner Approval Toggle + Owner List -->
-        <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+        <label class="flex items-center gap-2 text-sm text-body cursor-pointer">
           <input type="checkbox" id="requires-owner-approval-cb"
                  {% if asset_type and asset_type.requires_owner_approval %}checked{% endif %}
                  onchange="toggleOwnerSection()"
-                 class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                 class="rounded border-token-border text-blue-600 focus:ring-blue-500">
           Requires Application Owner Approval
         </label>
 
         <!-- Owner input section (shown when toggle is checked) -->
         <div id="owner-approval-section"
              class="{% if not asset_type or not asset_type.requires_owner_approval %}hidden{% endif %} ml-6 border-l-2 border-blue-200 pl-4">
-          <label class="block text-xs text-gray-500 mb-1">Application Owners</label>
+          <label class="block text-xs text-muted mb-1">Application Owners</label>
           <div id="approval-owner-list" class="flex flex-wrap gap-2 mb-2">
             {% if asset_type and asset_type.approval_owners %}
               {% for owner in asset_type.approval_owners %}
@@ -288,61 +288,61 @@
           <div class="flex items-start gap-2">
             <div class="flex-1">
               <input type="text" id="approval-owner-input" placeholder="Email or sAMAccountName"
-                     class="w-full max-w-md rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                     class="w-full max-w-md rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
                      onkeydown="if(event.key==='Enter'){event.preventDefault();addApprovalOwner()}">
               <div id="approval-owner-validate-result" class="mt-1 min-h-[1.25rem]"></div>
             </div>
             <button type="button" onclick="addApprovalOwner()"
-                    class="px-3 py-2 bg-gray-100 text-gray-700 text-sm rounded border border-gray-300 hover:bg-gray-200 whitespace-nowrap">
+                    class="px-3 py-2 bg-surface-raised text-body text-sm rounded border border-token-border hover:bg-surface-raised whitespace-nowrap">
               + Add
             </button>
           </div>
         </div>
 
         <!-- Re-approval on Modify Toggle -->
-        <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer mt-2 pt-2 border-t border-gray-100">
+        <label class="flex items-center gap-2 text-sm text-body cursor-pointer mt-2 pt-2 border-t border-token-border">
           <input type="checkbox" id="requires-approval-on-modify-cb"
                  {% if asset_type and asset_type.requires_approval_on_modify %}checked{% endif %}
-                 class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                 class="rounded border-token-border text-blue-600 focus:ring-blue-500">
           Require Re-Approval on Asset Modification
-          <span class="text-xs text-gray-400">(RDP/Admin user changes need new approval)</span>
+          <span class="text-xs text-muted/70">(RDP/Admin user changes need new approval)</span>
         </label>
       </div>
     </div>
 
     <!-- Automation Strategy -->
     {% set strat = asset_type.automation_strategy if asset_type and asset_type.automation_strategy else ('group_only' if asset_type and asset_type.automation_mode == 'targets_only' else 'runbook_only') %}
-    <div class="border-t border-gray-100 pt-5">
-      <label class="block text-xs font-medium text-gray-600 mb-2">Automation Mode</label>
+    <div class="border-t border-token-border pt-5">
+      <label class="block text-xs font-medium text-muted mb-2">Automation Mode</label>
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
 
-        <label class="relative flex cursor-pointer rounded-lg border border-gray-200 p-4 hover:border-green-400 has-[:checked]:border-green-500 has-[:checked]:bg-green-50">
+        <label class="relative flex cursor-pointer rounded-lg border border-token-border p-4 hover:border-green-400 has-[:checked]:border-green-500 has-[:checked]:bg-green-50 dark:has-[:checked]:bg-green-500/20 has-[:checked]:[&_p]:text-green-900 dark:has-[:checked]:[&_p]:text-green-200">
           <input type="radio" name="automation_strategy" value="group_only"
                  {% if strat == 'group_only' %}checked{% endif %}
                  class="sr-only" onchange="updateAutomationUI()">
           <div>
-            <p class="text-sm font-medium text-gray-900">Group Access</p>
-            <p class="text-xs text-gray-500 mt-0.5">Access via AD/Entra group membership – no script required</p>
+            <p class="text-sm font-medium text-heading">Group Access</p>
+            <p class="text-xs text-muted mt-0.5">Access via AD/Entra group membership – no script required</p>
           </div>
         </label>
 
-        <label class="relative flex cursor-pointer rounded-lg border border-gray-200 p-4 hover:border-purple-400 has-[:checked]:border-purple-500 has-[:checked]:bg-purple-50">
+        <label class="relative flex cursor-pointer rounded-lg border border-token-border p-4 hover:border-purple-400 has-[:checked]:border-purple-500 has-[:checked]:bg-purple-50 dark:has-[:checked]:bg-purple-500/20 has-[:checked]:[&_p]:text-purple-900 dark:has-[:checked]:[&_p]:text-purple-200">
           <input type="radio" name="automation_strategy" value="runbook_only"
                  {% if strat == 'runbook_only' or not asset_type %}checked{% endif %}
                  class="sr-only" onchange="updateAutomationUI()">
           <div>
-            <p class="text-sm font-medium text-gray-900">Runbook</p>
-            <p class="text-xs text-gray-500 mt-0.5">Custom runbook with PowerShell scripts</p>
+            <p class="text-sm font-medium text-heading">Runbook</p>
+            <p class="text-xs text-muted mt-0.5">Custom runbook with PowerShell scripts</p>
           </div>
         </label>
 
-        <label class="relative flex cursor-pointer rounded-lg border border-gray-200 p-4 hover:border-indigo-400 has-[:checked]:border-indigo-500 has-[:checked]:bg-indigo-50">
+        <label class="relative flex cursor-pointer rounded-lg border border-token-border p-4 hover:border-indigo-400 has-[:checked]:border-indigo-500 has-[:checked]:bg-indigo-50 dark:has-[:checked]:bg-indigo-500/20 has-[:checked]:[&_p]:text-indigo-900 dark:has-[:checked]:[&_p]:text-indigo-200">
           <input type="radio" name="automation_strategy" value="composite"
                  {% if strat == 'composite' %}checked{% endif %}
                  class="sr-only" onchange="updateAutomationUI()">
           <div>
-            <p class="text-sm font-medium text-gray-900">Combined</p>
-            <p class="text-xs text-gray-500 mt-0.5">Group targets and runbook in configurable order</p>
+            <p class="text-sm font-medium text-heading">Combined</p>
+            <p class="text-xs text-muted mt-0.5">Group targets and runbook in configurable order</p>
           </div>
         </label>
 
@@ -351,32 +351,32 @@
 
     <!-- COMPOSITE: Order -->
     {% set cs0type = asset_type.composite_steps[0].type if asset_type and asset_type.composite_steps else 'GROUP_TARGETS' %}
-    <div id="composite-order-section" class="{% if strat != 'composite' %}hidden{% endif %} rounded-lg bg-indigo-50 border border-indigo-100 px-4 py-3">
-      <label class="block text-xs font-semibold text-indigo-700 mb-2">Order
-        <span class="font-normal text-indigo-500 ml-1">– which step is executed first?</span>
+    <div id="composite-order-section" class="{% if strat != 'composite' %}hidden{% endif %} rounded-lg bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-100 dark:border-indigo-500/30 px-4 py-3">
+      <label class="block text-xs font-semibold text-indigo-700 dark:text-indigo-300 mb-2">Order
+        <span class="font-normal text-indigo-500 dark:text-indigo-400 ml-1">– which step is executed first?</span>
       </label>
       <div class="flex gap-6">
-        <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+        <label class="flex items-center gap-2 text-sm text-body cursor-pointer">
           <input type="radio" name="composite_order" value="groups_first"
                  {% if cs0type != 'RUNBOOK' %}checked{% endif %}>
           <span>Group access first</span>
         </label>
-        <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+        <label class="flex items-center gap-2 text-sm text-body cursor-pointer">
           <input type="radio" name="composite_order" value="runbook_first"
                  {% if cs0type == 'RUNBOOK' %}checked{% endif %}>
           <span>Runbook first</span>
         </label>
       </div>
-      <p class="mt-2 text-xs text-indigo-400">Both steps are executed – a critical error aborts the sequence.</p>
+      <p class="mt-2 text-xs text-indigo-500 dark:text-indigo-300">Both steps are executed – a critical error aborts the sequence.</p>
     </div>
 
     <!-- Targets editor (for group_only and composite) -->
     <div id="targets-section" class="{% if strat not in ('group_only', 'composite') %}hidden{% endif %}">
-      <label class="block text-xs font-medium text-gray-600 mb-1">
+      <label class="block text-xs font-medium text-muted mb-1">
         Access Targets
-        <span class="text-gray-400 font-normal ml-1">– which groups the user receives</span>
+        <span class="text-muted/70 font-normal ml-1">– which groups the user receives</span>
       </label>
-      <div class="grid grid-cols-12 gap-2 mb-1 text-xs text-gray-400 px-0.5">
+      <div class="grid grid-cols-12 gap-2 mb-1 text-xs text-muted/70 px-0.5">
         <span class="col-span-3">Type</span>
         <span class="col-span-5">Identifier (DN / ObjectId)</span>
         <span class="col-span-3">Assigned to</span>
@@ -386,16 +386,16 @@
           {% for tgt in asset_type.targets %}
           <div class="grid grid-cols-12 gap-2 items-center target-row">
             <select name="target_type[]"
-                    class="col-span-3 rounded border border-gray-300 text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-green-400">
+                    class="col-span-3 rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-green-400">
               <option value="ad_group" {% if tgt.type == 'ad_group' %}selected{% endif %}>AD Group</option>
               <option value="entra_group" {% if tgt.type == 'entra_group' %}selected{% endif %}>Entra Group</option>
               <option value="rds_collection" {% if tgt.type == 'rds_collection' %}selected{% endif %}>RDS Collection</option>
               <option value="other" {% if tgt.type == 'other' %}selected{% endif %}>Other</option>
             </select>
             <input type="text" name="target_identifier[]" value="{{ tgt.identifier }}" placeholder="CN=Group,OU=..."
-                   class="col-span-5 rounded border border-gray-300 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-green-400">
+                   class="col-span-5 rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-green-400">
             <select name="target_principal_source[]"
-                    class="col-span-3 rounded border border-gray-300 text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-green-400">
+                    class="col-span-3 rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-green-400">
               <option value="requester" {% if tgt.principal_source == 'requester' %}selected{% endif %}>Requester</option>
               <option value="rdp_users" {% if tgt.principal_source == 'rdp_users' %}selected{% endif %}>RDP users</option>
               <option value="admin_users" {% if tgt.principal_source == 'admin_users' %}selected{% endif %}>Admin users</option>
@@ -408,16 +408,16 @@
         {% else %}
           <div class="grid grid-cols-12 gap-2 items-center target-row">
             <select name="target_type[]"
-                    class="col-span-3 rounded border border-gray-300 text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-green-400">
+                    class="col-span-3 rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-green-400">
               <option value="ad_group">AD Group</option>
               <option value="entra_group">Entra Group</option>
               <option value="rds_collection">RDS Collection</option>
               <option value="other">Other</option>
             </select>
             <input type="text" name="target_identifier[]" placeholder="CN=Group,OU=..."
-                   class="col-span-5 rounded border border-gray-300 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-green-400">
+                   class="col-span-5 rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-green-400">
             <select name="target_principal_source[]"
-                    class="col-span-3 rounded border border-gray-300 text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-green-400">
+                    class="col-span-3 rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-green-400">
               <option value="requester">Requester</option>
               <option value="rdp_users">RDP users</option>
               <option value="admin_users">Admin users</option>
@@ -430,36 +430,36 @@
       </div>
       <button type="button" onclick="addTargetRow()"
               class="mt-2 text-xs text-green-600 hover:underline">+ Add Target</button>
-      <p class="mt-2 text-xs text-gray-400">
+      <p class="mt-2 text-xs text-muted/70">
         Provision/revoke runs automatically via these targets – no runbook editor needed.
       </p>
     </div>
 
     <!-- Runbook slots (Provision / Modify / Deprovision) -->
-    <div id="runbook-slots" class="{% if strat == 'group_only' %}hidden{% endif %} border-t border-gray-100 pt-5">
-      <label class="block text-xs font-medium text-gray-600 mb-2">
+    <div id="runbook-slots" class="{% if strat == 'group_only' %}hidden{% endif %} border-t border-token-border pt-5">
+      <label class="block text-xs font-medium text-muted mb-2">
         Runbooks
-        <span class="text-gray-400 font-normal ml-1">– one runbook per lifecycle action</span>
+        <span class="text-muted/70 font-normal ml-1">– one runbook per lifecycle action</span>
       </label>
       {% if not asset_type %}
-      <p class="text-xs text-gray-400 mb-2">Save the asset type first, then configure its runbooks here.</p>
+      <p class="text-xs text-muted/70 mb-2">Save the asset type first, then configure its runbooks here.</p>
       {% endif %}
       <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
         {% for slot in runbook_slots %}
-        <div class="rounded-lg border border-gray-200 bg-white px-4 py-3 runbook-slot" data-slot-action="{{ slot.action }}">
+        <div class="rounded-lg border border-token-border bg-surface px-4 py-3 runbook-slot" data-slot-action="{{ slot.action }}">
           <div class="flex items-center justify-between mb-1">
-            <span class="text-sm font-medium text-gray-800">{{ slot.label }}</span>
+            <span class="text-sm font-medium text-heading">{{ slot.label }}</span>
             {% if slot.runbook %}
               {% if slot.runbook.is_active %}
               <span class="inline-block px-2 py-0.5 rounded text-xs bg-green-100 text-green-700">Active</span>
               {% else %}
-              <span class="inline-block px-2 py-0.5 rounded text-xs bg-gray-100 text-gray-500">Inactive</span>
+              <span class="inline-block px-2 py-0.5 rounded text-xs bg-surface-raised text-muted">Inactive</span>
               {% endif %}
             {% else %}
               <span class="inline-block px-2 py-0.5 rounded text-xs bg-orange-100 text-orange-600">Not configured</span>
             {% endif %}
           </div>
-          <p class="text-xs text-gray-500 mb-3">
+          <p class="text-xs text-muted mb-3">
             {% if slot.runbook %}
               {{ slot.runbook.steps | length }} step{{ '' if slot.runbook.steps | length == 1 else 's' }}
             {% else %}
@@ -476,7 +476,7 @@
                     class="text-xs text-blue-600 hover:underline">+ Configure runbook</button>
             {% endif %}
           {% else %}
-            <span class="text-xs text-gray-300">Available after save</span>
+            <span class="text-xs text-muted/50">Available after save</span>
           {% endif %}
         </div>
         {% endfor %}
@@ -484,12 +484,12 @@
     </div>
 
     <!-- Attributes -->
-    <div class="border-t border-gray-100 pt-5">
-      <label class="block text-xs font-medium text-gray-600 mb-1">
+    <div class="border-t border-token-border pt-5">
+      <label class="block text-xs font-medium text-muted mb-1">
         Attributes
-        <span class="text-gray-400 font-normal ml-1">– optional, e.g. CPU options, license types</span>
+        <span class="text-muted/70 font-normal ml-1">– optional, e.g. CPU options, license types</span>
       </label>
-      <div class="grid grid-cols-12 gap-2 mb-1 text-xs text-gray-400 px-0.5">
+      <div class="grid grid-cols-12 gap-2 mb-1 text-xs text-muted/70 px-0.5">
         <span class="col-span-3">Key</span>
         <span class="col-span-3">Label</span>
         <span class="col-span-2">Type</span>
@@ -504,11 +504,11 @@
           <div class="attr-row">
             <div class="grid grid-cols-12 gap-2 items-center">
               <input type="text" name="attr_key[]" value="{{ attr.key }}" placeholder="e.g. cpu"
-                     class="col-span-3 rounded border border-gray-300 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400">
+                     class="col-span-3 rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500">
               <input type="text" name="attr_label[]" value="{{ attr.label }}" placeholder="e.g. CPU count"
-                     class="col-span-3 rounded border border-gray-300 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400">
+                     class="col-span-3 rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500">
               <select name="attr_type[]" onchange="updateAttrTypeUI(this.closest('.attr-row'))"
-                      class="col-span-2 rounded border border-gray-300 text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400">
+                      class="col-span-2 rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500">
                 <option value="STRING"     {% if attr_type == 'STRING' %}selected{% endif %}>Text</option>
                 <option value="INT"        {% if attr_type == 'INT' %}selected{% endif %}>Number</option>
                 <option value="BOOL"       {% if attr_type == 'BOOL' %}selected{% endif %}>Yes/No</option>
@@ -518,21 +518,21 @@
               <div class="col-span-1 flex justify-center">
                 <input type="checkbox" name="attr_required[]" value="1"
                        {% if attr.required %}checked{% endif %}
-                       class="rounded border-gray-300 mt-0.5">
+                       class="rounded border-token-border mt-0.5">
               </div>
               <input type="text" name="attr_default[]"
                      value="{{ attr.default_value or '' }}"
                      placeholder="Default"
-                     class="col-span-2 rounded border border-gray-300 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400">
+                     class="col-span-2 rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500">
               <button type="button" onclick="this.closest('.attr-row').remove()"
                       class="col-span-1 text-red-400 hover:text-red-600 text-lg leading-none text-center">×</button>
             </div>
             <div class="attr-options-row grid grid-cols-12 gap-2 items-center mt-1 {% if attr_type not in ('ENUM', 'MULTI_ENUM') %}hidden{% endif %}">
-              <span class="col-span-2 text-xs text-gray-400 text-right pr-1">Options:</span>
+              <span class="col-span-2 text-xs text-muted/70 text-right pr-1">Options:</span>
               <input type="text" name="attr_options[]"
                      value="{{ attr.options | default([]) | join(', ') }}"
                      placeholder="e.g. 2, 4, 8"
-                     class="col-span-9 rounded border border-gray-300 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400">
+                     class="col-span-9 rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500">
               <span class="col-span-1"></span>
             </div>
           </div>
@@ -541,11 +541,11 @@
           <div class="attr-row">
             <div class="grid grid-cols-12 gap-2 items-center">
               <input type="text" name="attr_key[]" placeholder="e.g. cpu"
-                     class="col-span-3 rounded border border-gray-300 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400">
+                     class="col-span-3 rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500">
               <input type="text" name="attr_label[]" placeholder="e.g. CPU count"
-                     class="col-span-3 rounded border border-gray-300 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400">
+                     class="col-span-3 rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500">
               <select name="attr_type[]" onchange="updateAttrTypeUI(this.closest('.attr-row'))"
-                      class="col-span-2 rounded border border-gray-300 text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400">
+                      class="col-span-2 rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500">
                 <option value="STRING">Text</option>
                 <option value="INT">Number</option>
                 <option value="BOOL">Yes/No</option>
@@ -553,17 +553,17 @@
                 <option value="MULTI_ENUM">Multi</option>
               </select>
               <div class="col-span-1 flex justify-center">
-                <input type="checkbox" name="attr_required[]" value="1" class="rounded border-gray-300 mt-0.5">
+                <input type="checkbox" name="attr_required[]" value="1" class="rounded border-token-border mt-0.5">
               </div>
               <input type="text" name="attr_default[]" placeholder="Default"
-                     class="col-span-2 rounded border border-gray-300 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400">
+                     class="col-span-2 rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500">
               <button type="button" onclick="this.closest('.attr-row').remove()"
                       class="col-span-1 text-red-400 hover:text-red-600 text-lg leading-none text-center">×</button>
             </div>
             <div class="attr-options-row grid grid-cols-12 gap-2 items-center mt-1 hidden">
-              <span class="col-span-2 text-xs text-gray-400 text-right pr-1">Options:</span>
+              <span class="col-span-2 text-xs text-muted/70 text-right pr-1">Options:</span>
               <input type="text" name="attr_options[]" placeholder="e.g. 2, 4, 8"
-                     class="col-span-9 rounded border border-gray-300 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400">
+                     class="col-span-9 rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500">
               <span class="col-span-1"></span>
             </div>
           </div>
@@ -574,9 +574,9 @@
     </div>
 
     <!-- Deprovision Policy -->
-    <div class="border-t border-gray-100 pt-5">
-      <label class="block text-xs font-medium text-gray-600 mb-2">Deprovision Strategy
-        <span class="text-gray-400 font-normal ml-1">– what happens on revoke/cancel?</span>
+    <div class="border-t border-token-border pt-5">
+      <label class="block text-xs font-medium text-muted mb-2">Deprovision Strategy
+        <span class="text-muted/70 font-normal ml-1">– what happens on revoke/cancel?</span>
       </label>
       {% set dp_opts = [
         ("access_only",               "Revoke access only",     "Remove group membership – instance remains untouched"),
@@ -588,24 +588,24 @@
       ] %}
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
         {% for dp_val, dp_short, dp_desc in dp_opts %}
-        <label class="relative flex cursor-pointer rounded-lg border border-gray-200 p-3 hover:border-orange-400 has-[:checked]:border-orange-500 has-[:checked]:bg-orange-50">
+        <label class="relative flex cursor-pointer rounded-lg border border-token-border p-3 hover:border-orange-400 has-[:checked]:border-orange-500 has-[:checked]:bg-orange-50 dark:has-[:checked]:bg-orange-500/20 has-[:checked]:[&_p]:text-orange-900 dark:has-[:checked]:[&_p]:text-orange-200">
           <input type="radio" name="deprovision_policy" value="{{ dp_val }}"
                  {% if asset_type and (asset_type.deprovision_policy == dp_val) %}checked
                  {% elif not asset_type and dp_val == 'access_only' %}checked{% endif %}
                  class="sr-only">
           <div>
-            <p class="text-sm font-medium text-gray-900">{{ dp_short }}</p>
-            <p class="text-xs text-gray-400 mt-0.5">{{ dp_desc }}</p>
+            <p class="text-sm font-medium text-heading">{{ dp_short }}</p>
+            <p class="text-xs text-muted/70 mt-0.5">{{ dp_desc }}</p>
           </div>
         </label>
         {% endfor %}
       </div>
-      <div id="dp-constraint-banner" class="hidden mt-2 text-xs rounded px-3 py-2 bg-amber-50 border border-amber-200 text-amber-700"></div>
+      <div id="dp-constraint-banner" class="hidden mt-2 text-xs rounded px-3 py-2 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 text-amber-700 dark:text-amber-300"></div>
     </div>
 
     <!-- Buttons -->
-    <div class="flex items-center justify-between pt-2 border-t border-gray-100">
-      <a href="/ui/asset-types" class="text-sm text-gray-500 hover:text-gray-800">Cancel</a>
+    <div class="flex items-center justify-between pt-2 border-t border-token-border">
+      <a href="/ui/asset-types" class="text-sm text-muted hover:text-heading">Cancel</a>
       <button type="button" onclick="submitForm()"
               class="px-6 py-2.5 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700">
         {% if asset_type %}Save{% else %}Create{% endif %} →
@@ -912,16 +912,16 @@ function addTargetRow() {
   row.className = 'grid grid-cols-12 gap-2 items-center target-row';
   row.innerHTML =
     '<select name="target_type[]"'
-    + ' class="col-span-3 rounded border border-gray-300 text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-green-400">'
+    + ' class="col-span-3 rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-green-400">'
     + '<option value="ad_group">AD Group</option>'
     + '<option value="entra_group">Entra Group</option>'
     + '<option value="rds_collection">RDS Collection</option>'
     + '<option value="other">Other</option>'
     + '</select>'
     + '<input type="text" name="target_identifier[]" placeholder="CN=Group,OU=..."'
-    + ' class="col-span-5 rounded border border-gray-300 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-green-400">'
+    + ' class="col-span-5 rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-green-400">'
     + '<select name="target_principal_source[]"'
-    + ' class="col-span-3 rounded border border-gray-300 text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-green-400">'
+    + ' class="col-span-3 rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-green-400">'
     + _buildPrincipalOptions('requester')
     + '</select>'
     + '<button type="button" onclick="this.closest(\'.target-row\').remove()"'
@@ -942,11 +942,11 @@ function addAttrRow() {
   row.innerHTML =
     '<div class="grid grid-cols-12 gap-2 items-center">'
     + '<input type="text" name="attr_key[]" placeholder="e.g. cpu"'
-    + ' class="col-span-3 rounded border border-gray-300 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400">'
+    + ' class="col-span-3 rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500">'
     + '<input type="text" name="attr_label[]" placeholder="e.g. CPU count"'
-    + ' class="col-span-3 rounded border border-gray-300 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400">'
+    + ' class="col-span-3 rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500">'
     + '<select name="attr_type[]" onchange="updateAttrTypeUI(this.closest(\'.attr-row\'))"'
-    + ' class="col-span-2 rounded border border-gray-300 text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400">'
+    + ' class="col-span-2 rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500">'
     + '<option value="STRING">Text</option>'
     + '<option value="INT">Number</option>'
     + '<option value="BOOL">Yes/No</option>'
@@ -954,17 +954,17 @@ function addAttrRow() {
     + '<option value="MULTI_ENUM">Multi</option>'
     + '</select>'
     + '<div class="col-span-1 flex justify-center">'
-    + '<input type="checkbox" name="attr_required[]" value="1" class="rounded border-gray-300 mt-0.5">'
+    + '<input type="checkbox" name="attr_required[]" value="1" class="rounded border-token-border mt-0.5">'
     + '</div>'
     + '<input type="text" name="attr_default[]" placeholder="Default"'
-    + ' class="col-span-2 rounded border border-gray-300 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400">'
+    + ' class="col-span-2 rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500">'
     + '<button type="button" onclick="this.closest(\'.attr-row\').remove()"'
     + ' class="col-span-1 text-red-400 hover:text-red-600 text-lg leading-none text-center">\xd7</button>'
     + '</div>'
     + '<div class="attr-options-row grid grid-cols-12 gap-2 items-center mt-1 hidden">'
-    + '<span class="col-span-2 text-xs text-gray-400 text-right pr-1">Options:</span>'
+    + '<span class="col-span-2 text-xs text-muted/70 text-right pr-1">Options:</span>'
     + '<input type="text" name="attr_options[]" placeholder="e.g. 2, 4, 8"'
-    + ' class="col-span-9 rounded border border-gray-300 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400">'
+    + ' class="col-span-9 rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500">'
     + '<span class="col-span-1"></span>'
     + '</div>';
   document.getElementById('attr-rows').appendChild(row);
@@ -1148,7 +1148,7 @@ async function addApprovalOwner() {
   if (!val) return;
 
   var resultDiv = document.getElementById('approval-owner-validate-result');
-  resultDiv.innerHTML = '<span class="text-xs text-gray-500">Validating...</span>';
+  resultDiv.innerHTML = '<span class="text-xs text-muted">Validating...</span>';
 
   try {
     var r = await fetch('/admin/_validate-user?q=' + encodeURIComponent(val));

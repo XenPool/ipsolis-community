@@ -4,47 +4,47 @@
 
 {% block content %}
 <div class="mb-6">
-  <a href="/ui/standalone-runbooks" class="text-sm text-gray-500 hover:text-gray-800">← Back to Runbooks</a>
+  <a href="/ui/standalone-runbooks" class="text-sm text-muted hover:text-heading">← Back to Runbooks</a>
 </div>
 
-<h1 class="text-lg font-semibold text-gray-900 mb-6">
+<h1 class="text-lg font-semibold text-heading mb-6">
   {% if runbook %}Edit Runbook{% else %}New Runbook{% endif %}
 </h1>
 
 <!-- ── Settings ─────────────────────────────────────────────────────────── -->
-<div class="bg-white rounded-lg border border-gray-200 p-5 mb-6">
-  <h2 class="text-sm font-semibold text-gray-700 mb-4">Settings</h2>
+<div class="bg-surface rounded-lg border border-token-border p-5 mb-6">
+  <h2 class="text-sm font-semibold text-body mb-4">Settings</h2>
 
   <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
     <div>
-      <label class="block text-xs font-medium text-gray-600 mb-1">Name <span class="text-red-500">*</span></label>
+      <label class="block text-xs font-medium text-muted mb-1">Name <span class="text-red-500">*</span></label>
       <input type="text" id="rb-name" value="{{ runbook.name if runbook else '' }}"
-             class="w-full rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400">
+             class="w-full rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500">
     </div>
     <div>
-      <label class="block text-xs font-medium text-gray-600 mb-1">Description</label>
+      <label class="block text-xs font-medium text-muted mb-1">Description</label>
       <input type="text" id="rb-description" value="{{ runbook.description if runbook and runbook.description else '' }}"
-             class="w-full rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400">
+             class="w-full rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500">
     </div>
   </div>
 
   <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
     <div>
-      <label class="block text-xs font-medium text-gray-600 mb-1">Active</label>
+      <label class="block text-xs font-medium text-muted mb-1">Active</label>
       <label class="flex items-center gap-2 text-sm cursor-pointer">
         <input type="checkbox" id="rb-active" {% if not runbook or runbook.is_active %}checked{% endif %} class="w-4 h-4">
         Enabled
       </label>
     </div>
     <div>
-      <label class="block text-xs font-medium text-gray-600 mb-1">Cron Enabled</label>
+      <label class="block text-xs font-medium text-muted mb-1">Cron Enabled</label>
       <label class="flex items-center gap-2 text-sm cursor-pointer">
         <input type="checkbox" id="rb-cron-enabled" {% if runbook and runbook.cron_enabled %}checked{% endif %} class="w-4 h-4">
         Run on schedule
       </label>
     </div>
     <div>
-      <label class="block text-xs font-medium text-gray-600 mb-1">Skip if Running</label>
+      <label class="block text-xs font-medium text-muted mb-1">Skip if Running</label>
       <label class="flex items-center gap-2 text-sm cursor-pointer">
         <input type="checkbox" id="rb-skip-running" {% if not runbook or runbook.skip_if_running %}checked{% endif %} class="w-4 h-4">
         Prevent overlap
@@ -53,14 +53,14 @@
   </div>
 
   <!-- Cron Schedule Builder -->
-  <div class="border border-gray-200 rounded p-4 mb-4 bg-gray-50">
-    <div class="text-xs font-medium text-gray-600 mb-3">Cron Schedule</div>
+  <div class="border border-token-border rounded p-4 mb-4 bg-surface-raised">
+    <div class="text-xs font-medium text-muted mb-3">Cron Schedule</div>
 
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-3">
       <div>
-        <label class="block text-xs text-gray-500 mb-1">Frequency</label>
+        <label class="block text-xs text-muted mb-1">Frequency</label>
         <select id="rb-cron-mode" onchange="rbOnCronModeChange()"
-                class="w-full rounded border border-gray-300 text-sm px-3 py-1.5">
+                class="w-full rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-1.5">
           <option value="daily">Daily</option>
           <option value="weekly">Weekly</option>
           <option value="monthly">Monthly</option>
@@ -70,16 +70,16 @@
       </div>
 
       <div id="rb-cron-time-wrap">
-        <label class="block text-xs text-gray-500 mb-1">Time (UTC)</label>
+        <label class="block text-xs text-muted mb-1">Time (UTC)</label>
         <input type="time" id="rb-cron-time" value="03:00" step="60"
                onchange="rbRebuildCron()"
-               class="w-full rounded border border-gray-300 text-sm px-3 py-1.5">
+               class="w-full rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-1.5">
       </div>
 
       <div id="rb-cron-dow-wrap" class="hidden">
-        <label class="block text-xs text-gray-500 mb-1">Weekday</label>
+        <label class="block text-xs text-muted mb-1">Weekday</label>
         <select id="rb-cron-dow" onchange="rbRebuildCron()"
-                class="w-full rounded border border-gray-300 text-sm px-3 py-1.5">
+                class="w-full rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-1.5">
           <option value="0">Sunday</option>
           <option value="1" selected>Monday</option>
           <option value="2">Tuesday</option>
@@ -91,30 +91,30 @@
       </div>
 
       <div id="rb-cron-dom-wrap" class="hidden">
-        <label class="block text-xs text-gray-500 mb-1">Day of month (1–28)</label>
+        <label class="block text-xs text-muted mb-1">Day of month (1–28)</label>
         <input type="number" id="rb-cron-dom" min="1" max="28" value="1"
                onchange="rbRebuildCron()"
-               class="w-full rounded border border-gray-300 text-sm px-3 py-1.5">
+               class="w-full rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-1.5">
       </div>
 
       <div id="rb-cron-every-hours-wrap" class="hidden">
-        <label class="block text-xs text-gray-500 mb-1">Run every N hours</label>
+        <label class="block text-xs text-muted mb-1">Run every N hours</label>
         <input type="number" id="rb-cron-every-hours" min="1" max="23" value="6"
                onchange="rbRebuildCron()"
-               class="w-full rounded border border-gray-300 text-sm px-3 py-1.5">
+               class="w-full rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-1.5">
       </div>
     </div>
 
     <div>
       <div class="flex items-center justify-between mb-1">
-        <label class="block text-xs text-gray-500">Cron expression (UTC)</label>
-        <span id="rb-cron-human" class="text-[11px] text-gray-400"></span>
+        <label class="block text-xs text-muted">Cron expression (UTC)</label>
+        <span id="rb-cron-human" class="text-[11px] text-muted/70"></span>
       </div>
       <input type="text" id="rb-cron" value="{{ runbook.cron_expression if runbook and runbook.cron_expression else '' }}"
              placeholder="e.g. 0 3 * * *"
              oninput="rbOnCronManualEdit()"
-             class="w-full rounded border border-gray-300 text-sm font-mono px-3 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
-      <p class="text-[11px] text-gray-400 mt-1">
+             class="w-full rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm font-mono px-3 py-2 bg-surface focus:outline-none focus:ring-1 focus:ring-blue-500">
+      <p class="text-[11px] text-muted/70 mt-1">
         Format: <code>min hour day-of-month month day-of-week</code>. Leave blank to disable.
       </p>
     </div>
@@ -131,52 +131,52 @@
 
 {% if runbook %}
 <!-- ── Steps ──────────────────────────────────────────────────────────── -->
-<div class="bg-white rounded-lg border border-gray-200 mb-6">
-  <div class="px-4 py-3 border-b border-gray-200 flex items-center justify-between bg-gray-50">
-    <h2 class="text-sm font-semibold text-gray-700">Steps</h2>
-    <span class="text-xs text-gray-400" id="step-count">{{ steps | length }} Steps</span>
+<div class="bg-surface rounded-lg border border-token-border mb-6">
+  <div class="px-4 py-3 border-b border-token-border flex items-center justify-between bg-surface-raised">
+    <h2 class="text-sm font-semibold text-body">Steps</h2>
+    <span class="text-xs text-muted/70" id="step-count">{{ steps | length }} Steps</span>
   </div>
 
   <div id="steps-list">
     {% if steps %}
     {% for step in steps %}
-    <div class="step-row flex items-center gap-3 px-4 py-3 border-b border-gray-100 last:border-0 hover:bg-gray-50"
+    <div class="step-row flex items-center gap-3 px-4 py-3 border-b border-token-border last:border-0 hover:bg-surface-raised"
          data-step-id="{{ step.id }}">
-      <span class="w-6 h-6 flex items-center justify-center rounded-full bg-gray-100 text-gray-600 text-xs font-mono font-medium flex-shrink-0">
+      <span class="w-6 h-6 flex items-center justify-center rounded-full bg-surface-raised text-muted text-xs font-mono font-medium flex-shrink-0">
         {{ step.position }}
       </span>
       <div class="flex-1 min-w-0">
         <div class="flex items-center gap-2">
-          <span class="text-sm font-medium text-gray-900">{{ step.step_name }}</span>
-          <span class="text-xs font-mono px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">
+          <span class="text-sm font-medium text-heading">{{ step.step_name }}</span>
+          <span class="text-xs font-mono px-1.5 py-0.5 rounded bg-surface-raised text-muted">
             {{ step.script_module_name or '–' }}
           </span>
           {% if step.is_critical %}
           <span class="text-xs px-1 py-0.5 rounded bg-red-100 text-red-600">critical</span>
           {% else %}
-          <span class="text-xs px-1 py-0.5 rounded bg-gray-100 text-gray-400">optional</span>
+          <span class="text-xs px-1 py-0.5 rounded bg-surface-raised text-muted/70">optional</span>
           {% endif %}
         </div>
         {% if step.params_template %}
-        <div class="text-xs text-gray-400 mt-0.5 font-mono">
+        <div class="text-xs text-muted/70 mt-0.5 font-mono">
           {{ step.params_template.keys() | list | join(', ') }}
         </div>
         {% endif %}
       </div>
       <div class="flex items-center gap-1 flex-shrink-0">
         <button onclick="moveStep({{ step.id }}, 'up')"
-                class="p-1 text-gray-400 hover:text-gray-700 rounded" title="Move up">↑</button>
+                class="p-1 text-muted/70 hover:text-body rounded" title="Move up">↑</button>
         <button onclick="moveStep({{ step.id }}, 'down')"
-                class="p-1 text-gray-400 hover:text-gray-700 rounded" title="Move down">↓</button>
+                class="p-1 text-muted/70 hover:text-body rounded" title="Move down">↓</button>
         <button onclick='editStep({{ step.id }}, {{ step | tojson | safe }})'
-                class="px-2 py-1 text-xs text-gray-500 hover:text-blue-600 rounded">Edit</button>
+                class="px-2 py-1 text-xs text-muted hover:text-blue-600 rounded">Edit</button>
         <button onclick="deleteStep({{ step.id }})"
-                class="px-2 py-1 text-xs text-gray-400 hover:text-red-500 rounded">Remove</button>
+                class="px-2 py-1 text-xs text-muted/70 hover:text-red-500 rounded">Remove</button>
       </div>
     </div>
     {% endfor %}
     {% else %}
-    <div id="no-steps" class="px-4 py-8 text-center text-gray-400 text-sm">
+    <div id="no-steps" class="px-4 py-8 text-center text-muted/70 text-sm">
       No steps defined yet. Add the first step below.
     </div>
     {% endif %}
@@ -184,18 +184,18 @@
 </div>
 
 <!-- Add / edit step -->
-<div class="bg-white rounded-lg border border-gray-200 p-5" id="step-form">
-  <h2 class="text-sm font-semibold text-gray-700 mb-4" id="step-form-title">+ Add step</h2>
+<div class="bg-surface rounded-lg border border-token-border p-5" id="step-form">
+  <h2 class="text-sm font-semibold text-body mb-4" id="step-form-title">+ Add step</h2>
 
   <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
     <div>
-      <label class="block text-xs font-medium text-gray-600 mb-1">Step name <span class="text-red-500">*</span></label>
+      <label class="block text-xs font-medium text-muted mb-1">Step name <span class="text-red-500">*</span></label>
       <div class="relative">
         <input type="text" id="new-step-name" placeholder="e.g. Cleanup temp files"
-               class="w-full rounded border border-gray-300 text-sm pl-3 pr-10 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400">
+               class="w-full rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm pl-3 pr-10 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500">
         <button type="button" onclick="copyModuleNameToStepName()"
                 title="Copy selected module name into Step name"
-                class="absolute inset-y-0 right-0 px-3 text-gray-400 hover:text-blue-600 focus:outline-none">
+                class="absolute inset-y-0 right-0 px-3 text-muted/70 hover:text-blue-600 focus:outline-none">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
                stroke="currentColor" stroke-width="2">
             <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
@@ -205,9 +205,9 @@
       </div>
     </div>
     <div>
-      <label class="block text-xs font-medium text-gray-600 mb-1">Module <span class="text-red-500">*</span></label>
+      <label class="block text-xs font-medium text-muted mb-1">Module <span class="text-red-500">*</span></label>
       <select id="new-step-module" onchange="updateModuleInfo()"
-              class="w-full rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400">
+              class="w-full rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500">
         <option value="">– Select module –</option>
         {% for m in script_modules %}
         <option value="{{ m.id }}"
@@ -223,50 +223,50 @@
   </div>
 
   <div id="module-info" class="mb-4 hidden">
-    <div class="rounded bg-gray-50 border border-gray-200 px-3 py-2">
-      <p class="text-xs font-medium text-gray-600 mb-1">Expected parameters:</p>
-      <div id="module-param-list" class="text-xs font-mono text-gray-500"></div>
+    <div class="rounded bg-surface-raised border border-token-border px-3 py-2">
+      <p class="text-xs font-medium text-muted mb-1">Expected parameters:</p>
+      <div id="module-param-list" class="text-xs font-mono text-muted"></div>
     </div>
   </div>
 
   <div class="grid grid-cols-3 gap-4 mb-4">
     <div>
-      <label class="block text-xs font-medium text-gray-600 mb-1">Critical</label>
+      <label class="block text-xs font-medium text-muted mb-1">Critical</label>
       <label class="flex items-center gap-2 text-sm cursor-pointer">
         <input type="checkbox" id="new-step-critical" checked class="w-4 h-4">
         Abort on error
       </label>
     </div>
     <div>
-      <label class="block text-xs font-medium text-gray-600 mb-1">Retry count</label>
+      <label class="block text-xs font-medium text-muted mb-1">Retry count</label>
       <input type="number" id="new-step-retry" value="3" min="0" max="10"
-             class="w-24 rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400">
+             class="w-24 rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500">
     </div>
     <div>
-      <label class="block text-xs font-medium text-gray-600 mb-1">Timeout (s)</label>
+      <label class="block text-xs font-medium text-muted mb-1">Timeout (s)</label>
       <input type="number" id="new-step-timeout" value="120" min="10"
-             class="w-24 rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400">
+             class="w-24 rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500">
     </div>
   </div>
 
   <!-- Parameter bindings -->
   <div class="mb-4">
     <div class="flex items-center justify-between mb-2">
-      <label class="block text-xs font-medium text-gray-600">
+      <label class="block text-xs font-medium text-muted">
         Parameter bindings
-        <span class="font-normal text-gray-400 ml-1">– bind to a global variable or literal value</span>
+        <span class="font-normal text-muted/70 ml-1">– bind to a global variable or literal value</span>
       </label>
       <button type="button" onclick="toggleAdvancedJson()"
               class="text-xs text-blue-600 hover:underline">Advanced (JSON)</button>
     </div>
-    <div id="param-bindings" class="border border-gray-200 rounded divide-y divide-gray-100 bg-gray-50">
-      <div class="px-3 py-4 text-xs text-gray-400 italic">Select a module to see its parameters.</div>
+    <div id="param-bindings" class="border border-token-border rounded divide-y divide-token-border bg-surface-raised">
+      <div class="px-3 py-4 text-xs text-muted/70 italic">Select a module to see its parameters.</div>
     </div>
     <div id="advanced-json-wrap" class="hidden mt-2">
       <textarea id="new-step-params" rows="4"
                 placeholder='{"SomeParam": "literal value", "OtherParam": "&#123;&#123;global_var_key&#125;&#125;"}'
-                class="w-full rounded border border-gray-300 text-xs font-mono px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400"></textarea>
-      <p class="text-xs text-gray-400 mt-1">
+                class="w-full rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-xs font-mono px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500"></textarea>
+      <p class="text-xs text-muted/70 mt-1">
         Use <code>&#123;&#123;key&#125;&#125;</code> to reference global variables. Literal values are passed as-is.
       </p>
     </div>
@@ -274,7 +274,7 @@
 
   <div class="flex items-center justify-between">
     <button type="button" id="cancel-edit-btn" onclick="cancelEdit()"
-            class="hidden px-4 py-2 text-sm text-gray-500 border border-gray-300 rounded hover:bg-gray-50">
+            class="hidden px-4 py-2 text-sm text-muted border border-token-border rounded hover:bg-surface-raised">
       Cancel
     </button>
     <button type="button" id="submit-step-btn" onclick="submitStep()"
@@ -314,12 +314,12 @@ function rbShowCronFields(mode) {
   var cronInput = document.getElementById('rb-cron');
   if (mode === 'custom') {
     cronInput.readOnly = false;
-    cronInput.classList.remove('bg-gray-100');
-    cronInput.classList.add('bg-white');
+    cronInput.classList.remove('bg-surface-raised');
+    cronInput.classList.add('bg-surface');
   } else {
     cronInput.readOnly = true;
-    cronInput.classList.add('bg-gray-100');
-    cronInput.classList.remove('bg-white');
+    cronInput.classList.add('bg-surface-raised');
+    cronInput.classList.remove('bg-surface');
   }
 }
 
@@ -493,19 +493,19 @@ function _bindingRow(p, mode, value) {
   var required = p.required
     ? '<span class="text-red-500" title="required">*</span> '
     : '';
-  var typeBadge = '<span class="text-gray-400 font-normal">(' + (p.type || 'string') + ')</span>';
+  var typeBadge = '<span class="text-muted/70 font-normal">(' + (p.type || 'string') + ')</span>';
   var effectiveMode = mode || 'literal';
   var litVal = effectiveMode === 'literal' ? (value || '') : '';
   var ctxVal = effectiveMode === 'context' ? (value || '') : '';
   return ''
     + '<div class="binding-row grid grid-cols-12 gap-2 items-center px-3 py-2" data-param-name="' + p.name + '">'
-    + '  <div class="col-span-3 text-xs font-mono text-gray-700">' + required + p.name + ' ' + typeBadge + '</div>'
-    + '  <select class="binding-mode col-span-2 rounded border border-gray-300 text-xs px-2 py-1 bg-white" onchange="onBindingModeChange(this)">'
+    + '  <div class="col-span-3 text-xs font-mono text-body">' + required + p.name + ' ' + typeBadge + '</div>'
+    + '  <select class="binding-mode col-span-2 rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-xs px-2 py-1 bg-surface" onchange="onBindingModeChange(this)">'
     + '    <option value="literal"' + (effectiveMode === 'literal' ? ' selected' : '') + '>Literal value</option>'
     + '    <option value="context"' + (effectiveMode === 'context' ? ' selected' : '') + '>Global var</option>'
     + '  </select>'
-    + '  <input  class="binding-lit col-span-7 rounded border border-gray-300 text-xs px-2 py-1' + (effectiveMode === 'literal' ? '' : ' hidden') + '" type="text" placeholder="Literal value" value="' + litVal.replace(/"/g, '&quot;') + '">'
-    + '  <input  class="binding-ctx col-span-7 rounded border border-gray-300 text-xs font-mono px-2 py-1' + (effectiveMode === 'context' ? '' : ' hidden') + '" type="text" placeholder="global_var_key" value="' + ctxVal.replace(/"/g, '&quot;') + '">'
+    + '  <input  class="binding-lit col-span-7 rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-xs px-2 py-1' + (effectiveMode === 'literal' ? '' : ' hidden') + '" type="text" placeholder="Literal value" value="' + litVal.replace(/"/g, '&quot;') + '">'
+    + '  <input  class="binding-ctx col-span-7 rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-xs font-mono px-2 py-1' + (effectiveMode === 'context' ? '' : ' hidden') + '" type="text" placeholder="global_var_key" value="' + ctxVal.replace(/"/g, '&quot;') + '">'
     + '</div>';
 }
 
@@ -521,7 +521,7 @@ function renderBindings(existingTemplate) {
   if (!container) return;
   var params = _currentModuleParams();
   if (!params.length) {
-    container.innerHTML = '<div class="px-3 py-4 text-xs text-gray-400 italic">Selected module has no declared parameters. Use Advanced (JSON) to set values manually.</div>';
+    container.innerHTML = '<div class="px-3 py-4 text-xs text-muted/70 italic">Selected module has no declared parameters. Use Advanced (JSON) to set values manually.</div>';
     return;
   }
   var tpl = existingTemplate || {};
@@ -600,7 +600,7 @@ function updateModuleInfo() {
       listEl.innerHTML = params.map(function(p) {
         return '<span class="inline-block mr-4">'
           + (p.required ? '<span class="text-red-400">*</span> ' : '')
-          + p.name + ' <span class="text-gray-400">(' + p.type + ')</span>'
+          + p.name + ' <span class="text-muted/70">(' + p.type + ')</span>'
           + (p.default ? ' = ' + p.default : '')
           + '</span>';
       }).join('');
@@ -736,7 +736,7 @@ function cancelEdit() {
   document.getElementById('new-step-params').value = '';
   document.getElementById('advanced-json-wrap').classList.add('hidden');
   document.getElementById('param-bindings').innerHTML =
-    '<div class="px-3 py-4 text-xs text-gray-400 italic">Select a module to see its parameters.</div>';
+    '<div class="px-3 py-4 text-xs text-muted/70 italic">Select a module to see its parameters.</div>';
   document.getElementById('module-info').classList.add('hidden');
   document.getElementById('step-form-title').textContent = '+ Add step';
   document.getElementById('submit-step-btn').textContent = 'Add step';

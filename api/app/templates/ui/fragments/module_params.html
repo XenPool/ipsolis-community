@@ -1,18 +1,18 @@
 {% if module %}
-<div class="rounded-lg bg-gray-50 border border-gray-200 p-3 text-xs">
-  <div class="font-medium text-gray-700 mb-1">{{ module.key }}</div>
-  <div class="text-gray-500 mb-2">{{ module.description }}</div>
+<div class="rounded-lg bg-surface-raised border border-token-border p-3 text-xs">
+  <div class="font-medium text-body mb-1">{{ module.key }}</div>
+  <div class="text-muted mb-2">{{ module.description }}</div>
   {% if module.params %}
   <div class="mb-2">
-    <span class="text-gray-400">Parameter:</span>
-    <span class="font-mono text-gray-700 ml-1">{{ module.params | join(', ') }}</span>
+    <span class="text-muted/70">Parameter:</span>
+    <span class="font-mono text-body ml-1">{{ module.params | join(', ') }}</span>
   </div>
   {% endif %}
   {% if module.output_keys %}
   <div>
-    <span class="text-gray-400">Output keys:</span>
+    <span class="text-muted/70">Output keys:</span>
     <span class="font-mono text-green-700 ml-1">{{ module.output_keys | join(', ') }}</span>
-    <span class="text-gray-400 ml-1">(added to context)</span>
+    <span class="text-muted/70 ml-1">(added to context)</span>
   </div>
   {% endif %}
   {% if module.params %}

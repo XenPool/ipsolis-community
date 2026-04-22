@@ -748,8 +748,12 @@ async def revoke_asset(
 @router.get("/assets")
 async def list_assets(
     asset_type_id: int | None = None,
+    include_capacity_pooled: bool = False,
     db: AsyncSession = Depends(get_db),
 ) -> list[dict]:
+    # By default, hide capacity_pooled types: their "slots" are tracked via
+    # orders + pool_capacity on the asset type, not per-row. Pool rows for
+    # these types (if any exist) are dead weight in the Asset Pool view.
     q = (
         select(AssetPool, AssetType.name.label("type_name"))
         .join(AssetType, AssetPool.asset_type_id == AssetType.id)
@@ -757,6 +761,8 @@ async def list_assets(
     )
     if asset_type_id:
         q = q.where(AssetPool.asset_type_id == asset_type_id)
+    elif not include_capacity_pooled:
+        q = q.where(AssetType.assignment_model != "capacity_pooled")
     rows = (await db.execute(q)).all()
 
     # Fetch user info for assets that have an active order
@@ -916,26 +922,26 @@ async def test_email(payload: dict = None, db: AsyncSession = Depends(get_db)) -
     smtp_user = await _get("email.username", "")
     smtp_password = await _get("email.password", "")
     mail_from = await _get("email.from", "noreply@example.com")
-    from_name = await _get("email.from_name", "XenPool IT Selfservice")
+    from_name = await _get("email.from_name", "Ipsolis")
     bcc = await _get("email.bcc", "")
-    company_name = await _get("company.name", "XenPool")
+    app_title = await _get("app.title", "Ipsolis")
 
     to_address = (payload or {}).get("to") or bcc or mail_from
 
-    subject = f"[{company_name}] Test Email"
+    subject = f"[{app_title}] SMTP connectivity check"
     html_body = f"""<!DOCTYPE html>
 <html><head><meta charset="UTF-8"></head>
 <body style="font-family:Arial,sans-serif;background:#f4f4f4;padding:20px;">
 <table width="620" style="background:#fff;border-radius:4px;margin:0 auto;">
-  <tr><td style="background:#BB0A30;padding:24px 32px;color:#fff;font-size:20px;font-weight:bold;">
-    {company_name} IT Self-Service
+  <tr><td style="background:#1e3a8a;padding:24px 32px;color:#fff;font-size:20px;font-weight:bold;">
+    {app_title}
   </td></tr>
   <tr><td style="padding:28px 32px;font-size:14px;color:#333;">
-    <p>This is a test email from the {company_name} IT Self-Service system.</p>
+    <p>This is a verification email from the {app_title} system.</p>
     <p>If you received this, your SMTP configuration is working correctly.</p>
   </td></tr>
   <tr><td style="background:#f8f8f8;padding:16px 32px;font-size:11px;color:#aaa;text-align:center;">
-    {company_name} IT Self-Service | This email was generated automatically.
+    {app_title} | This email was generated automatically.
   </td></tr>
 </table>
 </body></html>"""

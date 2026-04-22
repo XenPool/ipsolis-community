@@ -1,4 +1,4 @@
-# XenPool IT Selfservice
+# Ipsolis
 
 Open-source platform for IT asset lifecycle automation. Built for on-premises datacenters, replacing expensive commercial tools like Ivanti Automation or ServiceNow orchestration.
 

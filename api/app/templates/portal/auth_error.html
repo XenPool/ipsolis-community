@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" class="h-full bg-gray-50">
+<html lang="en" class="h-full bg-surface-raised">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,15 +8,15 @@
 </head>
 <body class="h-full flex items-center justify-center">
   <div class="max-w-md w-full mx-4">
-    <div class="bg-white rounded-lg border border-red-200 shadow-sm p-8 text-center">
+    <div class="bg-surface rounded-lg border border-red-200 shadow-sm p-8 text-center">
       <div class="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
         <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                 d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
         </svg>
       </div>
-      <h1 class="text-lg font-semibold text-gray-900 mb-2">{{ title }}</h1>
-      <p class="text-sm text-gray-600 mb-6">{{ message }}</p>
+      <h1 class="text-lg font-semibold text-heading mb-2">{{ title }}</h1>
+      <p class="text-sm text-muted mb-6">{{ message }}</p>
       <a href="/portal/login"
          class="inline-block px-5 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700">
         Try again

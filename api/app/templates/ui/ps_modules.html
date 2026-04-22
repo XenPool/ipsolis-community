@@ -2,24 +2,24 @@
 
 {% block title %}PS Modules – {{ app_title }}{% endblock %}
 
-{% macro status_class(s) %}{% if s == 'installed' %}bg-green-100 text-green-700{% elif s == 'installing' %}bg-blue-100 text-blue-700{% elif s == 'failed' %}bg-red-100 text-red-600{% elif s == 'awaiting_upload' %}bg-yellow-50 text-yellow-700{% else %}bg-gray-100 text-gray-600{% endif %}{% endmacro %}
+{% macro status_class(s) %}{% if s == 'installed' %}bg-green-100 text-green-700{% elif s == 'installing' %}bg-blue-100 text-blue-700{% elif s == 'failed' %}bg-red-100 text-red-600{% elif s == 'awaiting_upload' %}bg-yellow-50 text-yellow-700{% else %}bg-surface-raised text-muted{% endif %}{% endmacro %}
 
 {% block content %}
 <div class="flex items-center justify-between mb-4">
-  <h1 class="text-lg font-semibold text-gray-900">PowerShell Modules</h1>
+  <h1 class="text-lg font-semibold text-heading">PowerShell Modules</h1>
 </div>
 
 <!-- Add module form -->
-<div class="bg-white rounded-lg border border-gray-200 p-4 mb-6">
-  <h2 class="text-sm font-semibold text-gray-700 mb-3">Add module</h2>
+<div class="bg-surface rounded-lg border border-token-border p-4 mb-6">
+  <h2 class="text-sm font-semibold text-body mb-3">Add module</h2>
 
   <!-- Source selector -->
   <div class="flex gap-4 mb-3">
-    <label class="flex items-center gap-1.5 cursor-pointer text-sm text-gray-700">
+    <label class="flex items-center gap-1.5 cursor-pointer text-sm text-body">
       <input type="radio" name="add-source-type" value="gallery" checked onchange="onSourceTypeChange()" class="accent-blue-600">
       PSGallery
     </label>
-    <label class="flex items-center gap-1.5 cursor-pointer text-sm text-gray-700">
+    <label class="flex items-center gap-1.5 cursor-pointer text-sm text-body">
       <input type="radio" name="add-source-type" value="upload" onchange="onSourceTypeChange()" class="accent-blue-600">
       Manual Upload (SDK / non-Gallery)
     </label>
@@ -27,28 +27,28 @@
 
   <!-- Gallery fields -->
   <div id="form-gallery-fields">
-    <p class="text-xs text-gray-500 mb-3">
+    <p class="text-xs text-muted mb-3">
       The <strong>exact module name</strong> from the
       <a href="https://www.powershellgallery.com" target="_blank" rel="noopener"
          class="text-blue-600 hover:underline">PowerShell Gallery</a>
-      must be provided (case-sensitive, e.g.&nbsp;<code class="font-mono bg-gray-100 px-1 rounded">VMware.PowerCLI</code>).
+      must be provided (case-sensitive, e.g.&nbsp;<code class="font-mono bg-surface-raised px-1 rounded">VMware.PowerCLI</code>).
     </p>
     <div class="flex gap-3 items-end">
       <div class="relative">
-        <label class="block text-xs font-medium text-gray-600 mb-1">Name <span class="text-red-500">*</span></label>
+        <label class="block text-xs font-medium text-muted mb-1">Name <span class="text-red-500">*</span></label>
         <input type="text" id="add-name-gallery" autocomplete="off"
                placeholder="Search module or enter name…"
                oninput="onSearchInput()"
                onkeydown="if(event.key==='Escape') document.getElementById('search-dropdown').classList.add('hidden')"
-               class="rounded border border-gray-300 text-sm px-3 py-2 w-96 focus:outline-none focus:ring-1 focus:ring-blue-400">
+               class="rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-2 w-96 focus:outline-none focus:ring-1 focus:ring-blue-500">
         <div id="search-dropdown"
-             class="hidden absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded shadow-lg max-h-64 overflow-y-auto text-sm">
+             class="hidden absolute z-10 mt-1 w-full bg-surface border border-token-border rounded shadow-lg max-h-64 overflow-y-auto text-sm">
         </div>
       </div>
       <div>
-        <label class="block text-xs font-medium text-gray-600 mb-1">Version (optional)</label>
+        <label class="block text-xs font-medium text-muted mb-1">Version (optional)</label>
         <input type="text" id="add-version" placeholder="e.g. 13.2.1"
-               class="rounded border border-gray-300 text-sm px-3 py-2 w-36 focus:outline-none focus:ring-1 focus:ring-blue-400">
+               class="rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-2 w-36 focus:outline-none focus:ring-1 focus:ring-blue-500">
       </div>
       <button onclick="addModule()"
               class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700">
@@ -60,18 +60,18 @@
 
   <!-- Upload fields -->
   <div id="form-upload-fields" class="hidden">
-    <p class="text-xs text-gray-500 mb-3">
+    <p class="text-xs text-muted mb-3">
       Enter the <strong>exact module name</strong> (used as the folder name inside
-      <code class="font-mono bg-gray-100 px-1 rounded">~/.local/share/powershell/Modules/</code>).
+      <code class="font-mono bg-surface-raised px-1 rounded">~/.local/share/powershell/Modules/</code>).
       After saving, an <strong>Upload</strong> button will appear in the table row so you can
       upload the module zip.
     </p>
     <div class="flex gap-3 items-end">
       <div>
-        <label class="block text-xs font-medium text-gray-600 mb-1">Module name <span class="text-red-500">*</span></label>
+        <label class="block text-xs font-medium text-muted mb-1">Module name <span class="text-red-500">*</span></label>
         <input type="text" id="add-name-upload" autocomplete="off"
                placeholder="e.g. XenServerPSModule"
-               class="rounded border border-gray-300 text-sm px-3 py-2 w-72 focus:outline-none focus:ring-1 focus:ring-blue-400">
+               class="rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-2 w-72 focus:outline-none focus:ring-1 focus:ring-blue-500">
       </div>
       <button onclick="addModule()"
               class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700">
@@ -83,23 +83,23 @@
 </div>
 
 <!-- Module table -->
-<div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+<div class="bg-surface rounded-lg border border-token-border overflow-hidden">
   <table class="w-full text-sm">
-    <thead class="bg-gray-50 border-b border-gray-200">
+    <thead class="bg-surface-raised border-b border-token-border">
       <tr>
-        <th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-600">Name</th>
-        <th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-600">Source</th>
-        <th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-600">Desired version</th>
-        <th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-600">Status</th>
-        <th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-600">Installed version</th>
-        <th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-600">Actions</th>
+        <th class="text-left px-4 py-2.5 text-xs font-semibold text-muted">Name</th>
+        <th class="text-left px-4 py-2.5 text-xs font-semibold text-muted">Source</th>
+        <th class="text-left px-4 py-2.5 text-xs font-semibold text-muted">Desired version</th>
+        <th class="text-left px-4 py-2.5 text-xs font-semibold text-muted">Status</th>
+        <th class="text-left px-4 py-2.5 text-xs font-semibold text-muted">Installed version</th>
+        <th class="text-left px-4 py-2.5 text-xs font-semibold text-muted">Actions</th>
       </tr>
     </thead>
-    <tbody id="module-table-body" class="divide-y divide-gray-100">
+    <tbody id="module-table-body" class="divide-y divide-token-border">
       {% if ps_modules %}
         {% for m in ps_modules %}
         <tr data-module-id="{{ m.id }}" data-status="{{ m.status }}" data-source="{{ m.source_type }}">
-          <td class="px-4 py-3 font-mono text-xs text-gray-900">{{ m.name }}</td>
+          <td class="px-4 py-3 font-mono text-xs text-heading">{{ m.name }}</td>
           <td class="px-4 py-3 text-xs">
             {% if m.source_type == 'upload' %}
               <span class="bg-purple-50 text-purple-700 text-xs font-medium px-2 py-0.5 rounded-full">Upload</span>
@@ -107,13 +107,13 @@
               <span class="bg-blue-50 text-blue-700 text-xs font-medium px-2 py-0.5 rounded-full">Gallery</span>
             {% endif %}
           </td>
-          <td class="px-4 py-3 text-xs text-gray-600">{{ m.required_version or '–' }}</td>
+          <td class="px-4 py-3 text-xs text-muted">{{ m.required_version or '–' }}</td>
           <td class="px-4 py-3">
             <span class="status-badge {{ status_class(m.status) }} text-xs font-medium px-2 py-0.5 rounded-full">
               {{ m.status | replace('_', ' ') }}{% if m.status == 'installing' %} <span class="animate-pulse">…</span>{% endif %}
             </span>
           </td>
-          <td class="px-4 py-3 text-xs text-gray-600 font-mono">{{ m.installed_version or '–' }}</td>
+          <td class="px-4 py-3 text-xs text-muted font-mono">{{ m.installed_version or '–' }}</td>
           <td class="px-4 py-3 flex gap-3 items-center">
             {% if m.source_type == 'upload' %}
             <button onclick="triggerUpload({{ m.id }})"
@@ -135,7 +135,7 @@
         {% endfor %}
       {% else %}
         <tr id="empty-row">
-          <td colspan="6" class="px-4 py-6 text-center text-sm text-gray-400">
+          <td colspan="6" class="px-4 py-6 text-center text-sm text-muted/70">
             No PS modules configured yet.
           </td>
         </tr>
@@ -178,11 +178,11 @@ function onSearchInput() {
         var safeName = r.name.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
         var safeVer  = (r.version || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;');
         var safeDesc = (r.description || '').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-        return '<div class="px-3 py-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-0"'
+        return '<div class="px-3 py-2 hover:bg-blue-50 cursor-pointer border-b border-token-border last:border-0"'
           + ' data-name="' + safeName + '" data-version="' + safeVer + '">'
-          + '<span class="font-mono font-medium text-gray-900">' + safeName + '</span>'
-          + '<span class="ml-2 text-xs text-gray-400">' + safeVer + '</span>'
-          + (safeDesc ? '<div class="text-xs text-gray-500 mt-0.5">' + safeDesc + '</div>' : '')
+          + '<span class="font-mono font-medium text-heading">' + safeName + '</span>'
+          + '<span class="ml-2 text-xs text-muted/70">' + safeVer + '</span>'
+          + (safeDesc ? '<div class="text-xs text-muted mt-0.5">' + safeDesc + '</div>' : '')
           + '</div>';
       }).join('');
       dd.classList.remove('hidden');
@@ -210,13 +210,13 @@ var _pollingInterval = null;
 
 function _statusClass(s) {
   var map = {
-    pending:         'bg-gray-100 text-gray-600',
+    pending:         'bg-surface-raised text-muted',
     installing:      'bg-blue-100 text-blue-700',
     installed:       'bg-green-100 text-green-700',
     failed:          'bg-red-100 text-red-600',
     awaiting_upload: 'bg-yellow-50 text-yellow-700',
   };
-  return map[s] || 'bg-gray-100 text-gray-600';
+  return map[s] || 'bg-surface-raised text-muted';
 }
 
 function _statusLabel(s) {
@@ -285,7 +285,7 @@ async function addModule() {
   var version = sourceType === 'gallery' ? (document.getElementById('add-version').value.trim() || null) : null;
 
   resultEl.textContent = 'Adding…';
-  resultEl.className = 'text-sm text-gray-500';
+  resultEl.className = 'text-sm text-muted';
   try {
     var resp = await fetch('/admin/ps-modules', {
       method: 'POST',
@@ -324,11 +324,11 @@ async function addModule() {
       : '';
 
     tr.innerHTML =
-      '<td class="px-4 py-3 font-mono text-xs text-gray-900">' + data.name + '</td>'
+      '<td class="px-4 py-3 font-mono text-xs text-heading">' + data.name + '</td>'
       + '<td class="px-4 py-3 text-xs">' + sourceBadge + '</td>'
-      + '<td class="px-4 py-3 text-xs text-gray-600">' + (data.required_version || '–') + '</td>'
+      + '<td class="px-4 py-3 text-xs text-muted">' + (data.required_version || '–') + '</td>'
       + '<td class="px-4 py-3"><span class="status-badge ' + _statusClass(data.status) + ' text-xs font-medium px-2 py-0.5 rounded-full">' + _statusLabel(data.status) + '</span></td>'
-      + '<td class="px-4 py-3 text-xs text-gray-600 font-mono">–</td>'
+      + '<td class="px-4 py-3 text-xs text-muted font-mono">–</td>'
       + '<td class="px-4 py-3 flex gap-3 items-center">'
       + uploadBtn
       + '<button onclick="reinstall(' + data.id + ')" class="text-xs text-blue-600 hover:underline">Reinstall</button>'

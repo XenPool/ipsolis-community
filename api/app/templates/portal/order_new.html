@@ -4,10 +4,10 @@
 
 {% block content %}
 <div class="mb-6">
-  <a href="/portal/" class="text-sm text-gray-500 hover:text-gray-800">← Orders</a>
+  <a href="/portal/" class="text-sm text-muted hover:text-heading">← Orders</a>
 </div>
 
-<h1 class="text-lg font-semibold text-gray-900 mb-6">Request New Access</h1>
+<h1 class="text-lg font-semibold text-heading mb-6">Request New Access</h1>
 
 {% if error %}
 <div class="mb-6 rounded-lg bg-red-50 border border-red-200 px-4 py-3">
@@ -18,14 +18,14 @@
 <form method="post" action="/portal/orders/new" class="space-y-6">
 
   <!-- Asset-Typ -->
-  <div class="bg-white rounded-lg border border-gray-200 p-5">
-    <h2 class="text-sm font-semibold text-gray-700 mb-4">Asset Type</h2>
+  <div class="bg-surface rounded-lg border border-token-border p-5">
+    <h2 class="text-sm font-semibold text-body mb-4">Asset Type</h2>
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
       {% for t in asset_types %}
       {% set sold_out = t.id in unavailable_ids %}
       <label class="relative flex rounded-lg border p-4
-        {% if sold_out %}border-gray-200 bg-gray-50 cursor-not-allowed opacity-60
-        {% else %}cursor-pointer border-gray-200 hover:border-blue-400 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50{% endif %}">
+        {% if sold_out %}border-token-border bg-surface-raised cursor-not-allowed opacity-60
+        {% else %}cursor-pointer border-token-border hover:border-blue-400 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50 dark:has-[:checked]:bg-blue-500/20 has-[:checked]:[&_p]:text-blue-900 dark:has-[:checked]:[&_p]:text-blue-200{% endif %}">
         <input type="radio" name="asset_type_id" value="{{ t.id }}"
                {% if sold_out %}disabled{% endif %}
                {% if not sold_out and form and form.asset_type_id == t.id %}checked{% endif %}
@@ -36,7 +36,7 @@
           {% endif %}
           <div class="flex-1 min-w-0">
           <div class="flex items-center justify-between gap-2">
-            <p class="text-sm font-medium {% if sold_out %}text-gray-400{% else %}text-gray-900{% endif %}">{{ t.name }}</p>
+            <p class="text-sm font-medium {% if sold_out %}text-muted/70{% else %}text-heading{% endif %}">{{ t.name }}</p>
             {% if sold_out %}
             <span class="shrink-0 inline-flex items-center gap-1 rounded-full bg-amber-100 border border-amber-200 px-2 py-0.5 text-[11px] font-medium text-amber-700">
               <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M12 3a9 9 0 100 18 9 9 0 000-18z"/></svg>
@@ -45,12 +45,12 @@
             {% endif %}
           </div>
           {% if t.description %}
-          <p class="text-xs {% if sold_out %}text-gray-400{% else %}text-gray-500{% endif %} mt-0.5">{{ t.description }}</p>
+          <p class="text-xs {% if sold_out %}text-muted/70{% else %}text-muted{% endif %} mt-0.5">{{ t.description }}</p>
           {% endif %}
           {% if sold_out %}
           <p class="text-xs text-amber-600 mt-1">Currently no free assets available. Please try again later.</p>
           {% elif t.config and t.config | length > 0 %}
-          <p class="text-xs text-gray-400 mt-1">
+          <p class="text-xs text-muted/70 mt-1">
             {% for attr in t.config %}
               <span class="font-medium">{{ attr.label }}:</span> {{ attr.options | join(' / ') }}{% if not loop.last %} &middot; {% endif %}
             {% endfor %}
@@ -64,8 +64,8 @@
   </div>
 
   <!-- Attributes (dynamic, based on selected type) -->
-  <div id="attr-section-wrapper" class="hidden bg-white rounded-lg border border-gray-200 p-5">
-    <h2 class="text-sm font-semibold text-gray-700 mb-4">Options</h2>
+  <div id="attr-section-wrapper" class="hidden bg-surface rounded-lg border border-token-border p-5">
+    <h2 class="text-sm font-semibold text-body mb-4">Options</h2>
     {% for t in asset_types %}
     {% if t.config and t.config | length > 0 %}
     <div id="attr-section-{{ t.id }}" class="attr-section hidden space-y-4">
@@ -76,21 +76,21 @@
            data-visible-when-field="{{ attr.visible_when.field }}"
            data-visible-when-value="{{ attr.visible_when.value }}"
            {% endif %}>
-        <label class="block text-xs font-medium text-gray-600 mb-1">
+        <label class="block text-xs font-medium text-muted mb-1">
           {{ attr.label }}{% if attr.required %} <span class="text-red-500">*</span>{% endif %}
         </label>
         {% if attr_type == 'BOOL' %}
-        <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-          <input type="checkbox" name="attr_{{ attr.key }}" value="true" class="rounded border-gray-300">
+        <label class="flex items-center gap-2 text-sm text-body cursor-pointer">
+          <input type="checkbox" name="attr_{{ attr.key }}" value="true" class="rounded border-token-border">
           Yes
         </label>
         {% elif attr_type == 'INT' %}
         <input type="number" name="attr_{{ attr.key }}"
                value="{{ attr.default_value or '' }}"
-               class="w-32 rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400">
+               class="w-32 rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500">
         {% elif attr_type == 'ENUM' %}
         <select name="attr_{{ attr.key }}"
-                class="rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400">
+                class="rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500">
           {% if not attr.required %}<option value="">– please select –</option>{% endif %}
           {% for opt in (attr.options or []) %}
           <option value="{{ opt }}" {% if opt == (attr.default_value or '') %}selected{% endif %}>{{ opt }}</option>
@@ -99,8 +99,8 @@
         {% elif attr_type == 'MULTI_ENUM' %}
         <div class="flex flex-wrap gap-3">
           {% for opt in (attr.options or []) %}
-          <label class="flex items-center gap-1.5 text-sm text-gray-700 cursor-pointer">
-            <input type="checkbox" name="attr_{{ attr.key }}" value="{{ opt }}" class="rounded border-gray-300">
+          <label class="flex items-center gap-1.5 text-sm text-body cursor-pointer">
+            <input type="checkbox" name="attr_{{ attr.key }}" value="{{ opt }}" class="rounded border-token-border">
             {{ opt }}
           </label>
           {% endfor %}
@@ -108,7 +108,7 @@
         {% else %}
         <input type="text" name="attr_{{ attr.key }}"
                value="{{ attr.default_value or '' }}"
-               class="w-full rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400">
+               class="w-full rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500">
         {% endif %}
       </div>
       {% endfor %}
@@ -118,27 +118,27 @@
   </div>
 
   <!-- Requester (pre-filled from login, read-only) -->
-  <div class="bg-white rounded-lg border border-gray-200 p-5">
-    <h2 class="text-sm font-semibold text-gray-700 mb-4">Requester</h2>
-    <div class="flex items-center justify-between rounded bg-gray-50 border border-gray-100 px-4 py-3">
+  <div class="bg-surface rounded-lg border border-token-border p-5">
+    <h2 class="text-sm font-semibold text-body mb-4">Requester</h2>
+    <div class="flex items-center justify-between rounded bg-surface-raised border border-token-border px-4 py-3">
       <div>
-        <p class="text-sm font-medium text-gray-900">{{ user.name }}</p>
-        <p class="text-xs text-gray-500">{{ user.email }}</p>
+        <p class="text-sm font-medium text-heading">{{ user.name }}</p>
+        <p class="text-xs text-muted">{{ user.email }}</p>
       </div>
-      <span class="text-xs text-gray-400 italic">You</span>
+      <span class="text-xs text-muted/70 italic">You</span>
     </div>
     <input type="hidden" name="user_name" value="{{ user.name }}">
     <input type="hidden" name="user_email" value="{{ user.email }}">
 
     <!-- Deputy (optional, must be a valid AD user) -->
     <details class="mt-4" {% if form and form.owner_email %}open{% endif %}>
-      <summary class="text-xs text-gray-500 cursor-pointer hover:text-gray-700 select-none">
+      <summary class="text-xs text-muted cursor-pointer hover:text-body select-none">
         + Specify deputy (optional)
       </summary>
       <div class="mt-3">
-        <label class="block text-xs font-medium text-gray-600 mb-1">
+        <label class="block text-xs font-medium text-muted mb-1">
           Deputy
-          <span class="text-gray-400 font-normal ml-1">sAMAccountName or email · must be a valid domain user</span>
+          <span class="text-muted/70 font-normal ml-1">sAMAccountName or email · must be a valid domain user</span>
         </label>
 
         <div id="deputy-chip" class="mb-2 {% if not (form and form.owner_email) %}hidden{% endif %}">
@@ -159,12 +159,12 @@
                    hx-trigger="blur changed delay:400ms"
                    hx-target="#deputy-validate-result"
                    hx-include="this"
-                   class="w-full rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                   class="w-full rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
                    onkeydown="if(event.key==='Enter'){event.preventDefault();addDeputy()}">
             <div id="deputy-validate-result" class="mt-1 min-h-[1.25rem]"></div>
           </div>
           <button type="button" onclick="addDeputy()"
-                  class="px-3 py-2 bg-gray-100 text-gray-700 text-sm rounded border border-gray-300 hover:bg-gray-200 whitespace-nowrap">
+                  class="px-3 py-2 bg-surface-raised text-body text-sm rounded border border-token-border hover:bg-surface-raised whitespace-nowrap">
             + Add
           </button>
         </div>
@@ -177,26 +177,26 @@
   </div>
 
   <!-- Duration -->
-  <div class="bg-white rounded-lg border border-gray-200 p-5">
-    <h2 class="text-sm font-semibold text-gray-700 mb-4">Duration</h2>
+  <div class="bg-surface rounded-lg border border-token-border p-5">
+    <h2 class="text-sm font-semibold text-body mb-4">Duration</h2>
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
       <div>
-        <label class="block text-xs font-medium text-gray-600 mb-1">From <span class="text-red-500">*</span></label>
+        <label class="block text-xs font-medium text-muted mb-1">From <span class="text-red-500">*</span></label>
         <input type="date" name="requested_from" id="requested-from" required
                value="{{ form.requested_from if form else today }}"
                min="{{ today }}"
                {% if max_advance_days and max_advance_days > 0 %}max="{{ max_from_date }}"{% endif %}
-               class="w-full rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400">
+               class="w-full rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500">
         {% if max_advance_days and max_advance_days > 0 %}
-        <p class="text-xs text-gray-400 mt-1">Up to {{ max_advance_days }} days in advance</p>
+        <p class="text-xs text-muted/70 mt-1">Up to {{ max_advance_days }} days in advance</p>
         {% endif %}
       </div>
       <div>
-        <label class="block text-xs font-medium text-gray-600 mb-1">Until <span class="text-red-500">*</span></label>
+        <label class="block text-xs font-medium text-muted mb-1">Until <span class="text-red-500">*</span></label>
         <input type="date" name="requested_until" required
                value="{{ form.requested_until if form else '' }}"
                min="{{ today }}"
-               class="w-full rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400">
+               class="w-full rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500">
       </div>
     </div>
     <div id="schedule-hint" class="hidden mt-3 rounded bg-blue-50 border border-blue-200 px-3 py-2">
@@ -209,9 +209,9 @@
   <!-- RDP-User (nur wenn allow_rdp_users) -->
   <div id="rdp-section" class="hidden space-y-4">
 
-  <div class="bg-white rounded-lg border border-gray-200 p-5">
-    <h2 class="text-sm font-semibold text-gray-700 mb-1">RDP-User</h2>
-    <p class="text-xs text-gray-500 mb-4">Users with Remote Desktop access (sAMAccountName or email)</p>
+  <div class="bg-surface rounded-lg border border-token-border p-5">
+    <h2 class="text-sm font-semibold text-body mb-1">RDP-User</h2>
+    <p class="text-xs text-muted mb-4">Users with Remote Desktop access (sAMAccountName or email)</p>
 
     <div id="rdp-list" class="flex flex-wrap gap-2 mb-3">
       {% if form and form.rdp_users %}
@@ -232,13 +232,13 @@
                hx-trigger="blur changed delay:400ms"
                hx-target="#rdp-validate-result"
                hx-include="this"
-               class="w-full rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400"
+               class="w-full rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
                onkeydown="if(event.key==='Enter'){event.preventDefault();addUser('rdp')}"
                autocomplete="off">
         <div id="rdp-validate-result" class="mt-1 h-4"></div>
       </div>
       <button type="button" onclick="addUser('rdp')"
-              class="px-3 py-2 bg-gray-100 text-gray-700 text-sm rounded border border-gray-300 hover:bg-gray-200 whitespace-nowrap">
+              class="px-3 py-2 bg-surface-raised text-body text-sm rounded border border-token-border hover:bg-surface-raised whitespace-nowrap">
         + Add
       </button>
     </div>
@@ -248,9 +248,9 @@
 
   <!-- Admin-User (nur wenn allow_admin_users) -->
   <div id="admin-section" class="hidden space-y-4">
-  <div class="bg-white rounded-lg border border-gray-200 p-5">
-    <h2 class="text-sm font-semibold text-gray-700 mb-1">Admin-User</h2>
-    <p class="text-xs text-gray-500 mb-4">Users with local administrator access on the VM</p>
+  <div class="bg-surface rounded-lg border border-token-border p-5">
+    <h2 class="text-sm font-semibold text-body mb-1">Admin-User</h2>
+    <p class="text-xs text-muted mb-4">Users with local administrator access on the VM</p>
 
     <div id="admin-list" class="flex flex-wrap gap-2 mb-3">
       {% if form and form.admin_users %}
@@ -271,13 +271,13 @@
                hx-trigger="blur changed delay:400ms"
                hx-target="#admin-validate-result"
                hx-include="this"
-               class="w-full rounded border border-gray-300 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-400"
+               class="w-full rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
                onkeydown="if(event.key==='Enter'){event.preventDefault();addUser('admin')}"
                autocomplete="off">
         <div id="admin-validate-result" class="mt-1 h-4"></div>
       </div>
       <button type="button" onclick="addUser('admin')"
-              class="px-3 py-2 bg-gray-100 text-gray-700 text-sm rounded border border-gray-300 hover:bg-gray-200 whitespace-nowrap">
+              class="px-3 py-2 bg-surface-raised text-body text-sm rounded border border-token-border hover:bg-surface-raised whitespace-nowrap">
         + Add
       </button>
     </div>
@@ -286,7 +286,7 @@
 
   <!-- Submit -->
   <div class="flex items-center justify-between">
-    <a href="/portal/" class="text-sm text-gray-500 hover:text-gray-800">Cancel</a>
+    <a href="/portal/" class="text-sm text-muted hover:text-heading">Cancel</a>
     <button type="submit"
             class="px-6 py-2.5 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700 focus:outline-none">
       Submit Order →

@@ -107,27 +107,27 @@ async def require_portal_auth(
     )
 
 _STATUS_COLORS = {
-    "pending":      "bg-gray-100 text-gray-700",
-    "scheduled":    "bg-indigo-100 text-indigo-700",
-    "processing":   "bg-blue-100 text-blue-700",
-    "provisioning": "bg-blue-100 text-blue-700",
-    "delivered":    "bg-green-100 text-green-700",
-    "provisioned":  "bg-green-100 text-green-700",
-    "revoking":     "bg-orange-100 text-orange-700",
-    "revoked":      "bg-gray-100 text-gray-500",
-    "failed":       "bg-red-100 text-red-700",
-    "expired":      "bg-orange-100 text-orange-700",
-    "cancelled":        "bg-gray-100 text-gray-500",
-    "pending_approval": "bg-amber-100 text-amber-700",
-    "rejected":         "bg-red-100 text-red-700",
+    "pending":      "bg-gray-100 text-gray-700 dark:bg-slate-700 dark:text-slate-200",
+    "scheduled":    "bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300",
+    "processing":   "bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300",
+    "provisioning": "bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300",
+    "delivered":    "bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-300",
+    "provisioned":  "bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-300",
+    "revoking":     "bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300",
+    "revoked":      "bg-gray-100 text-gray-500 dark:bg-slate-700 dark:text-slate-400",
+    "failed":       "bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300",
+    "expired":      "bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300",
+    "cancelled":        "bg-gray-100 text-gray-500 dark:bg-slate-700 dark:text-slate-400",
+    "pending_approval": "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300",
+    "rejected":         "bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300",
 }
 
 _STEP_COLORS = {
-    "pending": "bg-gray-100 text-gray-600",
-    "running": "bg-blue-100 text-blue-700",
-    "success": "bg-green-100 text-green-700",
-    "failed":  "bg-red-100 text-red-700",
-    "skipped": "bg-gray-100 text-gray-400",
+    "pending": "bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-slate-300",
+    "running": "bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300",
+    "success": "bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-300",
+    "failed":  "bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300",
+    "skipped": "bg-gray-100 text-gray-400 dark:bg-slate-700 dark:text-slate-500",
 }
 
 

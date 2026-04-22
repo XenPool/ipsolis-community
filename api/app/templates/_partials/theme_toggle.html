@@ -1,0 +1,12 @@
+<button type="button"
+        onclick="(function(){var d=document.documentElement;var n=d.classList.toggle('dark');try{localStorage.setItem('theme',n?'dark':'light')}catch(e){}})()"
+        class="inline-flex items-center justify-center w-9 h-9 rounded-lg border border-token-border text-muted hover:text-body hover:bg-surface-raised transition"
+        aria-label="Toggle theme"
+        title="Toggle light/dark">
+  <svg class="hidden dark:block w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1.5M12 19.5V21M4.22 4.22l1.06 1.06M18.72 18.72l1.06 1.06M3 12h1.5M19.5 12H21M4.22 19.78l1.06-1.06M18.72 5.28l1.06-1.06M12 7.5a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9Z"/>
+  </svg>
+  <svg class="block dark:hidden w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 15.5a9 9 0 1 1-9.5-12.25 7.25 7.25 0 0 0 9.5 12.25Z"/>
+  </svg>
+</button>

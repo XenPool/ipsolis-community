@@ -4,7 +4,7 @@
 
 {% block content %}
 <div class="mb-6 flex items-center justify-between">
-  <h1 class="text-lg font-semibold text-gray-900">
+  <h1 class="text-lg font-semibold text-heading">
     My Approvals
     {% if pending_count > 0 %}
     <span class="ml-2 inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-700">
@@ -13,42 +13,42 @@
     {% endif %}
   </h1>
   <a href="/portal/approvals{% if not show_recent %}?show_recent=true{% endif %}"
-     class="text-xs text-gray-500 hover:text-gray-800 underline">
+     class="text-xs text-muted hover:text-heading underline">
     {% if show_recent %}Hide recent decisions{% else %}Show recent decisions{% endif %}
   </a>
 </div>
 
 {% if pending_approvals %}
-<div class="bg-white rounded-lg border border-gray-200 overflow-hidden mb-6">
-  <table class="min-w-full divide-y divide-gray-200 text-sm">
-    <thead class="bg-gray-50">
+<div class="bg-surface rounded-lg border border-token-border overflow-hidden mb-6">
+  <table class="min-w-full divide-y divide-token-border text-sm">
+    <thead class="bg-surface-raised">
       <tr>
-        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Requester</th>
-        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Asset Type</th>
-        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Approval Type</th>
-        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Requested</th>
-        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Period</th>
-        <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wide">Actions</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wide">Requester</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wide">Asset Type</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wide">Approval Type</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wide">Requested</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wide">Period</th>
+        <th class="px-4 py-3 text-right text-xs font-medium text-muted uppercase tracking-wide">Actions</th>
       </tr>
     </thead>
-    <tbody class="divide-y divide-gray-100">
+    <tbody class="divide-y divide-token-border">
       {% for item in pending_approvals %}
-      <tr class="hover:bg-gray-50" id="approval-row-{{ item.approval.id }}">
+      <tr class="hover:bg-surface-raised" id="approval-row-{{ item.approval.id }}">
         <td class="px-4 py-3">
-          <div class="font-medium text-gray-900">{{ item.order.user_name }}</div>
-          <div class="text-xs text-gray-500">{{ item.order.user_email }}</div>
+          <div class="font-medium text-heading">{{ item.order.user_name }}</div>
+          <div class="text-xs text-muted">{{ item.order.user_email }}</div>
         </td>
-        <td class="px-4 py-3 text-gray-700 text-xs">{{ item.asset_type_name }}</td>
+        <td class="px-4 py-3 text-body text-xs">{{ item.asset_type_name }}</td>
         <td class="px-4 py-3">
           <span class="inline-block px-2 py-0.5 rounded text-xs font-semibold
             {% if item.approval.approver_type == 'manager' %}bg-blue-100 text-blue-700{% else %}bg-purple-100 text-purple-700{% endif %}">
             {{ 'Manager' if item.approval.approver_type == 'manager' else 'App Owner' }}
           </span>
         </td>
-        <td class="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">
+        <td class="px-4 py-3 text-muted text-xs whitespace-nowrap">
           {{ item.order.created_at.strftime("%d.%m.%Y %H:%M") }}
         </td>
-        <td class="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">
+        <td class="px-4 py-3 text-muted text-xs whitespace-nowrap">
           {% if item.order.requested_from %}{{ item.order.requested_from.strftime("%d.%m.%Y") }}{% endif %}
           –
           {% if item.order.requested_until %}{{ item.order.requested_until.strftime("%d.%m.%Y") }}{% endif %}
@@ -72,7 +72,7 @@
             <form method="POST" action="/portal/approvals/{{ item.approval.id }}/decide">
               <input type="hidden" name="decision" value="decline">
               <textarea name="comment" rows="2" placeholder="Reason for declining (optional)"
-                        class="w-full text-xs rounded border border-gray-300 px-2 py-1 mb-1 focus:outline-none focus:ring-1 focus:ring-red-400"></textarea>
+                        class="w-full text-xs rounded border border-token-border bg-surface text-body placeholder:text-muted/60 px-2 py-1 mb-1 focus:outline-none focus:ring-1 focus:ring-red-400"></textarea>
               <button type="submit"
                       class="px-3 py-1 bg-red-600 text-white text-xs font-medium rounded hover:bg-red-700">
                 Confirm Decline
@@ -86,50 +86,50 @@
   </table>
 </div>
 {% elif not show_recent %}
-<div class="bg-white rounded-lg border border-gray-200 p-12 text-center text-gray-400 text-sm">
+<div class="bg-surface rounded-lg border border-token-border p-12 text-center text-muted/70 text-sm">
   No pending approvals.
 </div>
 {% endif %}
 
 {% if show_recent and recent_approvals %}
-<h2 class="text-sm font-semibold text-gray-700 mb-3 mt-6">Recent Decisions</h2>
-<div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
-  <table class="min-w-full divide-y divide-gray-200 text-sm">
-    <thead class="bg-gray-50">
+<h2 class="text-sm font-semibold text-body mb-3 mt-6">Recent Decisions</h2>
+<div class="bg-surface rounded-lg border border-token-border overflow-hidden">
+  <table class="min-w-full divide-y divide-token-border text-sm">
+    <thead class="bg-surface-raised">
       <tr>
-        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Requester</th>
-        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Asset Type</th>
-        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Decision</th>
-        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Decided</th>
-        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Comment</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wide">Requester</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wide">Asset Type</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wide">Decision</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wide">Decided</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wide">Comment</th>
       </tr>
     </thead>
-    <tbody class="divide-y divide-gray-100">
+    <tbody class="divide-y divide-token-border">
       {% for item in recent_approvals %}
-      <tr class="hover:bg-gray-50">
+      <tr class="hover:bg-surface-raised">
         <td class="px-4 py-3">
-          <div class="font-medium text-gray-900">{{ item.order.user_name }}</div>
-          <div class="text-xs text-gray-500">{{ item.order.user_email }}</div>
+          <div class="font-medium text-heading">{{ item.order.user_name }}</div>
+          <div class="text-xs text-muted">{{ item.order.user_email }}</div>
         </td>
-        <td class="px-4 py-3 text-gray-700 text-xs">{{ item.asset_type_name }}</td>
+        <td class="px-4 py-3 text-body text-xs">{{ item.asset_type_name }}</td>
         <td class="px-4 py-3">
           <span class="inline-block px-2 py-0.5 rounded text-xs font-semibold
             {% if item.approval.status == 'approved' %}bg-green-100 text-green-700{% else %}bg-red-100 text-red-700{% endif %}">
             {{ item.approval.status }}
           </span>
         </td>
-        <td class="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">
+        <td class="px-4 py-3 text-muted text-xs whitespace-nowrap">
           {% if item.approval.decided_at %}{{ item.approval.decided_at.strftime("%d.%m.%Y %H:%M") }}{% else %}–{% endif %}
         </td>
-        <td class="px-4 py-3 text-gray-500 text-xs">{{ item.approval.comment or '–' }}</td>
+        <td class="px-4 py-3 text-muted text-xs">{{ item.approval.comment or '–' }}</td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
 </div>
 {% elif show_recent %}
-<h2 class="text-sm font-semibold text-gray-700 mb-3 mt-6">Recent Decisions</h2>
-<div class="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-400 text-sm">
+<h2 class="text-sm font-semibold text-body mb-3 mt-6">Recent Decisions</h2>
+<div class="bg-surface rounded-lg border border-token-border p-8 text-center text-muted/70 text-sm">
   No recent decisions.
 </div>
 {% endif %}

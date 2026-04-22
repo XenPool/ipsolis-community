@@ -1,4 +1,4 @@
-# XenPool IT Selfservice – Task Backlog
+# Ipsolis – Task Backlog
 
 Format: `[open]` / `[done]` / `[blocked]`
 Add new tasks at the top.

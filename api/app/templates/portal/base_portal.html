@@ -4,35 +4,43 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}{{ app_title }}{% endblock %}</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  {% include "_partials/theme_head.html" %}
   <script src="https://unpkg.com/htmx.org@2.0.4" crossorigin="anonymous"></script>
 </head>
-<body class="h-full flex bg-gray-50">
+<body class="h-full flex bg-surface-raised font-sans text-body">
 
   <!-- ── Left Sidebar ──────────────────────────────────────────────────────── -->
-  <aside class="w-56 bg-white border-r border-gray-200 flex flex-col flex-shrink-0 min-h-full">
+  <aside class="w-56 bg-surface border-r border-token-border flex flex-col flex-shrink-0 min-h-full">
 
     <!-- Logo / Brand -->
-    <div class="px-4 py-5 border-b border-gray-100 flex flex-col gap-1.5
+    <div class="px-4 py-5 border-b border-token-border flex flex-col gap-1.5
       {% if app_logo_position == 'center' %}items-center
       {% elif app_logo_position == 'right' %}items-end
       {% else %}items-start{% endif %}">
       {% if app_logo %}
         <a href="/portal/">
           <img src="/portal/logo"
-               style="width: {{ app_logo_size }}%; max-width: 100%; max-height: 64px; object-fit: contain;"
+               style="width: {{ app_logo_size }}%; max-width: 100%; max-height: 192px; object-fit: contain;"
                alt="{{ app_title }}">
         </a>
         {% if app_logo_show_title == 'true' %}
         <a href="/portal/"
            style="font-size: {{ app_logo_title_size }}px;"
-           class="font-semibold text-gray-600 leading-snug
+           class="font-semibold text-muted leading-snug
              {% if app_logo_position == 'center' %}text-center{% elif app_logo_position == 'right' %}text-right{% else %}text-left{% endif %}">
           {{ app_title }}
         </a>
         {% endif %}
       {% else %}
-        <a href="/portal/" class="font-semibold text-gray-900 text-sm tracking-wide leading-snug">
+        <a href="/portal/" class="block w-full">
+          <img src="/static/logos/sunset_light.svg" alt="{{ app_title }}"
+               class="block dark:hidden w-full h-auto object-contain">
+          <img src="/static/logos/sunset_dark.svg" alt="{{ app_title }}"
+               class="hidden dark:block w-full h-auto object-contain">
+        </a>
+        <a href="/portal/"
+           class="text-sm font-semibold text-muted leading-snug
+             {% if app_logo_position == 'center' %}text-center{% elif app_logo_position == 'right' %}text-right{% else %}text-left{% endif %}">
           {{ app_title }}
         </a>
       {% endif %}
@@ -41,8 +49,8 @@
     <!-- Navigation -->
     <nav class="flex-1 px-3 py-4 space-y-0.5">
       <a href="/portal/"
-         class="flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition-colors
-                {% if active_page == 'overview' %}bg-blue-50 text-blue-700{% else %}text-gray-600 hover:bg-gray-100 hover:text-gray-900{% endif %}">
+         class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors
+                {% if active_page == 'overview' %}bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300{% else %}text-muted hover:bg-surface-raised hover:text-body{% endif %}">
         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                 d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
@@ -50,8 +58,8 @@
         My Orders
       </a>
       <a href="/portal/my-it"
-         class="flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition-colors
-                {% if active_page == 'my-it' %}bg-blue-50 text-blue-700{% else %}text-gray-600 hover:bg-gray-100 hover:text-gray-900{% endif %}">
+         class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors
+                {% if active_page == 'my-it' %}bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300{% else %}text-muted hover:bg-surface-raised hover:text-body{% endif %}">
         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                 d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
@@ -59,8 +67,8 @@
         My IT
       </a>
       <a href="/portal/approvals"
-         class="flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition-colors
-                {% if active_page == 'approvals' %}bg-blue-50 text-blue-700{% else %}text-gray-600 hover:bg-gray-100 hover:text-gray-900{% endif %}">
+         class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors
+                {% if active_page == 'approvals' %}bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300{% else %}text-muted hover:bg-surface-raised hover:text-body{% endif %}">
         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                 d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
@@ -68,8 +76,8 @@
         My Approvals
       </a>
       <a href="/portal/orders/new"
-         class="flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition-colors
-                {% if active_page == 'new' %}bg-blue-50 text-blue-700{% else %}text-gray-600 hover:bg-gray-100 hover:text-gray-900{% endif %}">
+         class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors
+                {% if active_page == 'new' %}bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300{% else %}text-muted hover:bg-surface-raised hover:text-body{% endif %}">
         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
         </svg>
@@ -77,21 +85,32 @@
       </a>
     </nav>
 
-    <!-- User info + sign out -->
+    <!-- User info + sign out + theme -->
     {% if user is defined and user %}
-    <div class="px-4 py-4 border-t border-gray-100">
+    <div class="px-4 py-4 border-t border-token-border">
+      <div class="flex items-center justify-between mb-3">
+        <span class="text-[10px] uppercase tracking-[0.15em] text-muted">Theme</span>
+        {% include "_partials/theme_toggle.html" %}
+      </div>
       <div class="flex items-center gap-2.5 mb-2.5">
         <div class="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center
                     text-white text-xs font-semibold select-none flex-shrink-0">
           {{ user.name[0] | upper if user.name else '?' }}
         </div>
-        <span class="text-xs text-gray-700 truncate leading-tight">{{ user.name }}</span>
+        <span class="text-xs text-body truncate leading-tight">{{ user.name }}</span>
       </div>
       <a href="/portal/logout"
-         class="text-xs text-gray-400 hover:text-gray-600 hover:underline">
+         class="text-xs text-muted hover:text-body hover:underline">
         Sign out
       </a>
-      <div class="mt-3 text-[10px] text-gray-300">v{{ app_version }}</div>
+      <div class="mt-3 text-[10px] text-muted/70">v{{ app_version }}</div>
+    </div>
+    {% else %}
+    <div class="px-4 py-4 border-t border-token-border">
+      <div class="flex items-center justify-between">
+        <span class="text-[10px] uppercase tracking-[0.15em] text-muted">Theme</span>
+        {% include "_partials/theme_toggle.html" %}
+      </div>
     </div>
     {% endif %}
 

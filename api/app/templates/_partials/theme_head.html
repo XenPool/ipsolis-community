@@ -1,0 +1,55 @@
+<link rel="icon" type="image/svg+xml" href="/static/logos/sunset_icon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script>
+  (function() {
+    try {
+      var saved = localStorage.getItem('theme');
+      var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      if (saved === 'dark' || (saved === null && prefersDark)) {
+        document.documentElement.classList.add('dark');
+      }
+    } catch (e) { /* localStorage blocked */ }
+  })();
+</script>
+<style>
+  :root {
+    --surface: 255 255 255;
+    --surface-raised: 248 250 252;
+    --token-border: 226 232 240;
+    --body: 15 23 42;
+    --heading: 15 23 42;
+    --muted: 100 116 139;
+  }
+  html.dark {
+    --surface: 15 23 42;
+    --surface-raised: 30 41 59;
+    --token-border: 51 65 85;
+    --body: 226 232 240;
+    --heading: 255 255 255;
+    --muted: 148 163 184;
+  }
+  html, body { font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; }
+</style>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    darkMode: 'class',
+    theme: {
+      extend: {
+        fontFamily: {
+          sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif']
+        },
+        colors: {
+          surface:          'rgb(var(--surface) / <alpha-value>)',
+          'surface-raised': 'rgb(var(--surface-raised) / <alpha-value>)',
+          body:             'rgb(var(--body) / <alpha-value>)',
+          heading:          'rgb(var(--heading) / <alpha-value>)',
+          muted:            'rgb(var(--muted) / <alpha-value>)',
+          'token-border':   'rgb(var(--token-border) / <alpha-value>)'
+        }
+      }
+    }
+  };
+</script>

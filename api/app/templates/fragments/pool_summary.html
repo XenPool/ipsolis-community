@@ -1,14 +1,14 @@
 {% set cards = [
-  ("Free",        summary.free,        "bg-green-50",  "text-green-700",  "border-green-200", "Free"),
-  ("In use",      summary.busy,        "bg-blue-50",   "text-blue-700",   "border-blue-200",  "busy"),
-  ("Reclaiming",  summary.reclaiming,  "bg-orange-50", "text-orange-700", "border-orange-200","reclaiming"),
-  ("Maintenance", summary.maintenance, "bg-gray-50",   "text-gray-700",   "border-gray-200",  "maintenance"),
-  ("Total",       summary.total,       "bg-white",     "text-gray-900",   "border-gray-300",  ""),
+  ("Free",        summary.free,        "bg-green-50 dark:bg-green-500/10",   "text-green-700 dark:text-green-300",   "border-green-200 dark:border-green-500/30", "Free"),
+  ("In use",      summary.busy,        "bg-blue-50 dark:bg-blue-500/10",     "text-blue-700 dark:text-blue-300",     "border-blue-200 dark:border-blue-500/30",  "busy"),
+  ("Reclaiming",  summary.reclaiming,  "bg-orange-50 dark:bg-orange-500/10", "text-orange-700 dark:text-orange-300", "border-orange-200 dark:border-orange-500/30","reclaiming"),
+  ("Maintenance", summary.maintenance, "bg-surface-raised",                  "text-body",                            "border-token-border",                       "maintenance"),
+  ("Total",       summary.total,       "bg-surface",                         "text-heading",                          "border-token-border",                       ""),
 ] %}
 <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
   {% for label, count, bg, fg, border, slug in cards %}
-  <div class="rounded-lg border {{ border }} {{ bg }} px-5 py-4">
-    <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">{{ label }}</p>
+  <div class="rounded-xl border {{ border }} {{ bg }} px-5 py-4 shadow-sm shadow-slate-900/5 dark:shadow-black/20 hover:shadow-md transition-shadow">
+    <p class="text-xs font-medium text-muted uppercase tracking-wide">{{ label }}</p>
     {% if slug %}
     <a href="/ui/asset-pool?status={{ slug }}"
        class="mt-1 block text-3xl font-bold {{ fg }} hover:underline">{{ count }}</a>

@@ -5,18 +5,18 @@
 
 {% block content %}
 <div class="mb-6 flex items-center justify-between">
-  <h1 class="text-lg font-semibold text-gray-900">
+  <h1 class="text-lg font-semibold text-heading">
     Orders
-    <span class="ml-2 text-sm font-normal text-gray-500">({{ total_count }} total)</span>
+    <span class="ml-2 text-sm font-normal text-muted">({{ total_count }} total)</span>
   </h1>
 </div>
 
 <!-- Filter Bar -->
 <form method="get" action="/ui/orders" class="mb-4 flex flex-wrap gap-3 items-end">
   <div>
-    <label class="block text-xs font-medium text-gray-600 mb-1">Status</label>
+    <label class="block text-xs font-medium text-muted mb-1">Status</label>
     <select name="status_filter"
-            class="rounded border border-gray-300 text-sm px-3 py-1.5 bg-white text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-400">
+            class="rounded-lg border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-1.5 bg-surface-raised text-body focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
       <option value="">All</option>
       {% for s in all_statuses %}
       <option value="{{ s }}" {% if s == status_filter %}selected{% endif %}>{{ s }}</option>
@@ -24,93 +24,94 @@
     </select>
   </div>
   <div>
-    <label class="block text-xs font-medium text-gray-600 mb-1">User E-Mail</label>
+    <label class="block text-xs font-medium text-muted mb-1">User E-Mail</label>
     <input type="text" name="user_email" value="{{ user_email }}" placeholder="user@example.com"
-           class="rounded border border-gray-300 text-sm px-3 py-1.5 w-56 focus:outline-none focus:ring-1 focus:ring-blue-400">
+           class="rounded-lg border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-1.5 w-56 bg-surface-raised text-body placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
   </div>
   <button type="submit"
-          class="px-4 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 focus:outline-none">
+          class="px-4 py-1.5 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-surface transition-colors">
     Filter
   </button>
   {% if status_filter or user_email %}
-  <a href="/ui/orders" class="px-4 py-1.5 text-sm text-gray-600 hover:text-gray-900 underline">Reset</a>
+  <a href="/ui/orders" class="px-4 py-1.5 text-sm text-muted hover:text-body underline">Reset</a>
   {% endif %}
 </form>
 
 <!-- Orders Table -->
-<div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
-  <table class="min-w-full divide-y divide-gray-200 text-sm">
-    <thead class="bg-gray-50">
+<div class="bg-surface rounded-xl border border-token-border shadow-sm shadow-slate-900/5 dark:shadow-black/20 overflow-hidden">
+  <table class="min-w-full divide-y divide-token-border text-sm">
+    <thead class="bg-surface-raised">
       <tr>
-        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">ID</th>
-        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">User</th>
-        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Asset</th>
-        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Action</th>
-        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Status</th>
-        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Steps</th>
-        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Valid until</th>
-        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Created</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wide">ID</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wide">User</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wide">Asset</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wide">Action</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wide">Status</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wide">Steps</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wide">Valid until</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wide">Created</th>
         <th class="px-4 py-3"></th>
         <th class="px-4 py-3"></th>
       </tr>
     </thead>
-    <tbody class="divide-y divide-gray-100">
+    <tbody class="divide-y divide-token-border">
       {% for order in orders %}
-      <tr class="hover:bg-gray-50">
-        <td class="px-4 py-3 font-mono text-gray-600">#{{ order.id }}</td>
+      <tr class="hover:bg-surface-raised transition-colors">
+        <td class="px-4 py-3 font-mono text-muted">#{{ order.id }}</td>
         <td class="px-4 py-3">
-          <div class="font-medium text-gray-900">{{ order.user_name }}</div>
-          <div class="text-xs text-gray-500">{{ order.user_email }}</div>
+          <div class="font-medium text-heading">{{ order.user_name }}</div>
+          <div class="text-xs text-muted">{{ order.user_email }}</div>
         </td>
-        <td class="px-4 py-3 text-gray-700">
+        <td class="px-4 py-3 text-body">
           {% if order.assigned_asset_id %}
             {{ asset_names.get(order.assigned_asset_id, "–") }}
           {% elif asset_type_models.get(order.asset_type_id) == "dedicated_shared" %}
-            <span class="text-xs text-gray-500">Shared</span>
+            <span class="text-xs text-muted">Shared</span>
           {% elif asset_type_models.get(order.asset_type_id) == "capacity_pooled" %}
-            <span class="text-xs text-gray-500">Pooled</span>
+            <span class="text-xs text-muted">Pooled</span>
           {% else %}–{% endif %}
         </td>
         <td class="px-4 py-3">
-          <span class="inline-block px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">
+          <span class="inline-block px-2 py-0.5 rounded-md text-xs font-medium bg-surface-raised text-body border border-token-border">
             {{ order.action.value }}
           </span>
         </td>
         <td class="px-4 py-3">
-          <span class="inline-block px-2 py-0.5 rounded text-xs font-semibold {{ status_colors.get(order.status.value, 'bg-gray-100 text-gray-700') }}">
+          <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold {{ status_colors.get(order.status.value, 'bg-slate-100 dark:bg-slate-700 text-body') }}">
+            <span class="w-1.5 h-1.5 rounded-full bg-current opacity-70"></span>
             {{ order.status.value }}
           </span>
         </td>
-        <td class="px-4 py-3 text-gray-500 text-xs">
+        <td class="px-4 py-3 text-muted text-xs">
           {% set done = order.steps | selectattr("status.value", "in", ["success", "skipped"]) | list | length %}
           {% set total = order.steps | length %}
           {% if total > 0 %}{{ done }}/{{ total }}{% else %}–{% endif %}
         </td>
-        <td class="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">
+        <td class="px-4 py-3 text-muted text-xs whitespace-nowrap">
           {% if order.requested_until %}{{ order.requested_until.strftime("%d.%m.%Y") }}{% else %}–{% endif %}
         </td>
-        <td class="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">
+        <td class="px-4 py-3 text-muted text-xs whitespace-nowrap">
           {{ order.created_at.strftime("%d.%m.%Y %H:%M") }}
         </td>
         <td class="px-4 py-3 text-right">
-          <a href="/ui/orders/{{ order.id }}" class="text-blue-600 hover:underline text-xs">Detail</a>
+          <a href="/ui/orders/{{ order.id }}" class="text-blue-600 dark:text-blue-400 hover:underline text-xs">Detail</a>
         </td>
         <td class="px-4 py-3 text-right">
           {% if order.status.value in ("delivered", "provisioned") %}
           <div class="relative inline-block text-left admin-action-menu">
             <button onclick="toggleMenu(this)"
-                    class="text-xs px-2 py-1 rounded border border-gray-300 text-gray-600 hover:bg-gray-50 whitespace-nowrap">
+                    class="text-xs px-2 py-1 rounded-lg border border-token-border text-body hover:bg-surface-raised whitespace-nowrap transition-colors">
               Actions ▾
             </button>
-            <div class="admin-dropdown hidden absolute right-0 z-20 mt-1 w-44 bg-white rounded-lg border border-gray-200 shadow-lg py-1">
+            <div class="admin-dropdown hidden absolute right-0 z-20 mt-1 w-44 bg-surface rounded-lg border border-token-border shadow-lg shadow-slate-900/10 dark:shadow-black/40 py-1">
               <a href="/ui/orders/{{ order.id }}#admin-actions"
-                 class="block px-4 py-2 text-xs text-gray-700 hover:bg-gray-50">
+                 class="block px-4 py-2 text-xs text-body hover:bg-surface-raised">
                 Extend / Modify
               </a>
               <form method="post" action="/ui/orders/{{ order.id }}/cancel"
                     onsubmit="return confirm('Really cancel order #{{ order.id }}?')">
                 <button type="submit"
-                        class="block w-full text-left px-4 py-2 text-xs text-red-600 hover:bg-red-50">
+                        class="block w-full text-left px-4 py-2 text-xs text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10">
                   Cancel
                 </button>
               </form>
@@ -121,7 +122,7 @@
       </tr>
       {% else %}
       <tr>
-        <td colspan="10" class="px-4 py-8 text-center text-gray-400 text-sm">No orders found.</td>
+        <td colspan="10" class="px-4 py-8 text-center text-muted text-sm">No orders found.</td>
       </tr>
       {% endfor %}
     </tbody>
@@ -131,15 +132,15 @@
 <!-- Pagination -->
 {% if has_prev or has_next %}
 <div class="mt-4 flex items-center justify-between text-sm">
-  <div class="text-gray-500">Page {{ page }}</div>
+  <div class="text-muted">Page {{ page }}</div>
   <div class="flex gap-2">
     {% if has_prev %}
     <a href="?page={{ page - 1 }}&status_filter={{ status_filter }}&user_email={{ user_email }}"
-       class="px-3 py-1 rounded border border-gray-300 text-gray-700 hover:bg-gray-50">← Back</a>
+       class="px-3 py-1 rounded-lg border border-token-border text-body hover:bg-surface-raised transition-colors">← Back</a>
     {% endif %}
     {% if has_next %}
     <a href="?page={{ page + 1 }}&status_filter={{ status_filter }}&user_email={{ user_email }}"
-       class="px-3 py-1 rounded border border-gray-300 text-gray-700 hover:bg-gray-50">Next →</a>
+       class="px-3 py-1 rounded-lg border border-token-border text-body hover:bg-surface-raised transition-colors">Next →</a>
     {% endif %}
   </div>
 </div>

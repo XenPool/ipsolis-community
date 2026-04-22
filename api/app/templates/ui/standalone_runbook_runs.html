@@ -4,22 +4,22 @@
 
 {% block content %}
 <div class="mb-6">
-  <a href="/ui/standalone-runbooks" class="text-sm text-gray-500 hover:text-gray-800">← Back to Runbooks</a>
+  <a href="/ui/standalone-runbooks" class="text-sm text-muted hover:text-heading">← Back to Runbooks</a>
 </div>
 
 <div class="flex items-center justify-between mb-6">
   <div>
-    <h1 class="text-lg font-semibold text-gray-900">{{ runbook.name }} – Run History</h1>
-    <p class="text-xs text-gray-500 mt-1">{{ runbook.description or 'No description' }}</p>
+    <h1 class="text-lg font-semibold text-heading">{{ runbook.name }} – Run History</h1>
+    <p class="text-xs text-muted mt-1">{{ runbook.description or 'No description' }}</p>
   </div>
   <div class="flex items-center gap-3">
     <button id="list-auto-btn" onclick="toggleListAuto()"
-            class="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50 inline-flex items-center gap-2">
+            class="px-4 py-2 text-sm border border-token-border rounded hover:bg-surface-raised inline-flex items-center gap-2">
       <span id="list-auto-dot" class="w-2 h-2 rounded-full bg-gray-300"></span>
-      <span id="list-auto-label" class="text-gray-600">Auto-Refresh: off</span>
+      <span id="list-auto-label" class="text-muted">Auto-Refresh: off</span>
     </button>
     <a href="/ui/standalone-runbooks/{{ runbook.id }}/edit"
-       class="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded hover:bg-gray-50">Edit</a>
+       class="px-4 py-2 text-sm text-muted border border-token-border rounded hover:bg-surface-raised">Edit</a>
     <button onclick="triggerRun()"
             class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700"
             {% if not runbook.is_active %}disabled title="Runbook is inactive"{% endif %}>
@@ -28,41 +28,41 @@
   </div>
 </div>
 
-<div class="bg-white rounded-lg border border-gray-200">
+<div class="bg-surface rounded-lg border border-token-border">
   <table class="w-full text-sm">
     <thead>
-      <tr class="border-b border-gray-200 bg-gray-50">
-        <th class="px-4 py-3 text-left font-medium text-gray-600">Run #</th>
-        <th class="px-4 py-3 text-left font-medium text-gray-600">Status</th>
-        <th class="px-4 py-3 text-left font-medium text-gray-600">Trigger</th>
-        <th class="px-4 py-3 text-left font-medium text-gray-600">Started</th>
-        <th class="px-4 py-3 text-left font-medium text-gray-600">Duration</th>
-        <th class="px-4 py-3 text-left font-medium text-gray-600">Notes</th>
-        <th class="px-4 py-3 text-right font-medium text-gray-600">Details</th>
+      <tr class="border-b border-token-border bg-surface-raised">
+        <th class="px-4 py-3 text-left font-medium text-muted">Run #</th>
+        <th class="px-4 py-3 text-left font-medium text-muted">Status</th>
+        <th class="px-4 py-3 text-left font-medium text-muted">Trigger</th>
+        <th class="px-4 py-3 text-left font-medium text-muted">Started</th>
+        <th class="px-4 py-3 text-left font-medium text-muted">Duration</th>
+        <th class="px-4 py-3 text-left font-medium text-muted">Notes</th>
+        <th class="px-4 py-3 text-right font-medium text-muted">Details</th>
       </tr>
     </thead>
     <tbody id="runs-body">
-      <tr><td colspan="7" class="px-4 py-8 text-center text-gray-400">Loading…</td></tr>
+      <tr><td colspan="7" class="px-4 py-8 text-center text-muted/70">Loading…</td></tr>
     </tbody>
   </table>
 </div>
 
 <!-- Run detail modal -->
 <div id="run-detail-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-  <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] overflow-y-auto">
-    <div class="flex items-center justify-between px-5 py-4 border-b border-gray-200">
-      <h3 class="text-sm font-semibold text-gray-900" id="modal-title">Run Details</h3>
+  <div class="bg-surface rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] overflow-y-auto">
+    <div class="flex items-center justify-between px-5 py-4 border-b border-token-border">
+      <h3 class="text-sm font-semibold text-heading" id="modal-title">Run Details</h3>
       <div class="flex items-center gap-2">
         <button id="detail-auto-btn" onclick="toggleDetailAuto()"
-                class="inline-flex items-center gap-2 text-xs border border-gray-300 rounded px-2 py-1 hover:bg-gray-50">
+                class="inline-flex items-center gap-2 text-xs border border-token-border rounded px-2 py-1 hover:bg-surface-raised">
           <span id="detail-auto-dot" class="w-1.5 h-1.5 rounded-full bg-gray-300"></span>
-          <span id="detail-auto-label" class="text-gray-600">Auto-Refresh: off</span>
+          <span id="detail-auto-label" class="text-muted">Auto-Refresh: off</span>
         </button>
-        <button onclick="closeModal()" class="text-gray-400 hover:text-gray-700 text-lg">&times;</button>
+        <button onclick="closeModal()" class="text-muted/70 hover:text-body text-lg">&times;</button>
       </div>
     </div>
     <div id="modal-body" class="px-5 py-4">
-      <p class="text-sm text-gray-400">Loading…</p>
+      <p class="text-sm text-muted/70">Loading…</p>
     </div>
   </div>
 </div>
@@ -83,12 +83,12 @@ var STATUS_COLORS = {
   success: 'bg-green-100 text-green-700',
   failed:  'bg-red-100 text-red-700',
   running: 'bg-blue-100 text-blue-700',
-  pending: 'bg-gray-100 text-gray-600',
-  skipped: 'bg-gray-100 text-gray-400',
+  pending: 'bg-surface-raised text-muted',
+  skipped: 'bg-surface-raised text-muted/70',
 };
 
 function _badge(status) {
-  var cls = STATUS_COLORS[status] || 'bg-gray-100 text-gray-600';
+  var cls = STATUS_COLORS[status] || 'bg-surface-raised text-muted';
   return '<span class="px-2 py-0.5 rounded-full text-xs font-medium ' + cls + '">' + status + '</span>';
 }
 
@@ -114,24 +114,24 @@ async function loadRuns() {
   var runs = await resp.json();
   if (!runs.length) {
     document.getElementById('runs-body').innerHTML =
-      '<tr><td colspan="7" class="px-4 py-8 text-center text-gray-400">No runs yet.</td></tr>';
+      '<tr><td colspan="7" class="px-4 py-8 text-center text-muted/70">No runs yet.</td></tr>';
     return;
   }
   var html = runs.map(function(r) {
     var trigger = r.trigger === 'scheduled'
-      ? '<span class="text-xs text-gray-500">Scheduled</span>'
+      ? '<span class="text-xs text-muted">Scheduled</span>'
       : '<span class="text-xs text-blue-600">Manual</span>';
     var notesCell = r.notes
-      ? '<span class="text-xs text-gray-700" title="' + String(r.notes).replace(/"/g, '&quot;') + '">' + String(r.notes) + '</span>'
-      : '<span class="text-xs text-gray-300">–</span>';
-    return '<tr class="border-b border-gray-100 last:border-0 hover:bg-gray-50">'
-      + '<td class="px-4 py-3 font-mono text-gray-600">#' + r.id + '</td>'
+      ? '<span class="text-xs text-body" title="' + String(r.notes).replace(/"/g, '&quot;') + '">' + String(r.notes) + '</span>'
+      : '<span class="text-xs text-muted/50">–</span>';
+    return '<tr class="border-b border-token-border last:border-0 hover:bg-surface-raised">'
+      + '<td class="px-4 py-3 font-mono text-muted">#' + r.id + '</td>'
       + '<td class="px-4 py-3">' + _badge(r.status)
       + (r.error_message ? '<span class="text-xs text-red-500 ml-1" title="' + r.error_message.replace(/"/g, '&quot;') + '">!</span>' : '')
       + '</td>'
       + '<td class="px-4 py-3">' + trigger + '</td>'
-      + '<td class="px-4 py-3 text-xs text-gray-500">' + _fmtTime(r.started_at || r.created_at) + '</td>'
-      + '<td class="px-4 py-3 text-xs text-gray-500">' + _duration(r.started_at, r.finished_at) + '</td>'
+      + '<td class="px-4 py-3 text-xs text-muted">' + _fmtTime(r.started_at || r.created_at) + '</td>'
+      + '<td class="px-4 py-3 text-xs text-muted">' + _duration(r.started_at, r.finished_at) + '</td>'
       + '<td class="px-4 py-3">' + notesCell + '</td>'
       + '<td class="px-4 py-3 text-right">'
       + '  <button onclick="showRunDetail(' + r.id + ')" class="text-xs text-blue-600 hover:underline">View</button>'
@@ -144,7 +144,7 @@ async function loadRuns() {
 async function showRunDetail(runId) {
   _currentRunId = runId;
   document.getElementById('modal-title').textContent = 'Run #' + runId;
-  document.getElementById('modal-body').innerHTML = '<p class="text-sm text-gray-400">Loading…</p>';
+  document.getElementById('modal-body').innerHTML = '<p class="text-sm text-muted/70">Loading…</p>';
   document.getElementById('run-detail-modal').classList.remove('hidden');
   await _fetchRunDetail(runId, true);
 }
@@ -166,9 +166,9 @@ async function _fetchRunDetail(runId, isInitial) {
   var html = '<div class="mb-4">'
     + '<div class="flex items-center gap-3 mb-2">'
     + '  ' + _badge(run.status)
-    + '  <span class="text-xs text-gray-500">' + run.trigger + ' / ' + (run.triggered_by || '–') + '</span>'
+    + '  <span class="text-xs text-muted">' + run.trigger + ' / ' + (run.triggered_by || '–') + '</span>'
     + '</div>'
-    + '<div class="text-xs text-gray-500">'
+    + '<div class="text-xs text-muted">'
     + '  Created: ' + _fmtTime(run.created_at)
     + '  · Started: ' + _fmtTime(run.started_at)
     + '  · Finished: ' + _fmtTime(run.finished_at)
@@ -178,28 +178,28 @@ async function _fetchRunDetail(runId, isInitial) {
     + '</div>';
 
   if (run.steps && run.steps.length) {
-    html += '<h4 class="text-xs font-semibold text-gray-600 mb-2">Steps</h4>';
-    html += '<div class="border border-gray-200 rounded divide-y divide-gray-100">';
+    html += '<h4 class="text-xs font-semibold text-muted mb-2">Steps</h4>';
+    html += '<div class="border border-token-border rounded divide-y divide-token-border">';
     run.steps.sort(function(a, b) { return a.position - b.position; });
     run.steps.forEach(function(s) {
       html += '<div class="px-3 py-2">'
         + '<div class="flex items-center gap-2 mb-1">'
-        + '  <span class="w-5 h-5 flex items-center justify-center rounded-full bg-gray-100 text-gray-600 text-xs font-mono">' + s.position + '</span>'
-        + '  <span class="text-sm font-medium text-gray-900">' + s.step_name + '</span>'
+        + '  <span class="w-5 h-5 flex items-center justify-center rounded-full bg-surface-raised text-muted text-xs font-mono">' + s.position + '</span>'
+        + '  <span class="text-sm font-medium text-heading">' + s.step_name + '</span>'
         + '  ' + _badge(s.status)
-        + '  <span class="text-xs text-gray-400 ml-auto">' + _duration(s.started_at, s.finished_at) + '</span>'
+        + '  <span class="text-xs text-muted/70 ml-auto">' + _duration(s.started_at, s.finished_at) + '</span>'
         + '</div>';
       if (s.error) {
         html += '<pre class="text-xs text-red-600 bg-red-50 rounded px-2 py-1 mt-1 whitespace-pre-wrap">' + s.error + '</pre>';
       }
       if (s.log_output) {
-        html += '<pre class="xp-log text-xs text-gray-600 bg-gray-50 rounded px-2 py-1 mt-1 whitespace-pre-wrap max-h-40 overflow-y-auto">' + s.log_output + '</pre>';
+        html += '<pre class="xp-log text-xs text-muted bg-surface-raised rounded px-2 py-1 mt-1 whitespace-pre-wrap max-h-40 overflow-y-auto">' + s.log_output + '</pre>';
       }
       html += '</div>';
     });
     html += '</div>';
   } else {
-    html += '<p class="text-xs text-gray-400">No step details available.</p>';
+    html += '<p class="text-xs text-muted/70">No step details available.</p>';
   }
 
   body.innerHTML = html;

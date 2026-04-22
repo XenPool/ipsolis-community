@@ -1,4 +1,4 @@
-# Lessons Learned – XenPool IT Selfservice
+# Lessons Learned – Ipsolis
 
 Dieses File wird nach Korrekturen durch den User aktualisiert.
 Ziel: Gleiche Fehler nicht wiederholen.

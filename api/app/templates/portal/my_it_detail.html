@@ -4,19 +4,19 @@
 
 {% block content %}
 <div class="mb-5">
-  <a href="/portal/my-it" class="text-sm text-gray-500 hover:text-gray-800">← My IT</a>
+  <a href="/portal/my-it" class="text-sm text-muted hover:text-heading">← My IT</a>
 </div>
 
 <!-- Header -->
 <div class="flex items-start justify-between mb-6">
   <div>
-    <h1 class="text-xl font-semibold text-gray-900">{{ asset_type_name or "Asset" }}</h1>
-    <p class="text-sm text-gray-500 mt-0.5">
+    <h1 class="text-xl font-semibold text-heading">{{ asset_type_name or "Asset" }}</h1>
+    <p class="text-sm text-muted mt-0.5">
       {% if asset_name %}<span class="font-mono">{{ asset_name }}</span> · {% endif %}
       Order #{{ order.id }} · Valid until {{ order.requested_until.strftime("%d.%m.%Y") }}
     </p>
   </div>
-  <span class="inline-block px-3 py-1 rounded-full text-sm font-semibold {{ status_colors.get(order.status.value, 'bg-gray-100 text-gray-700') }}">
+  <span class="inline-block px-3 py-1 rounded-full text-sm font-semibold {{ status_colors.get(order.status.value, 'bg-surface-raised text-body') }}">
     {{ order.status.value }}
   </span>
 </div>
@@ -33,9 +33,9 @@
 </div>
 
 <div class="max-w-md">
-  <div class="bg-white rounded-lg border border-gray-200 p-5">
-    <h2 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-4">Cancel Scheduled Order</h2>
-    <p class="text-xs text-gray-500 mb-4">
+  <div class="bg-surface rounded-lg border border-token-border p-5">
+    <h2 class="text-xs font-semibold text-muted uppercase tracking-wide mb-4">Cancel Scheduled Order</h2>
+    <p class="text-xs text-muted mb-4">
       Cancels the scheduled order. No resources have been provisioned yet.
     </p>
     <form method="post" action="/portal/orders/{{ order.id }}/cancel"
@@ -52,25 +52,25 @@
 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 
   <!-- Modify -->
-  <div class="bg-white rounded-lg border border-gray-200 p-5">
-    <h2 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-4">Modify</h2>
+  <div class="bg-surface rounded-lg border border-token-border p-5">
+    <h2 class="text-xs font-semibold text-muted uppercase tracking-wide mb-4">Modify</h2>
     <form method="post" action="/portal/orders/{{ order.id }}/change" class="space-y-4">
 
       <div>
-        <label class="block text-xs font-medium text-gray-600 mb-1">Valid Until</label>
+        <label class="block text-xs font-medium text-muted mb-1">Valid Until</label>
         <input type="date" name="new_until"
                value="{{ order.requested_until.strftime('%Y-%m-%d') if order.requested_until else '' }}"
                min="{{ today }}"
-               class="rounded border border-gray-300 text-sm px-3 py-1.5 w-full focus:outline-none focus:ring-1 focus:ring-blue-400">
+               class="rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-1.5 w-full focus:outline-none focus:ring-1 focus:ring-blue-500">
       </div>
 
       {% if asset_type and asset_type.allow_rdp_users %}
       <div>
-        <label class="block text-xs font-medium text-gray-600 mb-1">
+        <label class="block text-xs font-medium text-muted mb-1">
           RDP Users
-          <span class="text-gray-400 font-normal ml-1">Current members · add or remove, then click Update</span>
+          <span class="text-muted/70 font-normal ml-1">Current members · add or remove, then click Update</span>
         </label>
-        <div class="tag-editor rounded border border-gray-300 bg-white px-2 py-1.5 flex flex-wrap gap-1 min-h-[2.5rem] focus-within:ring-1 focus-within:ring-blue-400 cursor-text"
+        <div class="tag-editor rounded border border-token-border bg-surface px-2 py-1.5 flex flex-wrap gap-1 min-h-[2.5rem] focus-within:ring-1 focus-within:ring-blue-400 cursor-text"
              data-field="rdp_users" data-validate-result="rdp-validate-msg">
           {% for u in effective_rdp_users %}
           <span class="tag inline-flex items-center gap-1 bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded">
@@ -86,11 +86,11 @@
       {% endif %}
       {% if asset_type and asset_type.allow_admin_users %}
       <div>
-        <label class="block text-xs font-medium text-gray-600 mb-1">
+        <label class="block text-xs font-medium text-muted mb-1">
           Admin Users
-          <span class="text-gray-400 font-normal ml-1">Current members · add or remove, then click Update</span>
+          <span class="text-muted/70 font-normal ml-1">Current members · add or remove, then click Update</span>
         </label>
-        <div class="tag-editor rounded border border-gray-300 bg-white px-2 py-1.5 flex flex-wrap gap-1 min-h-[2.5rem] focus-within:ring-1 focus-within:ring-blue-400 cursor-text"
+        <div class="tag-editor rounded border border-token-border bg-surface px-2 py-1.5 flex flex-wrap gap-1 min-h-[2.5rem] focus-within:ring-1 focus-within:ring-blue-400 cursor-text"
              data-field="admin_users" data-validate-result="adm-validate-msg">
           {% for u in effective_admin_users %}
           <span class="tag inline-flex items-center gap-1 bg-purple-100 text-purple-800 text-xs px-2 py-0.5 rounded">
@@ -113,9 +113,9 @@
   </div>
 
   <!-- Deprovision -->
-  <div class="bg-white rounded-lg border border-gray-200 p-5">
-    <h2 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-4">Deprovision</h2>
-    <p class="text-xs text-gray-500 mb-4">
+  <div class="bg-surface rounded-lg border border-token-border p-5">
+    <h2 class="text-xs font-semibold text-muted uppercase tracking-wide mb-4">Deprovision</h2>
+    <p class="text-xs text-muted mb-4">
       Ends access and returns the asset to the pool. This action cannot be undone.
     </p>
     <form method="post" action="/portal/orders/{{ order.id }}/cancel"
@@ -168,7 +168,7 @@
       var value = rawValue.trim();
       if (!value) return;
       var msgEl = msgDivId ? document.getElementById(msgDivId) : null;
-      if (msgEl) msgEl.innerHTML = '<span class="text-xs text-gray-400">Validating…</span>';
+      if (msgEl) msgEl.innerHTML = '<span class="text-xs text-muted/70">Validating…</span>';
       try {
         var r = await fetch('/portal/_validate-user?q=' + encodeURIComponent(value));
         var html = await r.text();

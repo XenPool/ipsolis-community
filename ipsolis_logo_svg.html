@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Ipsolis — SVG Exports</title>
+<style>
+  body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    background: #0a0e1a;
+    color: #e8ecf4;
+    margin: 0;
+    padding: 40px 20px;
+  }
+  h1 {
+    text-align: center;
+    font-weight: 300;
+    letter-spacing: 0.2em;
+    color: #8b95a8;
+    font-size: 14px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  p.intro {
+    text-align: center;
+    color: #6b7488;
+    font-size: 13px;
+    max-width: 520px;
+    margin: 0 auto 40px;
+    line-height: 1.6;
+  }
+  h2 {
+    text-align: center;
+    font-weight: 500;
+    color: #e8ecf4;
+    font-size: 16px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin: 48px 0 20px;
+  }
+  .row {
+    max-width: 1200px;
+    margin: 0 auto 16px;
+    display: grid;
+    grid-template-columns: 2fr 2fr 1fr;
+    gap: 16px;
+  }
+  .card {
+    background: #141a2b;
+    border: 1px solid #1f2940;
+    border-radius: 16px;
+    padding: 36px 24px 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    min-height: 160px;
+    justify-content: center;
+  }
+  .card.light {
+    background: #f4f6fa;
+    border-color: #e1e5ed;
+  }
+  .label {
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: #6b7488;
+    font-weight: 500;
+  }
+  .card.light .label { color: #8892a6; }
+  .filename {
+    font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+    font-size: 10px;
+    color: #4a5370;
+  }
+  .card.light .filename { color: #8892a6; }
+</style>
+</head>
+<body>
+
+<h1>Ipsolis — Final SVG Exports</h1>
+<p class="intro">
+  Three palettes × dark wordmark + light wordmark + app icon = 9 SVG files.
+  All files are scalable, editable, and drop-in ready for web, print, pitch decks, and app stores.
+</p>
+
+<!-- SUNSET -->
+<h2>Sunset Gradient</h2>
+<div class="row">
+  <div class="card">
+    <svg xmlns="http://www.w3.org/2000/svg" width="300" height="110" viewBox="0 0 300 110">
+      <g transform="translate(55, 55) rotate(-90)">
+        <path d="M 30 0 A 30 30 0 0 1 0 30" fill="none" stroke="#3b82f6" stroke-width="5" stroke-linecap="round"/>
+        <path d="M 0 30 A 30 30 0 0 1 -30 0" fill="none" stroke="#8b5cf6" stroke-width="5" stroke-linecap="round"/>
+        <path d="M -30 0 A 30 30 0 0 1 0 -30" fill="none" stroke="#ec4899" stroke-width="5" stroke-linecap="round"/>
+        <path d="M 0 -30 A 30 30 0 0 1 30 0" fill="none" stroke="#f59e0b" stroke-width="5" stroke-linecap="round"/>
+      </g>
+      <circle cx="55" cy="55" r="3" fill="#e8ecf4"/>
+      <text x="105" y="65" font-family="Inter, -apple-system, sans-serif" font-size="32" font-weight="600" fill="#e8ecf4" letter-spacing="-0.5">Ipsolis</text>
+      <text x="105" y="82" font-family="Inter, -apple-system, sans-serif" font-size="10" font-weight="500" fill="#8b95a8" letter-spacing="3">IT ASSET LIFECYCLE</text>
+    </svg>
+    <div class="label">Dark Wordmark</div>
+    <div class="filename">ipsolis_sunset_dark.svg</div>
+  </div>
+  <div class="card light">
+    <svg xmlns="http://www.w3.org/2000/svg" width="300" height="110" viewBox="0 0 300 110">
+      <g transform="translate(55, 55) rotate(-90)">
+        <path d="M 30 0 A 30 30 0 0 1 0 30" fill="none" stroke="#2563eb" stroke-width="5" stroke-linecap="round"/>
+        <path d="M 0 30 A 30 30 0 0 1 -30 0" fill="none" stroke="#7c3aed" stroke-width="5" stroke-linecap="round"/>
+        <path d="M -30 0 A 30 30 0 0 1 0 -30" fill="none" stroke="#db2777" stroke-width="5" stroke-linecap="round"/>
+        <path d="M 0 -30 A 30 30 0 0 1 30 0" fill="none" stroke="#d97706" stroke-width="5" stroke-linecap="round"/>
+      </g>
+      <circle cx="55" cy="55" r="3" fill="#1a2340"/>
+      <text x="105" y="65" font-family="Inter, -apple-system, sans-serif" font-size="32" font-weight="600" fill="#1a2340" letter-spacing="-0.5">Ipsolis</text>
+      <text x="105" y="82" font-family="Inter, -apple-system, sans-serif" font-size="10" font-weight="500" fill="#5a6580" letter-spacing="3">IT ASSET LIFECYCLE</text>
+    </svg>
+    <div class="label">Light Wordmark</div>
+    <div class="filename">ipsolis_sunset_light.svg</div>
+  </div>
+  <div class="card">
+    <svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 512 512">
+      <defs>
+        <linearGradient id="bgS" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#1e1b4b"/>
+          <stop offset="100%" stop-color="#0f0f23"/>
+        </linearGradient>
+      </defs>
+      <rect x="0" y="0" width="512" height="512" rx="112" fill="url(#bgS)"/>
+      <g transform="translate(256, 256) rotate(-90)">
+        <path d="M 140 0 A 140 140 0 0 1 0 140" fill="none" stroke="#3b82f6" stroke-width="22" stroke-linecap="round"/>
+        <path d="M 0 140 A 140 140 0 0 1 -140 0" fill="none" stroke="#8b5cf6" stroke-width="22" stroke-linecap="round"/>
+        <path d="M -140 0 A 140 140 0 0 1 0 -140" fill="none" stroke="#ec4899" stroke-width="22" stroke-linecap="round"/>
+        <path d="M 0 -140 A 140 140 0 0 1 140 0" fill="none" stroke="#f59e0b" stroke-width="22" stroke-linecap="round"/>
+      </g>
+      <circle cx="256" cy="256" r="14" fill="#ffffff"/>
+    </svg>
+    <div class="label">App Icon</div>
+    <div class="filename">ipsolis_sunset_icon.svg</div>
+  </div>
+</div>
+
+<!-- BLUE -->
+<h2>Corporate Blue</h2>
+<div class="row">
+  <div class="card">
+    <svg xmlns="http://www.w3.org/2000/svg" width="300" height="110" viewBox="0 0 300 110">
+      <g transform="translate(55, 55) rotate(-90)">
+        <path d="M 30 0 A 30 30 0 0 1 0 30" fill="none" stroke="#60a5fa" stroke-width="5" stroke-linecap="round"/>
+        <path d="M 0 30 A 30 30 0 0 1 -30 0" fill="none" stroke="#3b82f6" stroke-width="5" stroke-linecap="round"/>
+        <path d="M -30 0 A 30 30 0 0 1 0 -30" fill="none" stroke="#2563eb" stroke-width="5" stroke-linecap="round"/>
+        <path d="M 0 -30 A 30 30 0 0 1 30 0" fill="none" stroke="#1d4ed8" stroke-width="5" stroke-linecap="round"/>
+      </g>
+      <circle cx="55" cy="55" r="3" fill="#e8ecf4"/>
+      <text x="105" y="65" font-family="Inter, -apple-system, sans-serif" font-size="32" font-weight="600" fill="#e8ecf4" letter-spacing="-0.5">Ipsolis</text>
+      <text x="105" y="82" font-family="Inter, -apple-system, sans-serif" font-size="10" font-weight="500" fill="#8b95a8" letter-spacing="3">IT ASSET LIFECYCLE</text>
+    </svg>
+    <div class="label">Dark Wordmark</div>
+    <div class="filename">ipsolis_blue_dark.svg</div>
+  </div>
+  <div class="card light">
+    <svg xmlns="http://www.w3.org/2000/svg" width="300" height="110" viewBox="0 0 300 110">
+      <g transform="translate(55, 55) rotate(-90)">
+        <path d="M 30 0 A 30 30 0 0 1 0 30" fill="none" stroke="#60a5fa" stroke-width="5" stroke-linecap="round"/>
+        <path d="M 0 30 A 30 30 0 0 1 -30 0" fill="none" stroke="#3b82f6" stroke-width="5" stroke-linecap="round"/>
+        <path d="M -30 0 A 30 30 0 0 1 0 -30" fill="none" stroke="#2563eb" stroke-width="5" stroke-linecap="round"/>
+        <path d="M 0 -30 A 30 30 0 0 1 30 0" fill="none" stroke="#1e3a8a" stroke-width="5" stroke-linecap="round"/>
+      </g>
+      <circle cx="55" cy="55" r="3" fill="#1a2340"/>
+      <text x="105" y="65" font-family="Inter, -apple-system, sans-serif" font-size="32" font-weight="600" fill="#1a2340" letter-spacing="-0.5">Ipsolis</text>
+      <text x="105" y="82" font-family="Inter, -apple-system, sans-serif" font-size="10" font-weight="500" fill="#5a6580" letter-spacing="3">IT ASSET LIFECYCLE</text>
+    </svg>
+    <div class="label">Light Wordmark</div>
+    <div class="filename">ipsolis_blue_light.svg</div>
+  </div>
+  <div class="card">
+    <svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 512 512">
+      <defs>
+        <linearGradient id="bgB" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#1e3a8a"/>
+          <stop offset="100%" stop-color="#0c1e5e"/>
+        </linearGradient>
+      </defs>
+      <rect x="0" y="0" width="512" height="512" rx="112" fill="url(#bgB)"/>
+      <g transform="translate(256, 256) rotate(-90)">
+        <path d="M 140 0 A 140 140 0 0 1 0 140" fill="none" stroke="#93c5fd" stroke-width="22" stroke-linecap="round"/>
+        <path d="M 0 140 A 140 140 0 0 1 -140 0" fill="none" stroke="#60a5fa" stroke-width="22" stroke-linecap="round"/>
+        <path d="M -140 0 A 140 140 0 0 1 0 -140" fill="none" stroke="#3b82f6" stroke-width="22" stroke-linecap="round"/>
+        <path d="M 0 -140 A 140 140 0 0 1 140 0" fill="none" stroke="#2563eb" stroke-width="22" stroke-linecap="round"/>
+      </g>
+      <circle cx="256" cy="256" r="14" fill="#ffffff"/>
+    </svg>
+    <div class="label">App Icon</div>
+    <div class="filename">ipsolis_blue_icon.svg</div>
+  </div>
+</div>
+
+<!-- MONOCHROME -->
+<h2>Monochrome</h2>
+<div class="row">
+  <div class="card">
+    <svg xmlns="http://www.w3.org/2000/svg" width="300" height="110" viewBox="0 0 300 110">
+      <g transform="translate(55, 55) rotate(-90)">
+        <path d="M 30 0 A 30 30 0 0 1 0 30" fill="none" stroke="#e8ecf4" stroke-width="5" stroke-linecap="round" opacity="1"/>
+        <path d="M 0 30 A 30 30 0 0 1 -30 0" fill="none" stroke="#e8ecf4" stroke-width="5" stroke-linecap="round" opacity="0.75"/>
+        <path d="M -30 0 A 30 30 0 0 1 0 -30" fill="none" stroke="#e8ecf4" stroke-width="5" stroke-linecap="round" opacity="0.5"/>
+        <path d="M 0 -30 A 30 30 0 0 1 30 0" fill="none" stroke="#e8ecf4" stroke-width="5" stroke-linecap="round" opacity="0.3"/>
+      </g>
+      <circle cx="55" cy="55" r="3" fill="#e8ecf4"/>
+      <text x="105" y="65" font-family="Inter, -apple-system, sans-serif" font-size="32" font-weight="600" fill="#e8ecf4" letter-spacing="-0.5">Ipsolis</text>
+      <text x="105" y="82" font-family="Inter, -apple-system, sans-serif" font-size="10" font-weight="500" fill="#8b95a8" letter-spacing="3">IT ASSET LIFECYCLE</text>
+    </svg>
+    <div class="label">Dark Wordmark</div>
+    <div class="filename">ipsolis_mono_dark.svg</div>
+  </div>
+  <div class="card light">
+    <svg xmlns="http://www.w3.org/2000/svg" width="300" height="110" viewBox="0 0 300 110">
+      <g transform="translate(55, 55) rotate(-90)">
+        <path d="M 30 0 A 30 30 0 0 1 0 30" fill="none" stroke="#1a2340" stroke-width="5" stroke-linecap="round" opacity="1"/>
+        <path d="M 0 30 A 30 30 0 0 1 -30 0" fill="none" stroke="#1a2340" stroke-width="5" stroke-linecap="round" opacity="0.75"/>
+        <path d="M -30 0 A 30 30 0 0 1 0 -30" fill="none" stroke="#1a2340" stroke-width="5" stroke-linecap="round" opacity="0.5"/>
+        <path d="M 0 -30 A 30 30 0 0 1 30 0" fill="none" stroke="#1a2340" stroke-width="5" stroke-linecap="round" opacity="0.3"/>
+      </g>
+      <circle cx="55" cy="55" r="3" fill="#1a2340"/>
+      <text x="105" y="65" font-family="Inter, -apple-system, sans-serif" font-size="32" font-weight="600" fill="#1a2340" letter-spacing="-0.5">Ipsolis</text>
+      <text x="105" y="82" font-family="Inter, -apple-system, sans-serif" font-size="10" font-weight="500" fill="#5a6580" letter-spacing="3">IT ASSET LIFECYCLE</text>
+    </svg>
+    <div class="label">Light Wordmark</div>
+    <div class="filename">ipsolis_mono_light.svg</div>
+  </div>
+  <div class="card">
+    <svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 512 512">
+      <rect x="0" y="0" width="512" height="512" rx="112" fill="#1a2340"/>
+      <g transform="translate(256, 256) rotate(-90)">
+        <path d="M 140 0 A 140 140 0 0 1 0 140" fill="none" stroke="#ffffff" stroke-width="22" stroke-linecap="round" opacity="1"/>
+        <path d="M 0 140 A 140 140 0 0 1 -140 0" fill="none" stroke="#ffffff" stroke-width="22" stroke-linecap="round" opacity="0.75"/>
+        <path d="M -140 0 A 140 140 0 0 1 0 -140" fill="none" stroke="#ffffff" stroke-width="22" stroke-linecap="round" opacity="0.5"/>
+        <path d="M 0 -140 A 140 140 0 0 1 140 0" fill="none" stroke="#ffffff" stroke-width="22" stroke-linecap="round" opacity="0.3"/>
+      </g>
+      <circle cx="256" cy="256" r="14" fill="#ffffff"/>
+    </svg>
+    <div class="label">App Icon</div>
+    <div class="filename">ipsolis_mono_icon.svg</div>
+  </div>
+</div>
+
+</body>
+</html>
