@@ -62,7 +62,8 @@ services:
     volumes:
       - ./scripts:/app/scripts      # PowerShell scripts (read/write for script editor)
       - ./backups:/app/backups      # Local DB backups (shared with worker)
-      - ./licenses:/app/license:ro  # Signed .lic file (read-only)
+      - ./licenses:/app/license     # Signed .lic file (read-write: api handles uploads)
+      - ./locales:/app/locales:ro   # Portal i18n JSON (served via /locales/*.json)
     depends_on:
       postgres:
         condition: service_healthy

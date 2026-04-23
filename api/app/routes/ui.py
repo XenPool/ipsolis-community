@@ -839,3 +839,12 @@ async def maintenance_page(request: Request) -> HTMLResponse:
         "ui/maintenance.html",
         {"active_page": "maintenance"},
     )
+
+
+@router.get("/license", response_class=HTMLResponse)
+async def license_page(request: Request) -> HTMLResponse:
+    return templates.TemplateResponse(
+        request,
+        "ui/license.html",
+        {"active_page": "license"},
+    )

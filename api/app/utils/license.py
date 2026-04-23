@@ -59,10 +59,18 @@ class LicenseInfo(BaseModel):
 
 _COMMUNITY_FALLBACK = LicenseInfo()
 _CACHED_INFO: LicenseInfo | None = None
+_CACHED_MTIME: float | None = None  # mtime of the license file at cache time (None = no file)
 
 
 def _community(message: str = "") -> LicenseInfo:
     return LicenseInfo(message=message) if message else _COMMUNITY_FALLBACK
+
+
+def _current_mtime() -> float | None:
+    try:
+        return LICENSE_PATH.stat().st_mtime
+    except FileNotFoundError:
+        return None
 
 
 def _verify_signature(payload: dict, signature_b64: str) -> bool:
@@ -106,17 +114,26 @@ def _parse_datetime(value: str | None) -> datetime | None:
 def load_license(force_reload: bool = False) -> LicenseInfo:
     """Load, verify, and cache the license file.
 
-    Returns a Community fallback on any failure. Safe to call multiple times;
-    the first successful call caches the result in the current process.
-    """
-    global _CACHED_INFO
+    The cache is keyed on the file's mtime, so overwriting ``ipsolis.lic`` at
+    runtime (e.g. via the admin upload endpoint) is automatically picked up
+    by all processes on the next call — no broadcast needed.
 
-    if _CACHED_INFO is not None and not force_reload:
+    Returns a Community fallback on any failure.
+    """
+    global _CACHED_INFO, _CACHED_MTIME
+
+    current_mtime = _current_mtime()
+    if (
+        _CACHED_INFO is not None
+        and not force_reload
+        and _CACHED_MTIME == current_mtime
+    ):
         return _CACHED_INFO
 
-    if not LICENSE_PATH.exists():
+    if current_mtime is None:
         # Normal for Community installs — do not warn.
         _CACHED_INFO = _community()
+        _CACHED_MTIME = None
         return _CACHED_INFO
 
     try:
@@ -125,17 +142,20 @@ def load_license(force_reload: bool = False) -> LicenseInfo:
     except (OSError, json.JSONDecodeError) as exc:
         logger.warning("License file exists but could not be parsed: %s", exc)
         _CACHED_INFO = _community(f"License file invalid: {exc}")
+        _CACHED_MTIME = current_mtime
         return _CACHED_INFO
 
     if not isinstance(data, dict) or "signature" not in data:
         logger.warning("License file missing 'signature' field")
         _CACHED_INFO = _community("License file malformed (no signature)")
+        _CACHED_MTIME = current_mtime
         return _CACHED_INFO
 
     signature_b64 = data.pop("signature")
     if not _verify_signature(data, signature_b64):
         logger.warning("License signature verification failed")
         _CACHED_INFO = _community("License signature invalid")
+        _CACHED_MTIME = current_mtime
         return _CACHED_INFO
 
     issued_at = _parse_datetime(data.get("issued_at"))
@@ -160,6 +180,7 @@ def load_license(force_reload: bool = False) -> LicenseInfo:
             valid=False,
             message=f"License expired on {expires_at.date().isoformat()}",
         )
+        _CACHED_MTIME = current_mtime
         return _CACHED_INFO
 
     edition = str(data.get("edition") or COMMUNITY_EDITION)
@@ -187,6 +208,7 @@ def load_license(force_reload: bool = False) -> LicenseInfo:
         info.expires_at.isoformat() if info.expires_at else "never",
     )
     _CACHED_INFO = info
+    _CACHED_MTIME = current_mtime
     return _CACHED_INFO
 
 

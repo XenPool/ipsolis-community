@@ -1,0 +1,326 @@
+{% extends "base.html" %}
+
+{% block title %}License – {{ app_title }}{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+  <h1 class="text-lg font-semibold text-heading">License</h1>
+  <p class="text-xs text-muted mt-1">
+    Install or replace your signed Enterprise license. Signature is verified
+    before the file is written to disk; a bad file never replaces a good one.
+  </p>
+</div>
+
+<!-- Banner (success / error) -->
+<div id="banner" class="hidden mb-4 px-4 py-3 rounded text-sm font-medium"></div>
+
+<!-- Current license card -->
+<section class="bg-surface rounded-lg border border-token-border p-5 mb-6" id="status-card">
+  <div class="flex items-start justify-between gap-4 flex-wrap">
+    <div class="flex-1 min-w-0">
+      <div class="flex items-center gap-2 mb-2">
+        <span id="edition-badge"
+              class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold"></span>
+        <span id="validity-badge"
+              class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium hidden"></span>
+      </div>
+      <h2 id="licensee" class="text-base font-semibold text-heading break-all">Loading…</h2>
+      <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 mt-3 text-sm">
+        <div>
+          <dt class="text-xs uppercase tracking-wide text-muted">License ID</dt>
+          <dd id="license-id" class="text-body font-mono text-xs break-all">–</dd>
+        </div>
+        <div>
+          <dt class="text-xs uppercase tracking-wide text-muted">Issued</dt>
+          <dd id="issued-at" class="text-body">–</dd>
+        </div>
+        <div>
+          <dt class="text-xs uppercase tracking-wide text-muted">Expires</dt>
+          <dd id="expires-at" class="text-body">–</dd>
+        </div>
+        <div>
+          <dt class="text-xs uppercase tracking-wide text-muted">Max users / asset types</dt>
+          <dd id="limits" class="text-body">–</dd>
+        </div>
+        <div class="sm:col-span-2">
+          <dt class="text-xs uppercase tracking-wide text-muted">Features</dt>
+          <dd id="features" class="text-body text-xs">–</dd>
+        </div>
+      </dl>
+      <p id="message" class="mt-3 text-xs text-muted italic hidden"></p>
+    </div>
+    <div class="flex flex-col gap-2 shrink-0">
+      <a id="download-btn" href="/admin/license/download"
+         class="hidden inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium
+                rounded border border-token-border text-body hover:bg-surface-raised">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4"/>
+        </svg>
+        Download .lic
+      </a>
+      <button id="remove-btn" onclick="removeLicense()"
+              class="hidden inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium
+                     rounded border border-red-200 dark:border-red-500/30
+                     text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-500/10">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3"/>
+        </svg>
+        Remove
+      </button>
+    </div>
+  </div>
+</section>
+
+<!-- Upload card -->
+<section class="bg-surface rounded-lg border border-token-border p-5 mb-6">
+  <h2 class="text-sm font-semibold text-heading mb-1">Install or replace license</h2>
+  <p class="text-xs text-muted mb-4">
+    Drop your <code class="px-1 py-0.5 bg-surface-raised rounded text-[11px]">.lic</code>
+    file onto the area below, or click to pick. The current license is only
+    overwritten after the signature check passes.
+  </p>
+
+  <form id="upload-form" enctype="multipart/form-data">
+    <label id="dropzone" for="file-input"
+           class="block border-2 border-dashed border-token-border rounded-lg
+                  px-6 py-10 text-center cursor-pointer
+                  hover:border-blue-400 hover:bg-blue-50/30 dark:hover:bg-blue-500/5
+                  transition-colors">
+      <svg class="w-10 h-10 mx-auto mb-2 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+              d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+      </svg>
+      <p class="text-sm text-body">
+        <span id="dz-label">Drop .lic file here or click to browse</span>
+      </p>
+      <p class="text-xs text-muted mt-1">Max 64 KiB</p>
+      <input id="file-input" type="file" name="file" accept=".lic,application/json" class="hidden">
+    </label>
+    <div class="mt-4 flex items-center gap-3">
+      <button id="upload-btn" type="submit" disabled
+              class="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded
+                     bg-blue-600 hover:bg-blue-700 text-white
+                     disabled:opacity-50 disabled:cursor-not-allowed">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M5 13l4 4L19 7"/>
+        </svg>
+        <span id="upload-label">Install license</span>
+      </button>
+      <span id="selected-name" class="text-xs text-muted italic"></span>
+    </div>
+  </form>
+</section>
+
+<!-- How-to card -->
+<section class="bg-surface-raised rounded-lg border border-token-border p-5 text-xs text-muted leading-relaxed">
+  <h3 class="text-xs font-semibold uppercase tracking-wider text-body mb-2">How it works</h3>
+  <ol class="list-decimal pl-5 space-y-1">
+    <li>Request a license from <a class="underline hover:text-body" href="mailto:info@xenpool.com">info@xenpool.com</a>.
+      We send you a signed <code class="px-1 bg-surface rounded">.lic</code> file by email.</li>
+    <li>Upload it here. The signature is checked against the public key baked
+      into this build — if the file is corrupt or from a different issuer, the
+      upload is rejected and your current license stays untouched.</li>
+    <li>On success, the new license takes effect immediately across all
+      processes (api, worker, beat). No restart needed.</li>
+    <li>Enterprise features (scheduled orders, deputy support, standalone runbooks,
+      advanced maintenance, …) unlock as soon as the new license is active.</li>
+  </ol>
+</section>
+
+<script>
+// ── Fetch + render ────────────────────────────────────────────────────────
+async function loadStatus() {
+  const res = await fetch('/admin/license', { credentials: 'include' });
+  if (!res.ok) { showBanner('Failed to load license status: HTTP ' + res.status, 'error'); return; }
+  const info = await res.json();
+  renderStatus(info);
+}
+
+function renderStatus(info) {
+  const editionBadge = document.getElementById('edition-badge');
+  const validity = document.getElementById('validity-badge');
+  const filePresent = !!info.file_present;
+
+  if (info.edition === 'enterprise' && info.valid) {
+    editionBadge.textContent = 'Enterprise';
+    editionBadge.className = 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ' +
+      'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300';
+  } else {
+    editionBadge.textContent = 'Community';
+    editionBadge.className = 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ' +
+      'bg-gray-100 text-gray-700 dark:bg-slate-700 dark:text-slate-200';
+  }
+
+  if (filePresent && !info.valid) {
+    validity.textContent = 'File present but invalid';
+    validity.className = 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ' +
+      'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300';
+    validity.classList.remove('hidden');
+  } else {
+    validity.classList.add('hidden');
+  }
+
+  document.getElementById('licensee').textContent = info.licensee || '–';
+  document.getElementById('license-id').textContent = info.license_id || '–';
+  document.getElementById('issued-at').textContent = fmtDate(info.issued_at) || '–';
+
+  const expEl = document.getElementById('expires-at');
+  if (info.expires_at) {
+    const days = daysUntil(info.expires_at);
+    if (days < 0) {
+      expEl.innerHTML = fmtDate(info.expires_at) +
+        ' <span class="text-red-600 dark:text-red-400 font-medium">(expired ' + Math.abs(days) + ' days ago)</span>';
+    } else if (days <= 30) {
+      expEl.innerHTML = fmtDate(info.expires_at) +
+        ' <span class="text-amber-600 dark:text-amber-400 font-medium">(in ' + days + ' days)</span>';
+    } else {
+      expEl.innerHTML = fmtDate(info.expires_at) +
+        ' <span class="text-muted">(in ' + days + ' days)</span>';
+    }
+  } else {
+    expEl.textContent = 'never';
+  }
+
+  const max = (n) => (n === 0 ? 'unlimited' : n);
+  document.getElementById('limits').textContent = max(info.max_users) + ' / ' + max(info.max_asset_types);
+
+  const feats = Array.isArray(info.features) ? info.features : [];
+  document.getElementById('features').textContent = feats.length ? feats.join(', ') : '–';
+
+  const msgEl = document.getElementById('message');
+  if (info.message) {
+    msgEl.textContent = info.message;
+    msgEl.classList.remove('hidden');
+  } else {
+    msgEl.classList.add('hidden');
+  }
+
+  document.getElementById('download-btn').classList.toggle('hidden', !filePresent);
+  document.getElementById('remove-btn').classList.toggle('hidden', !filePresent);
+}
+
+function fmtDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return d.toLocaleDateString('en-GB', { year: 'numeric', month: 'short', day: '2-digit' });
+}
+
+function daysUntil(iso) {
+  const ms = new Date(iso) - new Date();
+  return Math.ceil(ms / (24 * 60 * 60 * 1000));
+}
+
+function showBanner(msg, kind) {
+  const b = document.getElementById('banner');
+  b.textContent = msg;
+  b.className = 'mb-4 px-4 py-3 rounded text-sm font-medium ' + (
+    kind === 'error'
+      ? 'bg-red-100 text-red-800 dark:bg-red-500/15 dark:text-red-300'
+      : kind === 'warn'
+      ? 'bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300'
+      : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300'
+  );
+  b.classList.remove('hidden');
+}
+
+// ── Upload ────────────────────────────────────────────────────────────────
+const fileInput = document.getElementById('file-input');
+const uploadBtn = document.getElementById('upload-btn');
+const dropzone = document.getElementById('dropzone');
+const dzLabel = document.getElementById('dz-label');
+const selectedName = document.getElementById('selected-name');
+
+fileInput.addEventListener('change', () => {
+  const f = fileInput.files[0];
+  if (f) {
+    selectedName.textContent = f.name + ' (' + f.size + ' bytes)';
+    uploadBtn.disabled = false;
+    dzLabel.textContent = 'Ready to upload: ' + f.name;
+  } else {
+    selectedName.textContent = '';
+    uploadBtn.disabled = true;
+    dzLabel.textContent = 'Drop .lic file here or click to browse';
+  }
+});
+
+['dragenter', 'dragover'].forEach(ev => {
+  dropzone.addEventListener(ev, e => {
+    e.preventDefault();
+    dropzone.classList.add('border-blue-500', 'bg-blue-50/30', 'dark:bg-blue-500/5');
+  });
+});
+['dragleave', 'drop'].forEach(ev => {
+  dropzone.addEventListener(ev, e => {
+    e.preventDefault();
+    dropzone.classList.remove('border-blue-500', 'bg-blue-50/30', 'dark:bg-blue-500/5');
+  });
+});
+dropzone.addEventListener('drop', e => {
+  if (e.dataTransfer.files && e.dataTransfer.files.length) {
+    fileInput.files = e.dataTransfer.files;
+    fileInput.dispatchEvent(new Event('change'));
+  }
+});
+
+document.getElementById('upload-form').addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  const f = fileInput.files[0];
+  if (!f) return;
+  uploadBtn.disabled = true;
+  document.getElementById('upload-label').textContent = 'Uploading…';
+  const fd = new FormData();
+  fd.append('file', f);
+  try {
+    const res = await fetch('/admin/license/upload', {
+      method: 'POST',
+      body: fd,
+      credentials: 'include',
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      showBanner('Upload failed: ' + (body.detail || ('HTTP ' + res.status)), 'error');
+    } else {
+      const info = body.info || {};
+      if (body.already_expired) {
+        showBanner('License installed, but it is already expired (' + fmtDate(info.expires_at) + '). Running as Community.', 'warn');
+      } else if (info.edition === 'enterprise' && info.valid) {
+        showBanner('Enterprise license installed for ' + info.licensee + '.', 'success');
+      } else {
+        showBanner('License installed.', 'success');
+      }
+      renderStatus(info);
+      fileInput.value = '';
+      selectedName.textContent = '';
+      dzLabel.textContent = 'Drop .lic file here or click to browse';
+    }
+  } catch (err) {
+    showBanner('Upload failed: ' + err, 'error');
+  } finally {
+    uploadBtn.disabled = false;
+    document.getElementById('upload-label').textContent = 'Install license';
+  }
+});
+
+// ── Remove ────────────────────────────────────────────────────────────────
+async function removeLicense() {
+  if (!confirm('Remove the current license and fall back to Community edition?')) return;
+  const res = await fetch('/admin/license', {
+    method: 'DELETE',
+    credentials: 'include',
+  });
+  if (res.status === 204) {
+    showBanner('License removed — now running Community edition.', 'success');
+    await loadStatus();
+  } else {
+    const body = await res.json().catch(() => ({}));
+    showBanner('Remove failed: ' + (body.detail || ('HTTP ' + res.status)), 'error');
+  }
+}
+
+// ── Boot ──────────────────────────────────────────────────────────────────
+loadStatus();
+</script>
+{% endblock %}
