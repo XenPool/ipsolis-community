@@ -38,6 +38,10 @@
     {% else %}
     {{ tab_locked("Retention", "retention") }}
     {% endif %}
+    <button onclick="showTab('seed')" id="tab-btn-seed"
+            class="tab-btn px-4 py-2 text-sm font-medium border-b-2 border-transparent text-muted hover:text-body">
+      Seed
+    </button>
   </nav>
 </div>
 
@@ -342,12 +346,33 @@
 {% endif %}
 </div>
 
+<!-- ── Tab: Seed ────────────────────────────────────────────────────────── -->
+<div id="tab-seed" class="hidden">
+  <div class="bg-surface rounded-lg border border-token-border p-5 max-w-3xl">
+    <h2 class="text-sm font-semibold text-body mb-1">Export scripts &amp; runbooks to disk</h2>
+    <p class="text-xs text-muted mb-4">
+      At runtime the database is the source of truth for script modules and
+      standalone runbooks. Use this to snapshot the current DB state to
+      <code class="px-1 py-0.5 bg-surface-raised rounded text-[11px]">scripts/modules/</code> and
+      <code class="px-1 py-0.5 bg-surface-raised rounded text-[11px]">scripts/runbooks/</code> on the
+      host, then <code class="px-1 py-0.5 bg-surface-raised rounded text-[11px]">git commit</code>
+      the result. Fresh deployments import what has been committed via migration
+      <code class="px-1 py-0.5 bg-surface-raised rounded text-[11px]">0046</code>.
+    </p>
+    <button type="button" onclick="exportSeed()" id="seed-export-btn"
+            class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">
+      Export to disk
+    </button>
+    <div id="seed-export-result" class="mt-4 hidden px-4 py-3 rounded text-sm font-medium"></div>
+  </div>
+</div>
+
 <script>
   var REFRESH_INTERVAL_MS = 30000;
   var refreshTimer = null;
 
   function showTab(name) {
-    ['health', 'backups', 'queue', 'retention'].forEach(function(n) {
+    ['health', 'backups', 'queue', 'retention', 'seed'].forEach(function(n) {
       var panel = document.getElementById('tab-' + n);
       var btn = document.getElementById('tab-btn-' + n);
       if (!panel || !btn) return;
@@ -876,6 +901,36 @@
     } else {
       var t = await resp.text();
       banner('Test failed: ' + t, 'error');
+    }
+  }
+
+  // ── Seed tab ───────────────────────────────────────────────────────────
+  async function exportSeed() {
+    var btn = document.getElementById('seed-export-btn');
+    var out = document.getElementById('seed-export-result');
+    btn.disabled = true;
+    btn.textContent = 'Exporting…';
+    out.classList.add('hidden');
+    try {
+      var res = await fetch('/admin/seed/export', {method: 'POST', credentials: 'include'});
+      var body = await res.json().catch(function() { return {}; });
+      if (!res.ok) {
+        out.textContent = 'Export failed: ' + (body.detail || ('HTTP ' + res.status));
+        out.className = 'mt-4 px-4 py-3 rounded text-sm font-medium bg-red-100 text-red-800 dark:bg-red-500/15 dark:text-red-300';
+      } else {
+        out.textContent = 'Exported ' + body.scripts + ' script(s) and ' + body.runbooks +
+          ' runbook(s) to ' + body.modules_dir + ' / ' + body.runbooks_dir +
+          '. Commit the changes in scripts/ to ship them as seed data.';
+        out.className = 'mt-4 px-4 py-3 rounded text-sm font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300';
+      }
+      out.classList.remove('hidden');
+    } catch (e) {
+      out.textContent = 'Export failed: ' + e;
+      out.className = 'mt-4 px-4 py-3 rounded text-sm font-medium bg-red-100 text-red-800 dark:bg-red-500/15 dark:text-red-300';
+      out.classList.remove('hidden');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Export to disk';
     }
   }
 

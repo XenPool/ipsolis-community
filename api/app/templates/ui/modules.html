@@ -8,53 +8,11 @@
     <h1 class="text-lg font-semibold text-heading">Script Modules</h1>
     <p class="text-xs text-muted mt-1">Admin-created scripts used as steps in runbooks.</p>
   </div>
-  <div class="flex items-center gap-2">
-    <button type="button" onclick="exportSeed()" id="seed-export-btn"
-       class="px-3 py-2 bg-surface-raised text-body text-sm font-medium rounded border border-token-border hover:bg-surface"
-       title="Snapshot all scripts + runbooks to scripts/ on the host. Commit the result to git to bake it into the next release's seed.">
-      Export to disk
-    </button>
-    <a href="/ui/modules/new"
-       class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700">
-      + New Module
-    </a>
-  </div>
+  <a href="/ui/modules/new"
+     class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700">
+    + New Module
+  </a>
 </div>
-
-<!-- Seed-export feedback banner -->
-<div id="seed-banner" class="hidden mb-4 px-4 py-3 rounded text-sm font-medium"></div>
-
-<script>
-async function exportSeed() {
-  const btn = document.getElementById('seed-export-btn');
-  const banner = document.getElementById('seed-banner');
-  btn.disabled = true;
-  btn.textContent = 'Exporting…';
-  banner.classList.add('hidden');
-  try {
-    const res = await fetch('/admin/seed/export', {
-      method: 'POST',
-      credentials: 'include',
-    });
-    const body = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      banner.textContent = 'Export failed: ' + (body.detail || ('HTTP ' + res.status));
-      banner.className = 'mb-4 px-4 py-3 rounded text-sm font-medium bg-red-100 text-red-800 dark:bg-red-500/15 dark:text-red-300';
-    } else {
-      banner.textContent = 'Exported ' + body.scripts + ' script(s) and ' + body.runbooks + ' runbook(s) to ' + body.modules_dir + ' / ' + body.runbooks_dir + '. Commit the changes in scripts/ to ship them as seed data.';
-      banner.className = 'mb-4 px-4 py-3 rounded text-sm font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300';
-    }
-    banner.classList.remove('hidden');
-  } catch (e) {
-    banner.textContent = 'Export failed: ' + e;
-    banner.className = 'mb-4 px-4 py-3 rounded text-sm font-medium bg-red-100 text-red-800 dark:bg-red-500/15 dark:text-red-300';
-    banner.classList.remove('hidden');
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Export to disk';
-  }
-}
-</script>
 
 <div class="bg-surface rounded-lg border border-token-border overflow-hidden">
   <table class="min-w-full divide-y divide-token-border text-sm">
