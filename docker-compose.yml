@@ -104,7 +104,8 @@ services:
     command: >
       celery -A tasks worker
       --loglevel=info
-      --pool=solo
+      --pool=prefork
+      --concurrency=4
       --queues=default,provision,reclaim,notifications
     healthcheck:
       test: ["CMD", "celery", "-A", "tasks", "inspect", "ping"]
