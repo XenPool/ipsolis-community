@@ -119,19 +119,24 @@ try {
         }
     } catch {}
 
-    if ($runbookStopped) {
-        Write-Log "Runbook stopped early by a prior step — nothing to finalize." 'INFO'
+    # No VM to finalize (either the runner signalled an early stop, or the
+    # upstream "Read Recycle VMs" step found nothing eligible). In both
+    # cases there is literally no asset to touch — exit cleanly as success
+    # so the overall run ends green.
+    if ($runbookStopped -or [string]::IsNullOrWhiteSpace($VMName)) {
+        $reason = if ($runbookStopped) {
+            'Runbook stopped early; no asset to finalize.'
+        } else {
+            'No VMName supplied; no asset to finalize.'
+        }
+        Write-Log $reason 'INFO'
         Write-Output (@{
             success      = $true
+            skipped      = $true
             asset_status = 'unchanged'
-            reason       = 'Runbook stopped early; no asset to finalize.'
+            reason       = $reason
         } | ConvertTo-Json -Compress)
         exit 0
-    }
-
-    if ([string]::IsNullOrWhiteSpace($VMName)) {
-        Write-Output (@{ success = $false; error = 'VMName is empty' } | ConvertTo-Json -Compress)
-        exit 1
     }
 
     # Runner exposes RunbookFailed as a step_var / global when a prior

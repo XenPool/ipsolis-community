@@ -47,8 +47,10 @@
   </table>
 </div>
 
-<!-- Run detail modal -->
-<div id="run-detail-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+<!-- Run detail modal. Click the backdrop (outside the panel) to dismiss. -->
+<div id="run-detail-modal"
+     class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+     onclick="if(event.target===this) closeModal()">
   <div class="bg-surface rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] overflow-y-auto">
     <div class="flex items-center justify-between px-5 py-4 border-b border-token-border">
       <h3 class="text-sm font-semibold text-heading" id="modal-title">Run Details</h3>
