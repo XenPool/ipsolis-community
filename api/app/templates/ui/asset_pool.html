@@ -31,7 +31,7 @@
              class="w-full rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500">
     </div>
     <div class="col-span-3">
-      <label class="block text-xs font-medium text-muted mb-1">Asset Type <span class="text-red-500">*</span></label>
+      <label class="block text-xs font-medium text-muted mb-1">Asset Definition <span class="text-red-500">*</span></label>
       <select id="add-type"
               class="w-full rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500">
         <option value="">– Select type –</option>
@@ -80,7 +80,7 @@
              class="w-full rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500">
     </div>
     <div class="col-span-3">
-      <label class="block text-xs font-medium text-muted mb-1">Asset Type <span class="text-red-500">*</span></label>
+      <label class="block text-xs font-medium text-muted mb-1">Asset Definition <span class="text-red-500">*</span></label>
       <select id="bulk-type"
               class="w-full rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500">
         <option value="">– Select type –</option>
@@ -134,7 +134,7 @@
     </div>
     <div class="col-span-4 flex flex-col gap-3">
       <div>
-        <label class="block text-xs font-medium text-muted mb-1">Asset Type override</label>
+        <label class="block text-xs font-medium text-muted mb-1">Asset Definition override</label>
         <select id="import-type-override"
                 onchange="importPreview()"
                 class="w-full rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-teal-500">
@@ -161,7 +161,7 @@
         <thead class="bg-surface-raised sticky top-0">
           <tr>
             <th class="px-3 py-2 text-left text-muted font-medium">Hostname</th>
-            <th class="px-3 py-2 text-left text-muted font-medium">Asset Type</th>
+            <th class="px-3 py-2 text-left text-muted font-medium">Asset Definition</th>
             <th class="px-3 py-2 text-left text-muted font-medium">Notes</th>
             <th class="px-3 py-2 text-left text-muted font-medium">Status</th>
           </tr>
@@ -176,7 +176,7 @@
 <div class="mb-3 flex items-center gap-3">
   <select id="filter-type" onchange="applyFilters()"
           class="rounded border border-token-border bg-surface text-body text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500">
-    <option value="">All Asset Types</option>
+    <option value="">All Asset Definitions</option>
     {% for t in asset_types %}
     <option value="{{ t.id }}" {% if selected_type_id == t.id %}selected{% endif %}>{{ t.name }}</option>
     {% endfor %}
@@ -201,7 +201,7 @@
     <thead class="bg-surface-raised">
       <tr>
         <th class="px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wide">Hostname</th>
-        <th class="px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wide">Asset Type</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wide">Asset Definition</th>
         <th class="px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wide">Status</th>
         <th class="px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wide">Assigned To</th>
         <th class="px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wide">Order</th>
@@ -247,7 +247,7 @@
         <span class="text-sm text-body">
           Revoke permissions
           <span class="block text-xs text-muted/70 mt-0.5">
-            Remove the user's group memberships for this asset type.
+            Remove the user's group memberships for this asset definition.
           </span>
         </span>
       </label>
@@ -462,9 +462,80 @@ function buildRow(a) {
     + '<td class="px-4 py-3 text-xs">' + orderCell + '</td>'
     + '<td class="px-4 py-3 text-xs text-muted">' + _esc(expiresStr) + '</td>'
     + '<td class="px-4 py-3 text-xs text-muted font-mono">' + _esc(mac) + '</td>'
-    + '<td class="px-4 py-3 text-xs text-muted max-w-xs truncate" title="' + _esc(notes) + '">' + _esc(notes) + '</td>'
+    + '<td class="px-4 py-3 text-xs text-muted max-w-xs">'
+    +   '<span id="notes-cell-' + a.id + '" class="block truncate cursor-text hover:text-body"'
+    +   ' title="Click to edit notes" onclick="editNotesInline(' + a.id + ')">'
+    +   (notes ? _esc(notes) : '<span class="text-muted/40">–</span>')
+    +   '</span>'
+    + '</td>'
     + '<td class="px-4 py-3 text-right text-sm">' + actionsHtml + '</td>';
   return tr;
+}
+
+// Inline Notes editor — always available, regardless of asset status.
+function editNotesInline(id) {
+  var cell = document.getElementById('notes-cell-' + id);
+  if (!cell || cell.dataset.editing === '1') return;
+  var a = _allAssets.find(function(x) { return x.id === id; });
+  if (!a) return;
+  var current = (a.asset_metadata && a.asset_metadata.notes) || '';
+  cell.dataset.editing = '1';
+  cell.innerHTML =
+    '<input type="text" id="notes-input-' + id + '" value="' + _esc(current) + '" '
+    + 'placeholder="Notes" maxlength="500" '
+    + 'class="w-full rounded border border-token-border bg-surface text-body text-xs px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500">';
+  var input = document.getElementById('notes-input-' + id);
+  input.focus();
+  input.select();
+  var cancelled = false;
+  input.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+    else if (e.key === 'Escape') { cancelled = true; input.blur(); }
+  });
+  input.addEventListener('blur', function() {
+    if (cancelled) { _renderNotesCell(id, current); cell.dataset.editing = '0'; return; }
+    _saveNotesInline(id, input.value.trim(), current);
+  });
+}
+
+async function _saveNotesInline(id, newNotes, originalNotes) {
+  var a = _allAssets.find(function(x) { return x.id === id; });
+  if (!a) return;
+  // No change → just re-render without a round trip.
+  if (newNotes === originalNotes) { _renderNotesCell(id, newNotes); _markNotCell(id, false); return; }
+  var meta = Object.assign({}, a.asset_metadata || {});
+  if (newNotes) meta.notes = newNotes; else delete meta.notes;
+  try {
+    var resp = await fetch('/admin/assets/' + id, {
+      method: 'PUT',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ asset_metadata: Object.keys(meta).length ? meta : null }),
+    });
+    if (!resp.ok) {
+      var err = {}; try { err = await resp.json(); } catch(e) {}
+      alert('Saving notes failed: ' + (err.detail || resp.status));
+      _renderNotesCell(id, originalNotes);
+    } else {
+      a.asset_metadata = meta;
+      _renderNotesCell(id, newNotes);
+    }
+  } catch(e) {
+    alert('Network error while saving notes: ' + e.message);
+    _renderNotesCell(id, originalNotes);
+  }
+  _markNotCell(id, false);
+}
+
+function _renderNotesCell(id, notes) {
+  var cell = document.getElementById('notes-cell-' + id);
+  if (!cell) return;
+  cell.innerHTML = notes ? _esc(notes) : '<span class="text-muted/40">–</span>';
+  cell.title = notes ? 'Click to edit notes — ' + notes : 'Click to edit notes';
+}
+
+function _markNotCell(id, on) {
+  var cell = document.getElementById('notes-cell-' + id);
+  if (cell) cell.dataset.editing = on ? '1' : '0';
 }
 
 // ── Edit inline ───────────────────────────────────────────────────
@@ -683,7 +754,7 @@ async function addAsset() {
   var notes  = document.getElementById('add-notes').value.trim();
   var errEl  = document.getElementById('add-error');
   if (!name)   { errEl.textContent = 'Hostname is required.';         errEl.classList.remove('hidden'); return; }
-  if (!typeId) { errEl.textContent = 'Please select an asset type.';  errEl.classList.remove('hidden'); return; }
+  if (!typeId) { errEl.textContent = 'Please select an asset definition.';  errEl.classList.remove('hidden'); return; }
   errEl.classList.add('hidden');
   var meta = {};
   if (notes) meta.notes = notes;
@@ -750,7 +821,7 @@ async function bulkCreate() {
   if (!names.length || !document.getElementById('bulk-prefix').value.trim()) {
     errEl.textContent = 'Prefix is required.'; errEl.classList.remove('hidden'); return;
   }
-  if (!typeId) { errEl.textContent = 'Please select an asset type.'; errEl.classList.remove('hidden'); return; }
+  if (!typeId) { errEl.textContent = 'Please select an asset definition.'; errEl.classList.remove('hidden'); return; }
   var items = names.map(function(n) {
     var item = { name: n, asset_type_id: parseInt(typeId) };
     if (notes) item.notes = notes;
@@ -844,7 +915,7 @@ async function importAssets() {
   errEl.classList.add('hidden');
   resEl.classList.add('hidden');
   var validRows = _importRows.filter(function(r) { return r._valid; });
-  if (!validRows.length) { errEl.textContent = 'No valid rows to import. Check asset type names.'; errEl.classList.remove('hidden'); return; }
+  if (!validRows.length) { errEl.textContent = 'No valid rows to import. Check asset definition names.'; errEl.classList.remove('hidden'); return; }
   var items = validRows.map(function(r) {
     return { name: r.name, asset_type_id: r.asset_type_id, notes: r.notes || undefined };
   });

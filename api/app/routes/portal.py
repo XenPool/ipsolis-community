@@ -82,6 +82,20 @@ ANONYMOUS_PORTAL_USER = {
 }
 
 
+async def _has_any_approvals(db: AsyncSession, email: str) -> bool:
+    """Return True iff the user has at least one approval row (any status)."""
+    from app.models.approval import OrderApproval
+    row = (
+        await db.execute(
+            select(sa_func.count())
+            .select_from(OrderApproval)
+            .where(OrderApproval.approver_email == email)
+            .limit(1)
+        )
+    ).first()
+    return bool(row and row[0])
+
+
 async def require_portal_auth(
     request: Request,
     db: AsyncSession = Depends(get_db),
@@ -92,6 +106,10 @@ async def require_portal_auth(
     - 'disabled'          → portal open, anonymous shared identity (no login)
     - 'entra_only'        → Entra ID login required
     - 'entra_with_onprem' → Entra ID login + on-prem LDAP check
+
+    The returned dict always carries a ``has_any_approvals`` bool so the
+    sidebar can hide the *My Approvals* row for users who have never been
+    asked to approve anything.
     """
     mode_row = await db.execute(
         select(AppConfig).where(AppConfig.key == "entra.mode")
@@ -100,11 +118,12 @@ async def require_portal_auth(
     mode = (mode_cfg.value or "disabled") if mode_cfg else "disabled"
 
     if mode == "disabled":
-        return ANONYMOUS_PORTAL_USER
+        # Anonymous mode: nobody is an approver — always hide the nav row.
+        return {**ANONYMOUS_PORTAL_USER, "has_any_approvals": False}
 
     user = request.session.get("portal_user")
     if user:
-        return user
+        return {**user, "has_any_approvals": await _has_any_approvals(db, user.get("email", ""))}
 
     # Store the originally requested URL so callback can redirect back
     request.session["login_next"] = str(request.url)

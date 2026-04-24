@@ -19,7 +19,7 @@
 
   <!-- Asset-Typ -->
   <div class="bg-surface rounded-lg border border-token-border p-5">
-    <h2 class="text-sm font-semibold text-body mb-4" data-i18n="portal.order_new.section_asset_type">Asset Type</h2>
+    <h2 class="text-sm font-semibold text-body mb-4" data-i18n="portal.order_new.section_asset_type">Asset Definition</h2>
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
       {% for t in asset_types %}
       {% set sold_out = t.id in unavailable_ids %}

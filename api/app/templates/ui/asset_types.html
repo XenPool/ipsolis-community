@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 
-{% block title %}Asset Types – {{ app_title }}{% endblock %}
+{% block title %}Asset Definitions – {{ app_title }}{% endblock %}
 
 {% block content %}
 <div class="mb-6 flex items-center justify-between">
-  <h1 class="text-lg font-semibold text-heading">Asset Types</h1>
+  <h1 class="text-lg font-semibold text-heading">Asset Definitions</h1>
   <a href="/ui/asset-types/new"
      class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700">
-    + New Asset Type
+    + New Asset Definition
   </a>
 </div>
 
@@ -116,7 +116,7 @@
       {% else %}
       <tr>
         <td colspan="9" class="px-4 py-12 text-center text-muted/70 text-sm">
-          No asset types defined.
+          No asset definitions yet.
           <a href="/ui/asset-types/new" class="ml-1 text-blue-600 hover:underline">Create one →</a>
         </td>
       </tr>
@@ -127,7 +127,7 @@
 
 <script>
 async function deleteAssetType(id, name) {
-  if (!confirm("Really delete asset type '" + name + "'? All associated runbooks will also be deleted.")) return;
+  if (!confirm("Really delete asset definition '" + name + "'? All associated runbooks will also be deleted.")) return;
   const resp = await fetch('/admin/asset-types/' + id, {method: 'DELETE'});
   if (resp.status === 204) {
     var row = document.querySelector('[data-type-id="' + id + '"]');

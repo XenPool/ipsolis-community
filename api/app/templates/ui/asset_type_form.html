@@ -1,15 +1,15 @@
 {% extends "base.html" %}
 {% from "_partials/enterprise_teaser.html" import ent_badge %}
 
-{% block title %}{% if asset_type %}Edit Asset Type{% else %}New Asset Type{% endif %} – {{ app_title }}{% endblock %}
+{% block title %}{% if asset_type %}Edit Asset Definition{% else %}New Asset Definition{% endif %} – {{ app_title }}{% endblock %}
 
 {% block content %}
 <div class="mb-6">
-  <a href="/ui/asset-types" class="text-sm text-muted hover:text-heading">← Asset Types</a>
+  <a href="/ui/asset-types" class="text-sm text-muted hover:text-heading">← Asset Definitions</a>
 </div>
 
 <h1 class="text-lg font-semibold text-heading mb-6">
-  {% if asset_type %}Edit Asset Type: {{ asset_type.name }}{% else %}New Asset Type{% endif %}
+  {% if asset_type %}Edit Asset Definition: {{ asset_type.name }}{% else %}New Asset Definition{% endif %}
 </h1>
 
 <div class="bg-surface rounded-lg border border-token-border p-6 max-w-2xl">
@@ -245,7 +245,7 @@
         {% if not is_enterprise %}{{ ent_badge() }}{% endif %}
       </label>
       <p class="text-xs text-muted/70 mb-2">
-        Optional AD group (as Distinguished Name) whose members may request this asset type.
+        Optional AD group (as Distinguished Name) whose members may request this asset definition.
         Leave empty to allow all domain users.
       </p>
       <input type="text" id="eligible-requestors-dn"
@@ -455,7 +455,7 @@
         <span class="text-muted/70 font-normal ml-1">– one runbook per lifecycle action</span>
       </label>
       {% if not asset_type %}
-      <p class="text-xs text-muted/70 mb-2">Save the asset type first, then configure its runbooks here.</p>
+      <p class="text-xs text-muted/70 mb-2">Save the asset definition first, then configure its runbooks here.</p>
       {% endif %}
       <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
         {% for slot in runbook_slots %}
@@ -511,7 +511,7 @@
         scripts with a <code class="px-1 py-0.5 bg-surface-raised rounded">param()</code> block —
         as named CLI arguments (<code class="px-1 py-0.5 bg-surface-raised rounded">-Key value</code>).
         Use them to parameterise provisioning (e.g. CPU count, OS image, license SKU) without
-        needing a separate asset type per variant.
+        needing a separate asset definition per variant.
       </p>
       <div class="grid grid-cols-12 gap-2 mb-1 text-xs text-muted/70 px-0.5">
         <span class="col-span-3">Key</span>
