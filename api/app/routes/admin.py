@@ -464,6 +464,71 @@ async def update_asset_type(
     return asset_type
 
 
+@router.post("/asset-types/{type_id}/clone", response_model=AssetTypeRead, status_code=status.HTTP_201_CREATED)
+async def clone_asset_type(type_id: int, db: AsyncSession = Depends(get_db)) -> AssetType:
+    """Shallow-clone an asset type: same configuration, fresh row, name suffixed.
+
+    Runbooks (provision / modify / deprovision) and pool assets are NOT
+    copied — those reference the source type and would need a deeper clone.
+    The cloned row starts with empty runbook slots, which the admin then
+    configures or copies in separately.
+
+    Name collision is resolved by appending " (copy)", " (copy 2)", etc.
+    """
+    result = await db.execute(select(AssetType).where(AssetType.id == type_id))
+    src = result.scalar_one_or_none()
+    if not src:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Asset type {type_id} not found")
+
+    # Find a unique name. "Foo" -> "Foo (copy)" -> "Foo (copy 2)" -> ...
+    base = f"{src.name} (copy)"
+    candidate = base
+    suffix = 2
+    while True:
+        clash = await db.execute(select(AssetType.id).where(AssetType.name == candidate))
+        if clash.scalar_one_or_none() is None:
+            break
+        candidate = f"{base} {suffix}"
+        suffix += 1
+
+    new_type = AssetType(
+        name=candidate,
+        description=src.description,
+        category=src.category,
+        config=src.config,
+        assignment_model=src.assignment_model,
+        pool_capacity=src.pool_capacity,
+        automation_mode=src.automation_mode,
+        targets=src.targets,
+        lifecycle_ttl_days=src.lifecycle_ttl_days,
+        lifecycle_renewable=src.lifecycle_renewable,
+        lifecycle_reminder_days=src.lifecycle_reminder_days,
+        allow_rdp_users=src.allow_rdp_users,
+        allow_admin_users=src.allow_admin_users,
+        rds_gateway_url=src.rds_gateway_url,
+        deprovision_policy=src.deprovision_policy,
+        personal_provisioning_strategy=src.personal_provisioning_strategy,
+        naming_pattern=src.naming_pattern,
+        max_per_user=src.max_per_user,
+        automation_strategy=src.automation_strategy,
+        composite_steps=src.composite_steps,
+        requires_manager_approval=src.requires_manager_approval,
+        requires_owner_approval=src.requires_owner_approval,
+        approval_owners=src.approval_owners,
+        requires_approval_on_modify=src.requires_approval_on_modify,
+        eligible_requestors_dn=src.eligible_requestors_dn,
+        logo=src.logo,
+    )
+    db.add(new_type)
+    await db.flush()
+    await aaudit(db, "asset_type", new_type.id, "cloned", new=_type_snap(new_type),
+                 by=f"api:clone_asset_type from id={src.id}")
+    await db.commit()
+    await db.refresh(new_type)
+    logger.info("admin: cloned asset_type id=%s -> id=%s name=%r", src.id, new_type.id, new_type.name)
+    return new_type
+
+
 @router.delete("/asset-types/{type_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_asset_type(type_id: int, db: AsyncSession = Depends(get_db)) -> None:
     result = await db.execute(select(AssetType).where(AssetType.id == type_id))

@@ -12,58 +12,92 @@
   {% if asset_type %}Edit Asset Definition: {{ asset_type.name }}{% else %}New Asset Definition{% endif %}
 </h1>
 
-<div class="bg-surface rounded-lg border border-token-border p-6 max-w-2xl">
+<div class="flex gap-6 items-start">
+<div class="bg-surface rounded-lg border border-token-border p-6 max-w-2xl flex-1">
   <form id="at-form" class="space-y-6">
 
     <!-- Name + Description -->
-    <div class="grid grid-cols-1 gap-4">
+    <div id="section-identity" class="scroll-mt-4 grid grid-cols-1 gap-4">
       <div>
         <label class="block text-xs font-medium text-muted mb-1">Name <span class="text-red-500">*</span></label>
-        <input type="text" name="name" required
+        <input type="text" name="name" required oninput="updateTilePreview()"
                value="{{ asset_type.name if asset_type else '' }}"
                placeholder="e.g. Business VDI"
                class="w-full rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500">
       </div>
       <div>
         <label class="block text-xs font-medium text-muted mb-1">Description</label>
-        <input type="text" name="description"
+        <input type="text" name="description" oninput="updateTilePreview()"
                value="{{ asset_type.description if asset_type else '' }}"
                placeholder="Short description"
                class="w-full rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500">
       </div>
     </div>
 
-    <!-- Logo -->
+    <!-- Logo + live tile preview -->
     <div>
       <label class="block text-xs font-medium text-muted mb-1">Tile Logo</label>
       <p class="text-xs text-muted/70 mb-2">
         Shown on the portal "Request Access" tile. Optimal size: 160 x 40 px (landscape). PNG or SVG with transparent background, max 500 KB.
       </p>
-      <div id="at-logo-preview" class="mb-2 p-2 rounded border border-token-border bg-surface-raised min-h-[48px] flex items-center {% if not (asset_type and asset_type.logo) %}hidden{% endif %}">
-        <img id="at-logo-img"
-             src="{% if asset_type and asset_type.logo %}/admin/asset-types/{{ asset_type.id }}/logo?v={{ range(1, 999999) | random }}{% endif %}"
-             style="max-height: 40px; max-width: 200px;" alt="Logo">
-        <button type="button" onclick="removeAtLogo()" class="ml-3 text-xs text-red-500 hover:text-red-700">Remove</button>
+
+      <!-- Catalog tile preview: mirrors the portal's order_new.html tile so admins
+           see exactly what requesters will see when this definition appears in the catalog. -->
+      <div class="mb-3">
+        <div class="text-[10px] uppercase tracking-wider text-muted/60 mb-1.5">Catalog tile preview</div>
+        <div class="rounded-lg border border-token-border p-4 max-w-md bg-surface-raised/40">
+          <div class="flex items-center gap-3">
+            <div id="at-tile-logo-wrap" class="shrink-0 flex items-center justify-center w-12 h-8 rounded {% if not (asset_type and asset_type.logo) %}border border-dashed border-token-border bg-surface-raised{% endif %}">
+              <img id="at-logo-img"
+                   src="{% if asset_type and asset_type.logo %}/admin/asset-types/{{ asset_type.id }}/logo?v={{ range(1, 999999) | random }}{% endif %}"
+                   alt=""
+                   class="{% if not (asset_type and asset_type.logo) %}hidden{% endif %}"
+                   style="max-height: 32px; max-width: 48px;">
+              <span id="at-tile-logo-placeholder"
+                    class="text-[10px] text-muted/40 {% if asset_type and asset_type.logo %}hidden{% endif %}">no&nbsp;logo</span>
+            </div>
+            <div class="flex-1 min-w-0">
+              <p id="at-tile-preview-name" class="text-sm font-medium text-heading truncate">{% if asset_type %}{{ asset_type.name }}{% else %}Asset definition name{% endif %}</p>
+              <p id="at-tile-preview-desc" class="text-xs text-muted/70 mt-0.5 truncate">{% if asset_type and asset_type.description %}{{ asset_type.description }}{% else %}Description appears here{% endif %}</p>
+            </div>
+          </div>
+        </div>
       </div>
-      <input type="file" id="at-logo-file" accept="image/png,image/jpeg,image/gif,image/svg+xml,image/webp"
-             class="block text-sm text-muted
-                    file:mr-3 file:py-1 file:px-3 file:rounded file:border file:border-token-border
-                    file:text-xs file:font-medium file:bg-surface file:text-body hover:file:bg-surface-raised file:cursor-pointer">
+
+      <div class="flex items-center gap-3">
+        <input type="file" id="at-logo-file" accept="image/png,image/jpeg,image/gif,image/svg+xml,image/webp"
+               class="block text-sm text-muted
+                      file:mr-3 file:py-1 file:px-3 file:rounded file:border file:border-token-border
+                      file:text-xs file:font-medium file:bg-surface file:text-body hover:file:bg-surface-raised file:cursor-pointer">
+        <button type="button" onclick="removeAtLogo()" id="at-logo-remove-btn"
+                class="text-xs text-red-500 hover:text-red-700 {% if not (asset_type and asset_type.logo) %}hidden{% endif %}">Remove logo</button>
+      </div>
       <input type="hidden" id="at-logo-data" name="logo" value="">
     </div>
 
     <!-- Category -->
-    <div>
+    <div id="section-classification" class="scroll-mt-4">
       <label class="block text-xs font-medium text-muted mb-2">Category</label>
+      {# 4-tuple: (value, short label, one-line summary, concrete examples) #}
       {% set categories = [
-        ("platform_access",       "VDI / Server / Cloud",          "VDI, Server, Cloud Workloads"),
-        ("application_access",    "Business & SaaS Apps",          "Business & SaaS applications"),
-        ("data_access",           "Data & Collaboration",           "Files, DBs, Collaboration"),
-        ("device_access",         "Clients / MDM / WLAN",           "Clients, MDM, WLAN"),
-        ("infrastructure_access", "Network / Firewall / Admin",     "Network, firewall, admin-tiering")
+        ("platform_access",       "VDI / Server / Cloud",
+         "Compute workloads with their own OS instance.",
+         "Developer VDI · Database server · Build agent · Citrix XenDesktop · Azure / AWS / GCP VM"),
+        ("application_access",    "Business & SaaS Apps",
+         "App access without a dedicated VM per user.",
+         "Microsoft 365 license · Salesforce seat · SAP user · Citrix XenApp · AutoCAD network license"),
+        ("data_access",           "Data & Collaboration",
+         "File shares, databases, mailboxes, team workspaces.",
+         "SharePoint site · SMB share · SQL DB role · GitHub repo · Confluence space · Teams channel"),
+        ("device_access",         "Clients / MDM / WLAN",
+         "End-user hardware and managed devices.",
+         "Company laptop · iPhone / iPad · MDM enrollment · Guest WLAN voucher · BYOD profile"),
+        ("infrastructure_access", "Network / Firewall / Admin",
+         "Privileged access and infrastructure components.",
+         "VPN profile · Firewall admin role · Tier-0 PAW · Jump-host SSH · Switch CLI · DC admin")
       ] %}
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-        {% for cat_val, cat_short, cat_desc in categories %}
+        {% for cat_val, cat_short, cat_desc, cat_examples in categories %}
         <label class="relative flex cursor-pointer rounded-lg border border-token-border p-3 hover:border-blue-400 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50 dark:has-[:checked]:bg-blue-500/20 has-[:checked]:[&_p]:text-blue-900 dark:has-[:checked]:[&_p]:text-blue-200"
                title="{{ cat_desc }}">
           <input type="radio" name="category" value="{{ cat_val }}"
@@ -73,6 +107,7 @@
           <div>
             <p class="text-sm font-medium text-heading">{{ cat_short }}</p>
             <p class="text-xs text-muted/70 mt-0.5">{{ cat_desc }}</p>
+            <p class="text-[11px] text-muted/50 mt-1 leading-snug">e.g. {{ cat_examples }}</p>
           </div>
         </label>
         {% endfor %}
@@ -82,38 +117,32 @@
     <!-- Assignment Model -->
     <div>
       <label class="block text-xs font-medium text-muted mb-2">Assignment Model</label>
+      {# 4-tuple: (value, label, one-line summary, concrete examples) #}
+      {% set assignment_models = [
+        ("assigned_personal", "Personal",
+         "One dedicated instance per user; the asset belongs to them while assigned.",
+         "Personal VDI · Company laptop · Dedicated mailbox"),
+        ("dedicated_shared",  "Shared",
+         "One instance, many users — access via group membership.",
+         "Jump host · Shared workstation · Lab PC · Team mailbox · Project SharePoint"),
+        ("capacity_pooled",   "Pooled",
+         "No instance per user — just a counted slot from a license pool.",
+         "Citrix XenApp seat · Microsoft 365 E5 · SAP CAL · RDS user CAL · Concurrent-user license")
+      ] %}
       <div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
-
-        <label class="relative flex cursor-pointer rounded-lg border border-token-border p-3 hover:border-blue-400 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50 dark:has-[:checked]:bg-blue-500/20 has-[:checked]:[&_p]:text-blue-900 dark:has-[:checked]:[&_p]:text-blue-200">
-          <input type="radio" name="assignment_model" value="assigned_personal"
-                 {% if not asset_type or asset_type.assignment_model == 'assigned_personal' %}checked{% endif %}
+        {% for am_val, am_label, am_desc, am_examples in assignment_models %}
+        <label class="relative flex cursor-pointer rounded-lg border border-token-border p-3 hover:border-blue-400 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50 dark:has-[:checked]:bg-blue-500/20 has-[:checked]:[&_p]:text-blue-900 dark:has-[:checked]:[&_p]:text-blue-200"
+               title="{{ am_desc }}">
+          <input type="radio" name="assignment_model" value="{{ am_val }}"
+                 {% if (not asset_type and am_val == 'assigned_personal') or (asset_type and asset_type.assignment_model == am_val) %}checked{% endif %}
                  class="sr-only">
           <div>
-            <p class="text-sm font-medium text-heading">Personal</p>
-            <p class="text-xs text-muted/70 mt-0.5">Unique instance, 1:1 assigned (personal VDI, laptop)</p>
+            <p class="text-sm font-medium text-heading">{{ am_label }}</p>
+            <p class="text-xs text-muted/70 mt-0.5">{{ am_desc }}</p>
+            <p class="text-[11px] text-muted/50 mt-1 leading-snug">e.g. {{ am_examples }}</p>
           </div>
         </label>
-
-        <label class="relative flex cursor-pointer rounded-lg border border-token-border p-3 hover:border-blue-400 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50 dark:has-[:checked]:bg-blue-500/20 has-[:checked]:[&_p]:text-blue-900 dark:has-[:checked]:[&_p]:text-blue-200">
-          <input type="radio" name="assignment_model" value="dedicated_shared"
-                 {% if asset_type and asset_type.assignment_model == 'dedicated_shared' %}checked{% endif %}
-                 class="sr-only">
-          <div>
-            <p class="text-sm font-medium text-heading">Shared</p>
-            <p class="text-xs text-muted/70 mt-0.5">Instance exists, no fixed owner (jump host, shared workstation)</p>
-          </div>
-        </label>
-
-        <label class="relative flex cursor-pointer rounded-lg border border-token-border p-3 hover:border-blue-400 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50 dark:has-[:checked]:bg-blue-500/20 has-[:checked]:[&_p]:text-blue-900 dark:has-[:checked]:[&_p]:text-blue-200">
-          <input type="radio" name="assignment_model" value="capacity_pooled"
-                 {% if asset_type and asset_type.assignment_model == 'capacity_pooled' %}checked{% endif %}
-                 class="sr-only">
-          <div>
-            <p class="text-sm font-medium text-heading">Pooled</p>
-            <p class="text-xs text-muted/70 mt-0.5">Pool / license slot without dedicated instance (RDS, SaaS)</p>
-          </div>
-        </label>
-
+        {% endfor %}
       </div>
     </div>
 
@@ -151,10 +180,12 @@
             <span class="text-muted/70">(optional)</span>
             <span class="ml-1 text-blue-500" title="Available as {{asset_type.naming_pattern}} in runbook step parameters">– used in runbook as <code class="font-mono">{{'{{'}}asset_type.naming_pattern{{'}}'}}</code></span>
           </label>
-          <input type="text" name="naming_pattern"
+          <input type="text" name="naming_pattern" id="naming-pattern-input"
                  value="{{ asset_type.naming_pattern if asset_type and asset_type.naming_pattern else '' }}"
                  placeholder="e.g. VDI-{sam} or LAP-{employeeId}"
+                 oninput="updateNamingPatternPreview()"
                  class="w-64 rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500">
+          <p id="naming-pattern-preview" class="text-[11px] text-muted/60 mt-1 leading-snug hidden font-mono"></p>
         </div>
         <div>
           <label class="block text-xs text-muted mb-1">Max. Instances/User</label>
@@ -175,7 +206,7 @@
     </div>
 
     <!-- Lifecycle -->
-    <div>
+    <div id="section-lifecycle" class="scroll-mt-4">
       <label class="block text-xs font-medium text-muted mb-2">Lifecycle Settings (optional)</label>
       <div class="flex flex-wrap gap-4 items-end">
         <div>
@@ -239,7 +270,7 @@
     </div>
 
     <!-- Eligible Requestors (Enterprise: eligible_requestors) -->
-    <div class="border-t border-token-border pt-5">
+    <div id="section-access" class="scroll-mt-4 border-t border-token-border pt-5">
       <label class="block text-xs font-medium text-muted mb-2">
         Eligible Requestors
         {% if not is_enterprise %}{{ ent_badge() }}{% endif %}
@@ -325,7 +356,7 @@
 
     <!-- Automation Strategy -->
     {% set strat = asset_type.automation_strategy if asset_type and asset_type.automation_strategy else ('group_only' if asset_type and asset_type.automation_mode == 'targets_only' else 'runbook_only') %}
-    <div class="border-t border-token-border pt-5">
+    <div id="section-automation" class="scroll-mt-4 border-t border-token-border pt-5">
       <label class="block text-xs font-medium text-muted mb-2">Automation Mode</label>
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
 
@@ -497,7 +528,7 @@
     </div>
 
     <!-- Attributes -->
-    <div class="border-t border-token-border pt-5">
+    <div id="section-attributes" class="scroll-mt-4 border-t border-token-border pt-5">
       <label class="block text-xs font-medium text-muted mb-1">
         Attributes
         <span class="text-muted/70 font-normal ml-1">– optional, e.g. CPU options, license types</span>
@@ -598,7 +629,7 @@
     </div>
 
     <!-- Deprovision Policy -->
-    <div class="border-t border-token-border pt-5">
+    <div id="section-deprovision" class="scroll-mt-4 border-t border-token-border pt-5">
       <label class="block text-xs font-medium text-muted mb-2">Deprovision Strategy
         <span class="text-muted/70 font-normal ml-1">– what happens on revoke/cancel?</span>
       </label>
@@ -632,8 +663,8 @@
       <div id="dp-constraint-banner" class="hidden mt-2 text-xs rounded px-3 py-2 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 text-amber-700 dark:text-amber-300"></div>
     </div>
 
-    <!-- Buttons -->
-    <div class="flex items-center justify-between pt-2 border-t border-token-border">
+    <!-- Save bar (sticky to the bottom of the viewport so it's always reachable on this long form) -->
+    <div class="sticky bottom-0 z-10 -mx-6 px-6 mt-6 py-3 bg-surface border-t border-token-border flex items-center justify-between shadow-[0_-4px_12px_-8px_rgba(0,0,0,0.15)]">
       <a href="/ui/asset-types" class="text-sm text-muted hover:text-heading">Cancel</a>
       <button type="button" onclick="submitForm()"
               class="px-6 py-2.5 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700">
@@ -644,6 +675,33 @@
   </form>
 
   <div id="form-result" class="mt-4"></div>
+</div>
+
+<!-- Section nav rail. Hidden below xl breakpoint to avoid cramping the form.
+     `sticky` lives on the <aside> itself (not the inner <nav>) so it has the
+     flex container's full height to slide within — putting `sticky` on the
+     <nav> only works when its parent is tall, but in a `flex items-start`
+     layout the aside collapses to the nav's natural height. -->
+<aside class="hidden xl:block w-48 flex-shrink-0 sticky top-4 self-start">
+  <nav id="at-section-nav" class="space-y-0.5 text-xs">
+    <p class="text-[10px] uppercase tracking-wider text-muted/60 mb-2 px-2">On this page</p>
+    {% set sections = [
+      ('section-identity',       'Identity'),
+      ('section-classification', 'Classification'),
+      ('section-lifecycle',      'Lifecycle'),
+      ('section-access',         'Access &amp; Approval'),
+      ('section-automation',     'Automation'),
+      ('section-attributes',     'Attributes'),
+      ('section-deprovision',    'Deprovision'),
+    ] %}
+    {% for sid, label in sections %}
+    <a href="#{{ sid }}" data-target="{{ sid }}"
+       class="block px-2 py-1.5 rounded text-muted hover:text-body hover:bg-surface-raised transition-colors border-l-2 border-transparent">
+      {{ label | safe }}
+    </a>
+    {% endfor %}
+  </nav>
+</aside>
 </div>
 
 <script>
@@ -690,15 +748,44 @@ document.getElementById('at-logo-file').addEventListener('change', async functio
   }
   var dataUrl = await resizeImageToDataUrl(file, AT_LOGO_MAX_W, AT_LOGO_MAX_H);
   document.getElementById('at-logo-data').value = dataUrl;
-  var img = document.getElementById('at-logo-img');
-  img.src = dataUrl;
-  document.getElementById('at-logo-preview').classList.remove('hidden');
+  _showTileLogo(dataUrl);
 });
+
+// Reflect the logo's presence in the catalog tile preview.
+function _showTileLogo(dataUrl) {
+  var img = document.getElementById('at-logo-img');
+  var ph  = document.getElementById('at-tile-logo-placeholder');
+  var wrap = document.getElementById('at-tile-logo-wrap');
+  var rm  = document.getElementById('at-logo-remove-btn');
+  if (dataUrl) {
+    img.src = dataUrl;
+    img.classList.remove('hidden');
+    if (ph)   ph.classList.add('hidden');
+    if (wrap) wrap.classList.remove('border', 'border-dashed', 'border-token-border', 'bg-surface-raised');
+    if (rm)   rm.classList.remove('hidden');
+  } else {
+    img.removeAttribute('src');
+    img.classList.add('hidden');
+    if (ph)   ph.classList.remove('hidden');
+    if (wrap) wrap.classList.add('border', 'border-dashed', 'border-token-border', 'bg-surface-raised');
+    if (rm)   rm.classList.add('hidden');
+  }
+}
+
+// Mirror name/description changes into the catalog tile preview.
+function updateTilePreview() {
+  var nameInput = document.querySelector('[name="name"]');
+  var descInput = document.querySelector('[name="description"]');
+  var nameOut = document.getElementById('at-tile-preview-name');
+  var descOut = document.getElementById('at-tile-preview-desc');
+  if (nameOut) nameOut.textContent = (nameInput && nameInput.value.trim()) || 'Asset definition name';
+  if (descOut) descOut.textContent = (descInput && descInput.value.trim()) || 'Description appears here';
+}
 
 function removeAtLogo() {
   document.getElementById('at-logo-data').value = '__remove__';
-  document.getElementById('at-logo-preview').classList.add('hidden');
   document.getElementById('at-logo-file').value = '';
+  _showTileLogo(null);
 }
 
 function updateAutomationUI() {
@@ -759,6 +846,39 @@ function toggleAssignmentDependents() {
 
 // Compat alias (also called by existing listeners)
 function toggleCapacity() { toggleAssignmentDependents(); }
+
+// ── Naming Pattern preview ────────────────────────────────────────────────────
+// Tokens are interpreted by the runbook script at provision time, not the
+// framework. We render a sample with common substitutions so admins catch
+// typos (e.g. missing braces) before they hit the first order.
+var _NAMING_PATTERN_SAMPLES = {
+  'sam':         'jdoe',
+  'username':    'jdoe',
+  'employeeid':  '12345',
+  'firstname':   'John',
+  'lastname':    'Doe',
+  'department':  'rnd',
+  'location':    'fra',
+  'n':           '001',
+  'count':       '001',
+  'date':        '20260424',
+  'year':        '2026'
+};
+
+function updateNamingPatternPreview() {
+  var input = document.getElementById('naming-pattern-input');
+  var out = document.getElementById('naming-pattern-preview');
+  if (!input || !out) return;
+  var raw = input.value;
+  if (!raw) { out.classList.add('hidden'); return; }
+  // Replace any {token} (with optional :format) using the samples table.
+  var rendered = raw.replace(/\{([a-zA-Z][\w]*)(?::[^}]*)?\}/g, function(full, tok) {
+    var key = tok.toLowerCase();
+    return _NAMING_PATTERN_SAMPLES[key] || ('<' + tok + '?>');
+  });
+  out.innerHTML = 'Preview: <span class="text-body">' + rendered.replace(/</g, '&lt;') + '</span>';
+  out.classList.remove('hidden');
+}
 
 // ── Provisioning strategy: create_new requires runbook/composite ──────────────
 function onProvisioningStrategyChange() {
@@ -905,7 +1025,47 @@ document.addEventListener('DOMContentLoaded', function() {
   onProvisioningStrategyChange(); // apply provisioning strategy constraints on initial load
   updatePrincipalSourceOptions(); // filter principal_source dropdowns based on checked user list flags
   enforceConstraints();          // reconcile runbook-slot visibility with deprovision_policy
+  updateNamingPatternPreview();  // populate the live preview if editing an existing pattern
+  initSectionNav();              // wire section-nav highlighting (xl screens only)
 });
+
+// Highlight the section-nav entry whose section is currently in view. Cheap
+// IntersectionObserver-based; only active when the nav is rendered (xl: width).
+function initSectionNav() {
+  var nav = document.getElementById('at-section-nav');
+  if (!nav) return;
+  var links = nav.querySelectorAll('a[data-target]');
+  if (!links.length) return;
+  var byId = {};
+  links.forEach(function(a) { byId[a.dataset.target] = a; });
+
+  function setActive(id) {
+    links.forEach(function(a) {
+      a.classList.remove('text-blue-600', 'dark:text-blue-300', 'border-blue-500', 'bg-blue-50/40', 'dark:bg-blue-500/10');
+      a.classList.add('text-muted', 'border-transparent');
+    });
+    var hit = byId[id];
+    if (!hit) return;
+    hit.classList.remove('text-muted', 'border-transparent');
+    hit.classList.add('text-blue-600', 'dark:text-blue-300', 'border-blue-500', 'bg-blue-50/40', 'dark:bg-blue-500/10');
+  }
+
+  // Track which sections are currently intersecting; pick the topmost one.
+  var visible = new Set();
+  var observer = new IntersectionObserver(function(entries) {
+    entries.forEach(function(e) {
+      if (e.isIntersecting) visible.add(e.target.id);
+      else visible.delete(e.target.id);
+    });
+    var ordered = Object.keys(byId).filter(function(id) { return visible.has(id); });
+    if (ordered.length) setActive(ordered[0]);
+  }, { rootMargin: '-10% 0px -70% 0px', threshold: 0 });
+
+  Object.keys(byId).forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) observer.observe(el);
+  });
+}
 
 function _buildPrincipalOptions(selected) {
   var allowRdp   = document.getElementById('allow-rdp-users-cb')   ? document.getElementById('allow-rdp-users-cb').checked   : false;
