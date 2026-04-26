@@ -891,3 +891,12 @@ async def cost_report_page(request: Request) -> HTMLResponse:
         "ui/cost_report.html",
         {"active_page": "cost-report"},
     )
+
+
+@router.get("/audit-log", response_class=HTMLResponse)
+async def audit_log_page(request: Request) -> HTMLResponse:
+    return templates.TemplateResponse(
+        request,
+        "ui/audit_log.html",
+        {"active_page": "audit-log"},
+    )

@@ -52,7 +52,7 @@ Enterprise IT automation shouldn't require a 6-month implementation project and 
 - Manual backup/restore/download via Admin UI
 - Health probes (DB, Redis, external system reachability) with email alerts on state transitions
 - Celery queue inspection and targeted purge
-- Append-only audit log viewer
+- **Audit Log viewer** at `/ui/audit-log` — filterable by entity type, entity id, triggered-by substring, and time range; coloured actor badges show at a glance whether each row was driven by a bearer token, an admin session, the legacy `X-Admin-Key`, or a webhook; expand any row to see the JSON before/after diff
 
 ### Access Control
 - Restrict asset types to specific AD groups (eligible requestors)

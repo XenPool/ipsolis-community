@@ -1,0 +1,249 @@
+{% extends "base.html" %}
+
+{% block title %}Audit Log – {{ app_title }}{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+  <h1 class="text-lg font-semibold text-heading">Audit Log</h1>
+  <p class="text-xs text-muted/70 mt-1 max-w-2xl">
+    Append-only history of every mutating change. Each row records what
+    happened, when, and which credential triggered it
+    (<code class="font-mono bg-surface-raised px-1 rounded">token:&lt;name&gt;</code>,
+    <code class="font-mono bg-surface-raised px-1 rounded">admin:session:&lt;user&gt;</code>,
+    <code class="font-mono bg-surface-raised px-1 rounded">admin:legacy_key</code>,
+    or <code class="font-mono bg-surface-raised px-1 rounded">webhook:*</code>).
+    Filter narrows server-side; expand a row to see the JSON diff.
+  </p>
+</div>
+
+<!-- Filter bar -->
+<div class="bg-surface rounded-lg border border-token-border p-4 mb-4">
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+    <div>
+      <label class="block text-[10px] uppercase tracking-wider text-muted/60 mb-1">Entity type</label>
+      <select id="f-entity-type"
+              class="w-full rounded border border-token-border bg-surface text-body text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500">
+        <option value="">all</option>
+        <option value="order">order</option>
+        <option value="asset">asset</option>
+        <option value="asset_type">asset_type</option>
+        <option value="app_config">app_config</option>
+      </select>
+    </div>
+    <div>
+      <label class="block text-[10px] uppercase tracking-wider text-muted/60 mb-1">Entity ID</label>
+      <input id="f-entity-id" type="number" min="1" placeholder="optional"
+             class="w-full rounded border border-token-border bg-surface text-body placeholder:text-muted/50 text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono">
+    </div>
+    <div>
+      <label class="block text-[10px] uppercase tracking-wider text-muted/60 mb-1">Triggered by (substring)</label>
+      <input id="f-triggered-by" type="text" placeholder="e.g. token:servicenow or admin:session"
+             class="w-full rounded border border-token-border bg-surface text-body placeholder:text-muted/50 text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono">
+    </div>
+    <div>
+      <label class="block text-[10px] uppercase tracking-wider text-muted/60 mb-1">From</label>
+      <input id="f-from" type="datetime-local"
+             class="w-full rounded border border-token-border bg-surface text-body text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500">
+    </div>
+    <div>
+      <label class="block text-[10px] uppercase tracking-wider text-muted/60 mb-1">Until</label>
+      <input id="f-until" type="datetime-local"
+             class="w-full rounded border border-token-border bg-surface text-body text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500">
+    </div>
+  </div>
+  <div class="mt-3 flex items-center gap-2">
+    <button onclick="loadAudit(0)"
+            class="px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded hover:bg-blue-700">
+      Apply filter
+    </button>
+    <button onclick="resetFilter()"
+            class="px-3 py-1.5 bg-surface-raised text-body text-xs font-medium rounded hover:bg-surface border border-token-border">
+      Reset
+    </button>
+    <span id="audit-count" class="ml-auto text-xs text-muted/70"></span>
+  </div>
+</div>
+
+<!-- Audit table -->
+<div class="bg-surface rounded-lg border border-token-border overflow-hidden">
+  <table class="min-w-full divide-y divide-token-border text-sm">
+    <thead class="bg-surface-raised">
+      <tr>
+        <th class="px-3 py-2 text-left text-[10px] font-medium text-muted uppercase tracking-wider w-10"></th>
+        <th class="px-3 py-2 text-left text-[10px] font-medium text-muted uppercase tracking-wider">Timestamp</th>
+        <th class="px-3 py-2 text-left text-[10px] font-medium text-muted uppercase tracking-wider">Entity</th>
+        <th class="px-3 py-2 text-left text-[10px] font-medium text-muted uppercase tracking-wider">Action</th>
+        <th class="px-3 py-2 text-left text-[10px] font-medium text-muted uppercase tracking-wider">Triggered by</th>
+        <th class="px-3 py-2 text-left text-[10px] font-medium text-muted uppercase tracking-wider">Context</th>
+      </tr>
+    </thead>
+    <tbody id="audit-body" class="divide-y divide-token-border">
+      <tr><td colspan="6" class="px-4 py-8 text-center text-muted/70 text-sm">Loading…</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="mt-4 flex items-center gap-3">
+  <button id="prev-btn" onclick="loadAudit(_offset - _limit)"
+          class="px-3 py-1.5 bg-surface-raised text-body text-xs rounded border border-token-border hover:bg-surface disabled:opacity-40 disabled:cursor-not-allowed">
+    ← Newer
+  </button>
+  <button id="next-btn" onclick="loadAudit(_offset + _limit)"
+          class="px-3 py-1.5 bg-surface-raised text-body text-xs rounded border border-token-border hover:bg-surface disabled:opacity-40 disabled:cursor-not-allowed">
+    Older →
+  </button>
+  <span id="page-info" class="text-xs text-muted/70 ml-auto"></span>
+</div>
+
+<script>
+var _offset = 0;
+var _limit = 50;
+var _lastCount = 0;
+
+function fmtTs(s) {
+  if (!s) return '—';
+  try {
+    var d = new Date(s);
+    return d.toLocaleString();
+  } catch (e) { return s; }
+}
+
+function escapeHtml(s) {
+  return (s == null ? '' : String(s)).replace(/[&<>"']/g, function(c) {
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+  });
+}
+
+function actorBadge(triggered_by) {
+  // Pull the credential portion if present, e.g. "api:update_config (token:foo)" → "token:foo"
+  var m = (triggered_by || '').match(/\(([^)]+)\)\s*$/);
+  var credential = m ? m[1] : triggered_by || '';
+  var color =
+    credential.startsWith('token:')         ? 'bg-blue-100 text-blue-800 dark:bg-blue-500/15 dark:text-blue-300'   :
+    credential.startsWith('admin:session')  ? 'bg-green-100 text-green-800 dark:bg-green-500/15 dark:text-green-300' :
+    credential.startsWith('admin:legacy')   ? 'bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300' :
+    credential.startsWith('webhook:')       ? 'bg-purple-100 text-purple-800 dark:bg-purple-500/15 dark:text-purple-300' :
+                                              'bg-surface-raised text-muted';
+  var prefix = m ? triggered_by.replace(/\s*\([^)]+\)\s*$/, '') : '';
+  return (prefix ? '<span class="text-muted/70 text-xs">' + escapeHtml(prefix) + '</span> ' : '')
+       + '<span class="inline-block ' + color + ' rounded px-1.5 py-0.5 text-[10px] font-mono">'
+       + escapeHtml(credential) + '</span>';
+}
+
+function rowHtml(r, idx) {
+  var diffJson = '';
+  if (r.old_value || r.new_value) {
+    var combined = {};
+    if (r.old_value) combined.before = r.old_value;
+    if (r.new_value) combined.after  = r.new_value;
+    diffJson = JSON.stringify(combined, null, 2);
+  }
+  var expandable = diffJson
+    ? '<button onclick="toggleRow(' + idx + ')" class="text-blue-600 hover:text-blue-800 dark:text-blue-400" title="Show diff">▸</button>'
+    : '<span class="text-muted/30">·</span>';
+  return ''
+    + '<tr class="hover:bg-surface-raised/40">'
+    +   '<td class="px-3 py-2 text-center" id="exp-' + idx + '">' + expandable + '</td>'
+    +   '<td class="px-3 py-2 text-xs whitespace-nowrap text-muted">' + escapeHtml(fmtTs(r.timestamp)) + '</td>'
+    +   '<td class="px-3 py-2 text-xs"><span class="font-mono">' + escapeHtml(r.entity_type) + '</span> '
+    +     '<span class="text-muted/70">#' + escapeHtml(r.entity_id) + '</span></td>'
+    +   '<td class="px-3 py-2 text-xs"><span class="font-mono text-body">' + escapeHtml(r.action) + '</span></td>'
+    +   '<td class="px-3 py-2 text-xs">' + actorBadge(r.triggered_by) + '</td>'
+    +   '<td class="px-3 py-2 text-xs text-muted">' + escapeHtml(r.context || '—') + '</td>'
+    + '</tr>'
+    + (diffJson
+        ? '<tr id="diff-' + idx + '" class="hidden bg-surface-raised/30"><td colspan="6" class="px-4 py-3">'
+          + '<pre class="text-[11px] text-body font-mono overflow-x-auto whitespace-pre">' + escapeHtml(diffJson) + '</pre>'
+          + '</td></tr>'
+        : '');
+}
+
+function toggleRow(idx) {
+  var diff = document.getElementById('diff-' + idx);
+  var btn = document.querySelector('#exp-' + idx + ' button');
+  if (!diff) return;
+  if (diff.classList.contains('hidden')) {
+    diff.classList.remove('hidden');
+    if (btn) btn.textContent = '▾';
+  } else {
+    diff.classList.add('hidden');
+    if (btn) btn.textContent = '▸';
+  }
+}
+
+function buildQuery(offset) {
+  var qs = new URLSearchParams();
+  var entity = document.getElementById('f-entity-type').value;
+  var entityId = document.getElementById('f-entity-id').value.trim();
+  var trig = document.getElementById('f-triggered-by').value.trim();
+  var from = document.getElementById('f-from').value;
+  var until = document.getElementById('f-until').value;
+  if (entity)   qs.set('entity_type', entity);
+  if (entityId) qs.set('entity_id', entityId);
+  if (trig)     qs.set('triggered_by', trig);
+  if (from)     qs.set('from_ts', new Date(from).toISOString());
+  if (until)    qs.set('until_ts', new Date(until).toISOString());
+  qs.set('limit', _limit);
+  qs.set('offset', offset);
+  return qs.toString();
+}
+
+async function loadAudit(offset) {
+  if (offset < 0) offset = 0;
+  _offset = offset;
+  var body = document.getElementById('audit-body');
+  body.innerHTML = '<tr><td colspan="6" class="px-4 py-8 text-center text-muted/70 text-sm">Loading…</td></tr>';
+
+  var resp;
+  try {
+    resp = await fetch('/admin/audit-log?' + buildQuery(offset));
+  } catch (e) {
+    body.innerHTML = '<tr><td colspan="6" class="px-4 py-8 text-center text-red-600 text-sm">Network error.</td></tr>';
+    return;
+  }
+  if (!resp.ok) {
+    var detail = await resp.json().catch(function() { return {}; });
+    body.innerHTML = '<tr><td colspan="6" class="px-4 py-8 text-center text-red-600 text-sm">Failed to load (HTTP '
+      + resp.status + ' — ' + escapeHtml(detail.detail || '') + ').</td></tr>';
+    return;
+  }
+  var rows = await resp.json();
+  _lastCount = rows.length;
+
+  if (!rows.length) {
+    body.innerHTML = offset === 0
+      ? '<tr><td colspan="6" class="px-4 py-12 text-center text-muted/70 text-sm">No audit entries match the filter.</td></tr>'
+      : '<tr><td colspan="6" class="px-4 py-12 text-center text-muted/70 text-sm">No more entries — you\'re at the end.</td></tr>';
+  } else {
+    body.innerHTML = rows.map(function(r, i) { return rowHtml(r, i); }).join('');
+  }
+
+  document.getElementById('audit-count').textContent =
+    rows.length + ' row' + (rows.length === 1 ? '' : 's') + ' shown';
+  document.getElementById('page-info').textContent =
+    'Showing rows ' + (offset + 1) + '–' + (offset + rows.length);
+  document.getElementById('prev-btn').disabled = offset === 0;
+  document.getElementById('next-btn').disabled = rows.length < _limit;
+}
+
+function resetFilter() {
+  document.getElementById('f-entity-type').value = '';
+  document.getElementById('f-entity-id').value = '';
+  document.getElementById('f-triggered-by').value = '';
+  document.getElementById('f-from').value = '';
+  document.getElementById('f-until').value = '';
+  loadAudit(0);
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  loadAudit(0);
+  // Enter in any filter field re-runs the query
+  ['f-entity-id', 'f-triggered-by'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') { e.preventDefault(); loadAudit(0); }
+    });
+  });
+});
+</script>
+{% endblock %}

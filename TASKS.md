@@ -115,6 +115,23 @@ follow-up slices.
   / valid-HMAC all return correct status codes and create or reject
   orders consistently. Audit log shows correct attribution per path.
 
+**Done — Audit log viewer UI (2026-04-26):**
+- New `/ui/audit-log` page rendering the existing `/admin/audit-log`
+  JSON endpoint. Filter bar with entity-type dropdown, entity ID,
+  triggered-by substring search, and from/until timestamp.
+- Coloured actor badges: blue for `token:*`, green for
+  `admin:session:*`, amber for `admin:legacy_key`, purple for
+  `webhook:*`. Makes it instantly obvious whether a change was
+  driven by an integration, an admin in the UI, or a fallback path.
+- Expandable rows: each entry shows a one-line summary; expanding
+  reveals the JSON `before` / `after` diff for the change.
+- Pagination (50 per page, "Newer" / "Older" buttons) plus a
+  "Reset" filter button.
+- Nav entry between API Tokens and License.
+- Verified: filtering for `triggered_by=token:` and
+  `triggered_by=legacy_key` returns the expected subsets from the
+  ~800 audit rows currently in the dev DB.
+
 **Done — audit attribution everywhere (2026-04-26):**
 - New `actor_by(request, label)` helper in `app.utils.audit` builds the
   `triggered_by` string from `request.state.actor` (set by
