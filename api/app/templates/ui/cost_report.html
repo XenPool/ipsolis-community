@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+
+{% block title %}Cost Report – {{ app_title }}{% endblock %}
+
+{% block content %}
+<div class="mb-6 flex items-start justify-between gap-4">
+  <div>
+    <h1 class="text-lg font-semibold text-heading">Cost Report</h1>
+    <p class="text-xs text-muted/70 mt-1 max-w-2xl">
+      Projected monthly spend per cost center, based on currently active orders.
+      Asset definitions without a <code class="font-mono bg-surface-raised px-1 rounded">monthly_cost</code>
+      are excluded — set one on the
+      <a href="/ui/asset-types" class="text-blue-600 hover:underline">Asset Definitions</a>
+      page to start tracking. Active = any order in pending / scheduled / processing / provisioning / provisioned / delivered status.
+    </p>
+  </div>
+  <a href="/admin/cost-report?fmt=csv"
+     class="px-4 py-2 bg-surface-raised text-body text-sm font-medium rounded hover:bg-surface border border-token-border whitespace-nowrap">
+    Download CSV
+  </a>
+</div>
+
+<div id="totals-card" class="hidden mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"></div>
+
+<div class="bg-surface rounded-lg border border-token-border overflow-hidden">
+  <table class="min-w-full divide-y divide-token-border text-sm">
+    <thead class="bg-surface-raised">
+      <tr>
+        <th class="px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wide">Cost center</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wide">Asset definition</th>
+        <th class="px-4 py-3 text-right text-xs font-medium text-muted uppercase tracking-wide">Unit cost</th>
+        <th class="px-4 py-3 text-right text-xs font-medium text-muted uppercase tracking-wide">Active orders</th>
+        <th class="px-4 py-3 text-right text-xs font-medium text-muted uppercase tracking-wide">Unique users</th>
+        <th class="px-4 py-3 text-right text-xs font-medium text-muted uppercase tracking-wide">Projected / month</th>
+      </tr>
+    </thead>
+    <tbody id="rows-body" class="divide-y divide-token-border">
+      <tr><td colspan="6" class="px-4 py-8 text-center text-muted/70 text-sm">Loading…</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<script>
+function fmtMoney(n, currency) {
+  if (n == null || isNaN(n)) return '—';
+  try {
+    return new Intl.NumberFormat(navigator.language, {
+      style: 'currency', currency: currency || 'EUR',
+      minimumFractionDigits: 2, maximumFractionDigits: 2,
+    }).format(n);
+  } catch (e) {
+    return n.toFixed(2) + ' ' + (currency || '');
+  }
+}
+
+function escapeHtml(s) {
+  return (s || '').replace(/[&<>"']/g, function(c) {
+    return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c];
+  });
+}
+
+async function loadReport() {
+  var resp = await fetch('/admin/cost-report?fmt=json');
+  if (!resp.ok) {
+    document.getElementById('rows-body').innerHTML =
+      '<tr><td colspan="6" class="px-4 py-8 text-center text-red-600 text-sm">Failed to load report (HTTP ' + resp.status + ').</td></tr>';
+    return;
+  }
+  var data = await resp.json();
+  renderTotals(data.totals || []);
+  renderRows(data.rows || []);
+}
+
+function renderTotals(totals) {
+  var card = document.getElementById('totals-card');
+  if (!totals.length) { card.classList.add('hidden'); return; }
+  card.innerHTML = totals.map(function(t) {
+    return '<div class="bg-surface rounded-lg border border-token-border p-4">'
+      + '<div class="text-[11px] uppercase tracking-wider text-muted/60">' + escapeHtml(t.cost_center) + '</div>'
+      + '<div class="mt-1 text-lg font-semibold text-heading">' + fmtMoney(t.projected_monthly_total, t.currency) + '</div>'
+      + '<div class="text-xs text-muted mt-0.5">' + t.active_orders + ' active orders across ' + t.asset_types + ' definition' + (t.asset_types === 1 ? '' : 's') + '</div>'
+      + '</div>';
+  }).join('');
+  card.classList.remove('hidden');
+}
+
+function renderRows(rows) {
+  var body = document.getElementById('rows-body');
+  if (!rows.length) {
+    body.innerHTML = '<tr><td colspan="6" class="px-4 py-12 text-center text-muted/70 text-sm">No asset definitions have a <span class="font-mono">monthly_cost</span> set yet. <a href="/ui/asset-types" class="text-blue-600 hover:underline ml-1">Configure one →</a></td></tr>';
+    return;
+  }
+  // Group by cost center for visual separation
+  var lastCC = null;
+  body.innerHTML = rows.map(function(r) {
+    var ccCell = (r.cost_center !== lastCC)
+      ? '<td class="px-4 py-3 text-xs font-medium text-heading whitespace-nowrap align-top">' + escapeHtml(r.cost_center) + '</td>'
+      : '<td class="px-4 py-3 text-xs text-muted/40 align-top">↳</td>';
+    lastCC = r.cost_center;
+    return '<tr>'
+      + ccCell
+      + '<td class="px-4 py-3"><a href="/ui/asset-types/' + r.asset_type_id + '/edit" class="text-blue-600 hover:underline">' + escapeHtml(r.asset_type_name) + '</a></td>'
+      + '<td class="px-4 py-3 text-right text-sm tabular-nums">' + fmtMoney(r.unit_monthly_cost, r.currency) + '</td>'
+      + '<td class="px-4 py-3 text-right text-sm tabular-nums">' + r.active_orders + '</td>'
+      + '<td class="px-4 py-3 text-right text-sm tabular-nums">' + r.unique_users + '</td>'
+      + '<td class="px-4 py-3 text-right text-sm tabular-nums font-medium">' + fmtMoney(r.projected_monthly_total, r.currency) + '</td>'
+      + '</tr>';
+  }).join('');
+}
+
+document.addEventListener('DOMContentLoaded', loadReport);
+</script>
+{% endblock %}

@@ -97,4 +97,7 @@ def _type_snap(t) -> dict:
         "personal_provisioning_strategy": t.personal_provisioning_strategy,
         "naming_pattern": t.naming_pattern,
         "max_per_user": t.max_per_user,
+        "monthly_cost": str(t.monthly_cost) if t.monthly_cost is not None else None,
+        "currency": t.currency,
+        "cost_center": t.cost_center,
     }

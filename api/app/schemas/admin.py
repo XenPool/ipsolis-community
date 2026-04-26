@@ -82,6 +82,9 @@ class AssetTypeCreate(BaseModel):
     personal_provisioning_strategy: str | None = None
     naming_pattern: str | None = None
     max_per_user: int = 1
+    monthly_cost: float | None = None
+    currency: str | None = None
+    cost_center: str | None = None
     automation_strategy: str = "runbook_only"
     composite_steps: list[dict[str, Any]] | None = None
     rds_gateway_url: str | None = None
@@ -113,6 +116,9 @@ class AssetTypeUpdate(BaseModel):
     personal_provisioning_strategy: str | None = None
     naming_pattern: str | None = None
     max_per_user: int | None = None
+    monthly_cost: float | None = None
+    currency: str | None = None
+    cost_center: str | None = None
     automation_strategy: str | None = None
     composite_steps: list[dict[str, Any]] | None = None
     rds_gateway_url: str | None = None

@@ -882,3 +882,12 @@ async def api_tokens_page(request: Request) -> HTMLResponse:
         "ui/api_tokens.html",
         {"active_page": "api-tokens"},
     )
+
+
+@router.get("/cost-report", response_class=HTMLResponse)
+async def cost_report_page(request: Request) -> HTMLResponse:
+    return templates.TemplateResponse(
+        request,
+        "ui/cost_report.html",
+        {"active_page": "cost-report"},
+    )

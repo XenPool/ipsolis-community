@@ -442,6 +442,9 @@ async def create_asset_type(
         personal_provisioning_strategy=payload.personal_provisioning_strategy,
         naming_pattern=payload.naming_pattern,
         max_per_user=payload.max_per_user,
+        monthly_cost=payload.monthly_cost,
+        currency=(payload.currency or None),
+        cost_center=(payload.cost_center or None),
         automation_strategy=payload.automation_strategy,
         composite_steps=payload.composite_steps,
         requires_manager_approval=payload.requires_manager_approval,
@@ -531,6 +534,12 @@ async def update_asset_type(
         asset_type.naming_pattern = payload.naming_pattern
     if payload.max_per_user is not None:
         asset_type.max_per_user = payload.max_per_user
+    if payload.monthly_cost is not None:
+        asset_type.monthly_cost = payload.monthly_cost
+    if payload.currency is not None:
+        asset_type.currency = payload.currency or None
+    if payload.cost_center is not None:
+        asset_type.cost_center = payload.cost_center or None
     if payload.automation_strategy is not None:
         asset_type.automation_strategy = payload.automation_strategy
     if payload.composite_steps is not None:
@@ -602,6 +611,9 @@ async def clone_asset_type(type_id: int, db: AsyncSession = Depends(get_db)) -> 
         personal_provisioning_strategy=src.personal_provisioning_strategy,
         naming_pattern=src.naming_pattern,
         max_per_user=src.max_per_user,
+        monthly_cost=src.monthly_cost,
+        currency=src.currency,
+        cost_center=src.cost_center,
         automation_strategy=src.automation_strategy,
         composite_steps=src.composite_steps,
         requires_manager_approval=src.requires_manager_approval,

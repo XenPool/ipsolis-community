@@ -240,6 +240,41 @@
       </p>
     </div>
 
+    <!-- Cost / chargeback (optional) -->
+    <div id="section-cost" class="scroll-mt-4">
+      <label class="block text-xs font-medium text-muted mb-2">Cost & Chargeback (optional)</label>
+      <p class="text-[11px] text-muted/60 mb-2 leading-snug">
+        Used by the cost report (<a href="/ui/cost-report" class="text-blue-600 hover:underline">/ui/cost-report</a>) to project monthly spend per cost center.
+        Leave blank to keep this definition out of the report.
+      </p>
+      <div class="flex flex-wrap gap-4 items-end">
+        <div>
+          <label class="block text-xs text-muted mb-1">Monthly cost</label>
+          <input type="number" name="monthly_cost" min="0" step="0.01"
+                 value="{{ asset_type.monthly_cost if asset_type and asset_type.monthly_cost is not none else '' }}"
+                 placeholder="e.g. 12.50"
+                 class="w-32 rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono">
+        </div>
+        <div>
+          <label class="block text-xs text-muted mb-1">Currency</label>
+          {% set _cur = (asset_type.currency if asset_type and asset_type.currency else 'EUR') %}
+          <select name="currency"
+                  class="rounded border border-token-border bg-surface text-body text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500">
+            {% for code in ['EUR', 'USD', 'GBP', 'CHF', 'JPY', 'CAD', 'AUD', 'SEK', 'DKK', 'NOK', 'PLN'] %}
+            <option value="{{ code }}" {% if _cur == code %}selected{% endif %}>{{ code }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs text-muted mb-1">Cost center</label>
+          <input type="text" name="cost_center"
+                 value="{{ asset_type.cost_center if asset_type and asset_type.cost_center else '' }}"
+                 placeholder="e.g. CC-IT-2100"
+                 class="w-48 rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono">
+        </div>
+      </div>
+    </div>
+
     <!-- Lifecycle -->
     <div id="section-lifecycle" class="scroll-mt-4">
       <label class="block text-xs font-medium text-muted mb-2">Lifecycle Settings (optional)</label>
@@ -723,6 +758,7 @@
     {% set sections = [
       ('section-identity',       'Identity'),
       ('section-classification', 'Classification'),
+      ('section-cost',           'Cost &amp; Chargeback'),
       ('section-lifecycle',      'Lifecycle'),
       ('section-access',         'Access &amp; Approval'),
       ('section-automation',     'Automation'),
@@ -1307,6 +1343,10 @@ async function submitForm() {
     naming_pattern: form.querySelector('[name="naming_pattern"]').value.trim() || null,
     max_per_user: form.querySelector('[name="max_per_user"]').value
       ? parseInt(form.querySelector('[name="max_per_user"]').value) : 1,
+    monthly_cost: form.querySelector('[name="monthly_cost"]').value
+      ? parseFloat(form.querySelector('[name="monthly_cost"]').value) : null,
+    currency: form.querySelector('[name="currency"]').value || null,
+    cost_center: form.querySelector('[name="cost_center"]').value.trim() || null,
     rds_gateway_url: document.getElementById('rds-gateway-url').value.trim() || null,
     requires_manager_approval: document.getElementById('requires-manager-approval-cb').checked,
     requires_owner_approval: document.getElementById('requires-owner-approval-cb')

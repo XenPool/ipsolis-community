@@ -13,6 +13,7 @@ explicit *Enterprise license* note appears.
 - [Prometheus `/metrics` endpoint](#prometheus-metrics-endpoint)
 - [SIEM audit-log streaming (Splunk HEC)](#siem-audit-log-streaming-splunk-hec)
 - [Per-integration API tokens](#per-integration-api-tokens)
+- [Cost report / chargeback](#cost-report--chargeback)
 
 ---
 
@@ -431,3 +432,56 @@ Bearer header acceptance + last-used tracking + soft-delete revocation.
   HMAC stays as-is; admins can pre-create a token named e.g.
   `servicenow-int` and send it as `Authorization: Bearer …` once the
   scoped admin endpoints land.
+
+---
+
+## Cost report / chargeback
+
+Three optional fields on every asset definition feed a monthly cost
+report:
+
+| Field | Purpose |
+|---|---|
+| `monthly_cost` | Per-instance monthly cost (e.g. an M365 E5 seat at €12.50) |
+| `currency` | ISO 4217 code (defaults to EUR; USD/GBP/CHF/JPY/CAD/AUD/SEK/DKK/NOK/PLN supported in the dropdown) |
+| `cost_center` | Free-form label, e.g. `CC-IT-2100`, `RnD/Platform` |
+
+Definitions without `monthly_cost` are excluded from the report so
+legacy entries don't surface as 0 €.
+
+### What the report shows
+
+Admin UI → **Cost Report** in the left nav (`/ui/cost-report`):
+
+- **Summary cards** at the top — projected monthly spend per
+  (cost center × currency).
+- **Detail table** — one row per (cost center, asset definition):
+  unit cost, active orders, unique users, projected monthly total.
+- **Download CSV** button — `GET /admin/cost-report?fmt=csv` returns
+  a CSV the same data spreadsheet-friendly.
+
+### What "active" means
+
+Counts every order in `pending`, `pending_approval`, `scheduled`,
+`processing`, `provisioning`, `provisioned`, or `delivered` status —
+the same set used by capacity / per-user quota enforcement.
+Cancelled, rejected, expired, revoked, and failed orders never count.
+
+### Where to set the fields
+
+Admin UI → *Asset Definitions* → edit a definition → **Cost & Chargeback**
+section (between Classification and Lifecycle). Saved via the same
+`PUT /admin/asset-types/{id}` endpoint, picked up by the next report
+load.
+
+### Useful patterns
+
+- **Personal VDIs** — set `monthly_cost` to the actual hosting cost
+  per VM, `cost_center` to the user's department. Report shows
+  exactly which department is consuming how much VDI capacity.
+- **SaaS license types** — set `monthly_cost` to per-seat list price,
+  `cost_center` to the function paying the bill (HR for Workday,
+  Finance for Concur, IT for collaboration tools).
+- **Pooled licenses** — `active_orders` reflects current usage out of
+  `pool_capacity`; multiplying gives a usage-adjusted projected
+  monthly total rather than just the negotiated maximum.

@@ -2,6 +2,8 @@ import enum
 from datetime import datetime
 from typing import Any
 
+from decimal import Decimal
+
 from sqlalchemy import (
     BigInteger,
     Boolean,
@@ -9,6 +11,7 @@ from sqlalchemy import (
     Enum,
     ForeignKey,
     Integer,
+    Numeric,
     String,
     Text,
     func,
@@ -115,6 +118,11 @@ class AssetType(Base):
     max_per_user: Mapped[int] = mapped_column(
         Integer, nullable=False, default=1, server_default="1"
     )
+    # Cost / chargeback — populated by finance for the monthly cost report.
+    # NULL means "untracked" so legacy definitions don't surface as 0 €.
+    monthly_cost: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    currency: Mapped[str | None] = mapped_column(String(3), nullable=True)
+    cost_center: Mapped[str | None] = mapped_column(String(100), nullable=True)
     # Lifecycle
     lifecycle_ttl_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
     lifecycle_renewable: Mapped[bool] = mapped_column(

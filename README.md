@@ -70,6 +70,9 @@ Enterprise IT automation shouldn't require a 6-month implementation project and 
 - **SIEM audit-log streaming (Splunk HEC)** — every `audit_log` row is forwarded once a minute to a configured Splunk HTTP Event Collector, with persistent cursor, automatic retry on transient failure, and a "Send Test Event" button to verify connectivity before enabling
 - **Per-integration API tokens** — replaces the single shared `X-Admin-Key` with named, expiring, revocable bearer tokens stored as SHA-256 hashes (raw token shown once on creation); legacy `X-Admin-Key` still accepted as a fallback so existing integrations don't break on upgrade
 
+### Finance & Chargeback
+- **Cost / chargeback per asset definition** — set `monthly_cost`, `currency`, and `cost_center` on each definition; the Cost Report page aggregates active orders into projected monthly spend per cost center with CSV export
+
 ### Admin UI
 - Dashboard with live pool status tiles (auto-refreshing HTMX fragments)
 - Full asset type configuration (categories, attributes, automation strategy, approvals)

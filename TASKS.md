@@ -218,11 +218,44 @@ deferred to a separate slice (different dep tree, optional).
 - [ ] Sample Grafana dashboards: provisioning latency p50/p95, queue depth, error rate
 - [ ] `ipsolis_celery_queue_depth{queue}` (needs Redis LLEN per Celery queue)
 
-### [open] Cost / chargeback per asset type — Prio 1
-- [ ] Asset type fields: `monthly_cost`, `cost_center`, `currency`
-- [ ] Order detail shows projected cost
-- [ ] Monthly export: rows per cost-center × asset-type × user-count
-- [ ] Optional alert when monthly cost exceeds threshold
+### [partial] Cost / chargeback per asset type — Prio 1
+Reporting side **shipped 2026-04-26**. Per-order cost projection on the
+order detail page and threshold-based alerts deferred.
+
+**Done — schema + report (2026-04-26):**
+- Migration `0056_asset_type_cost.py` — adds `monthly_cost NUMERIC(12,2)`,
+  `currency VARCHAR(3)`, `cost_center VARCHAR(100)` (all nullable so
+  legacy definitions stay untracked).
+- ORM `AssetType.monthly_cost / currency / cost_center`.
+- Pydantic schemas (Create / Update / Read) carry the new fields.
+- Admin form: new "Cost & Chargeback" section between Classification
+  and Lifecycle, with monthly cost input, currency dropdown
+  (EUR/USD/GBP/CHF/JPY/CAD/AUD/SEK/DKK/NOK/PLN), and cost-center text.
+  Section nav updated to include the new anchor.
+- Admin route: `GET /admin/cost-report?fmt=json|csv` — aggregates
+  active orders (same status set as capacity enforcement) per
+  (cost_center × asset_type × currency), returns rows + per-cost-center
+  totals. CSV export with `Content-Disposition: attachment`.
+- Admin UI: new `/ui/cost-report` page with summary cards + detail
+  table + CSV download. Linked from the left nav between Maintenance
+  and License.
+- Audit snapshot updated to capture cost field changes.
+- README + `docs/ENTERPRISE_FEATURES.md` updated with the field
+  definitions and report behaviour.
+- Verified end-to-end: empty report when no definitions priced,
+  correct active-order counts and projected totals after seeding
+  two test definitions, CSV export with right content-type and
+  attachment filename.
+
+**Still to do:**
+- [ ] Per-order cost projection on the portal order detail page
+      (`monthly_cost × months_requested`).
+- [ ] Threshold alerting — email/Teams when projected monthly per
+      cost center crosses a configurable amount.
+- [ ] Historical view: report by date range, not just "currently
+      active" (would need a snapshot table or order-status time series).
+- [ ] FX conversion for mixed-currency cost centers (today the
+      summary cards keep currencies separate).
 
 ---
 
