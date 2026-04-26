@@ -432,11 +432,23 @@ instrumentation, sample dashboards, and the queue-depth gauge remain.
   OTLP collector, an http-dispatched runbook produces a single
   distributed trace.
 
+**Done — Celery queue depth gauge (2026-04-26):**
+- New `ipsolis_celery_queue_depth{queue}` Prometheus gauge in
+  `app.utils.metrics`. Refreshed on every `/metrics` scrape via
+  `redis.asyncio` `LLEN` against the four known queues
+  (`default`, `provision`, `reclaim`, `notifications`).
+- Resilient: missing/non-Redis broker → gauges cleared (no error);
+  per-queue LLEN failures logged at WARNING and skipped without
+  affecting other queues.
+- Verified live: pushed 3 synthetic messages to `provision`,
+  next scrape reported `provision=3.0`; cleared the queue, next
+  scrape reported `provision=0.0`. Pre-existing `default=2.0`
+  matched real Beat-scheduled tasks waiting in the broker.
+
 **Still to do:**
-- [ ] `ipsolis_celery_queue_depth{queue}` Prometheus gauge (needs
-      Redis LLEN per queue; orthogonal to tracing)
 - [ ] Sample Grafana dashboards: provisioning latency p50/p95,
-      queue depth, error rate
+      queue depth, error rate (purely a content task — JSON files
+      under `docs/grafana/` admins can import directly)
 
 ### [partial] Cost / chargeback per asset type — Prio 1
 Reporting side **shipped 2026-04-26**. Per-order cost projection on the

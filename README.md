@@ -65,7 +65,7 @@ Enterprise IT automation shouldn't require a 6-month implementation project and 
 - **Active / inactive flag** on asset definitions — deprecate without losing history; inactive types disappear from the portal catalog but stay visible in the admin list
 
 ### Observability
-- **Prometheus `/metrics` endpoint** — request count + latency histogram per route, plus business gauges (orders by status, pending approvals, pool free/busy by asset type)
+- **Prometheus `/metrics` endpoint** — request count + latency histogram per route, plus business gauges (orders by status, pending approvals, pool free/busy by asset type, Celery queue depth per worker queue)
 - Cardinality-bounded route labels (path templates, not actual paths)
 - Toggleable via the `metrics.enabled` config flag
 - **OpenTelemetry tracing** — auto-instrumented FastAPI requests, SQLAlchemy queries, and Celery tasks flow through an OTLP HTTP exporter to any standard collector (Jaeger, Tempo, SigNoz, Honeycomb); a request that dispatches a runbook produces a single trace spanning api + worker; a console exporter mode is available for local verification without a collector

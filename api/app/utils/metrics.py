@@ -82,6 +82,20 @@ pool_assets = Gauge(
     registry=REGISTRY,
 )
 
+celery_queue_depth = Gauge(
+    "ipsolis_celery_queue_depth",
+    "Number of pending tasks per Celery queue (Redis LLEN).",
+    ["queue"],
+    registry=REGISTRY,
+)
+
+# Queues actually used by ipSolis. Worker.task_routes maps tasks here:
+# default        — license check, maintenance, SIEM streamer
+# provision      — order dispatch, scheduled-runbook trigger, PS module install
+# reclaim        — DELETE actions and expiry-driven reclaim
+# notifications  — approval emails, approval reminders + escalation
+_KNOWN_QUEUES: tuple[str, ...] = ("default", "provision", "reclaim", "notifications")
+
 
 def record_request(method: str, route: str, status_code: int, duration_seconds: float) -> None:
     """Bump the HTTP counter + histogram for a completed request."""
@@ -125,12 +139,52 @@ async def _refresh_business_gauges(db: AsyncSession) -> None:
         pool_assets.labels(asset_type=type_name, status=label).set(count)
 
 
+async def _refresh_celery_gauges() -> None:
+    """Set ``ipsolis_celery_queue_depth{queue}`` from Redis ``LLEN`` per queue.
+
+    Redis is the broker; Celery stores pending messages as plain Redis lists
+    keyed by the queue name. ``LLEN`` returns the depth in O(1). When the
+    broker URL is missing or non-Redis, the gauges stay at zero (cleared).
+    """
+    import os
+    broker = os.environ.get("CELERY_BROKER_URL", "")
+    if not broker.startswith(("redis://", "rediss://")):
+        celery_queue_depth.clear()
+        return
+
+    try:
+        import redis.asyncio as aioredis
+    except ImportError as exc:
+        logger.warning("metrics: redis client unavailable: %s", exc)
+        return
+
+    client = aioredis.from_url(broker)
+    try:
+        celery_queue_depth.clear()
+        for queue in _KNOWN_QUEUES:
+            try:
+                depth = await client.llen(queue)
+            except Exception as exc:  # noqa: BLE001 — per-queue failures shouldn't tank the rest
+                logger.warning("metrics: LLEN %s failed: %s", queue, exc)
+                continue
+            celery_queue_depth.labels(queue=queue).set(int(depth or 0))
+    finally:
+        try:
+            await client.aclose()
+        except Exception:  # noqa: BLE001
+            pass
+
+
 async def render(db: AsyncSession) -> tuple[bytes, str]:
     """Return ``(payload, content_type)`` for the /metrics response."""
     try:
         await _refresh_business_gauges(db)
     except Exception as exc:  # noqa: BLE001 — never fail a scrape on a transient DB error
         logger.warning("metrics: gauge refresh failed: %s", exc)
+    try:
+        await _refresh_celery_gauges()
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("metrics: celery queue refresh failed: %s", exc)
     return generate_latest(REGISTRY), CONTENT_TYPE_LATEST
 
 
