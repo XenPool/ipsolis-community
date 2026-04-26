@@ -456,14 +456,76 @@ delegation, N-of-M, conditional rules) remain.
   through `PUT /admin/asset-types/{id}` persists rules in the JSON
   column verbatim.
 
-**Still to do — slice 2:**
-- [ ] Boolean composition (AND / OR) — extend `_matches()` to handle
-      ``{"all_of": [...]}`` and ``{"any_of": [...]}`` shapes; UI gets
-      one extra dropdown per row.
-- [ ] Custom-attribute conditions (e.g. ``attr.environment == "prod"``)
-      — add an `attribute` field type that reads from `order.config`.
-- [ ] Per-rule N-of-M (separate threshold per rule, not just
-      asset-type-wide).
+**Done — conditional approval rules slice 2 (2026-04-26):**
+- Boolean composition: ``_eval_condition()`` now recognises compound
+  nodes ``{"op": "and"|"or"|"not", "clauses": [...]}`` alongside the
+  slice-1 leaf shape, recursing up to 8 levels. ``and`` is vacuously
+  True on empty clauses; ``or`` is False on empty clauses; ``not``
+  inverts a single clause. Leaf shape is preserved unchanged so all
+  existing rules round-trip.
+- Custom-attribute conditions: ``build_context()`` flat-maps every
+  ``order.config`` key under ``attr.<key>`` so a rule can reference
+  ``attr.cost_center`` or ``attr.justification`` with the same six
+  operators. ``contains`` against a list-valued attr (e.g.
+  MULTI_ENUM) iterates members instead of stringifying the list.
+- Per-rule N-of-M: optional ``min_approvals_required`` on the rule
+  itself. Migration ``0066_order_approval_rule_quorum.py`` adds two
+  columns to ``order_approvals``:
+  * ``rule_name`` (200 chars, NULL on manager / owner rows) carries
+    the full untruncated rule name — the existing ``approver_type``
+    column is capped at 30 chars and only holds a short prefix.
+  * ``rule_threshold`` (int, NULL fold-in-with-global) freezes the
+    quorum at order-creation time so subsequent admin edits to the
+    asset-type rules don't shift the order's decision logic
+    mid-flight.
+- Decision logic in ``apply_approval_decision()`` rebuilt: each rule
+  with its own threshold forms a private quorum bucket; manager /
+  owner / no-threshold-rule approvers fold into a single "global"
+  bucket gated by ``asset_type.min_approvals_required``. ``threshold_met``
+  is true iff every bucket meets its quorum. Per-bucket thresholds
+  are clamped to the bucket size so a rule asking for more approvers
+  than it has can't create an unfulfillable quorum. Pending approvals
+  are only superseded once every bucket is satisfied — no premature
+  "approved" while another bucket still needs decisions.
+- Rule builder UI rebuilt as a card-per-rule editor: name + ALL/ANY
+  combinator + per-rule quorum input in the header; conditions
+  stacked vertically with their own ``+ Add condition`` button; field
+  input is a free-text ``<input list="approval-rule-fields">``
+  backed by a datalist that includes built-ins plus every
+  ``attr.<key>`` from the asset type's ``config`` so admins get
+  autocomplete for known custom attributes. Saved rules with deeply-
+  nested conditions render with an inline warning, since the simple
+  card editor only round-trips top-level clauses.
+- Save serializer collapses 1-leaf rules to the flat slice-1 shape
+  (cleaner JSON for trivial rules) and emits the compound shape only
+  when 2+ leaves exist. Per-rule quorum sent as
+  ``min_approvals_required`` only when set.
+- README updated; ``docs/ENTERPRISE_FEATURES.md`` left as-is (rules
+  weren't called out there in slice 1 — adding a section is a future
+  doc-polish slice).
+- Verified end-to-end:
+  * Evaluator unit tests for leaf, AND, OR, NOT, attr-fields,
+    nested compounds, threshold-bearing rules — all green.
+  * Bucket-decision smoke tests (single global, mgr+rule, multi-rule
+    with clamped threshold, asset-type N-of-M crossed with rule
+    N-of-M) — all green.
+  * Round-trip via ``PUT /admin/asset-types/{id}``: persisted shape
+    matches what the evaluator consumes, rule with
+    ``{op:"and",clauses:[duration>30, attr.cost_center contains EU]}``
+    + per-rule quorum=1 fires correctly against a synthetic order
+    in the EU cost center, and the same rule does NOT fire when
+    cost_center is flipped to US (proves attr.* lookup).
+  * Admin UI form renders the card structure, datalist with attr
+    fields, combinator + quorum inputs.
+
+**Still to do — slice 3 (deferred):**
+- [ ] Visual editor for deeply-nested compounds (today's UI flattens
+      to 1 level + warning; tree editor would close the gap for
+      power users).
+- [ ] Per-bucket reminder optimisation: stop nagging approvers in a
+      bucket whose quorum is already met but whose siblings are still
+      pending (today they get reminders until the *whole* order
+      crosses the line).
 - [ ] Escalation v2: optionally **assign** the escalated approval
       to the contact (creating a new approval row with their email)
       so they can decide directly via the existing token URL —

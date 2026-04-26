@@ -76,24 +76,71 @@ async def apply_approval_decision(
         logger.info("Approval %s declined for order %s", approval.id, order.id)
         return DecisionResult(status="declined", all_granted=False)
 
-    # Approved — check whether the N-of-M threshold is now satisfied.
+    # Approved — check whether quorum is now satisfied. Slice 2 of the
+    # rules engine introduces per-rule N-of-M: each rule with its own
+    # ``min_approvals_required`` (frozen onto each ``OrderApproval`` as
+    # ``rule_threshold``) forms a private quorum group. All other
+    # approvers — manager, owner, and rule-driven approvers without a
+    # per-rule threshold — fold into a single "global" group governed
+    # by ``asset_type.min_approvals_required``. The order is only
+    # unblocked when *every* group has met its threshold.
     rows = await db.execute(
         select(OrderApproval).where(OrderApproval.order_id == order.id)
     )
     all_approvals = list(rows.scalars().all())
-    approved_count = sum(1 for a in all_approvals if a.status == "approved")
 
-    # Resolve threshold: NULL / 0 / >= total → "all required" (legacy).
     asset_type = await db.get(AssetType, order.asset_type_id)
-    configured = (asset_type.min_approvals_required if asset_type else None) or 0
-    if configured <= 0 or configured >= len(all_approvals):
-        threshold = len(all_approvals)
-        mode = "all"
-    else:
-        threshold = configured
-        mode = f"{threshold}-of-{len(all_approvals)}"
+    global_threshold_cfg = (asset_type.min_approvals_required if asset_type else None) or 0
 
-    threshold_met = approved_count >= threshold
+    # Bucket approvals: "global" plus one bucket per rule_name with a
+    # rule_threshold. Approvals from the same rule but without a
+    # threshold continue to live in "global".
+    buckets: dict[str, list[OrderApproval]] = {"global": []}
+    bucket_thresholds: dict[str, int] = {}
+    for a in all_approvals:
+        if a.rule_threshold and a.rule_name:
+            key = f"rule:{a.rule_name}"
+            buckets.setdefault(key, []).append(a)
+            # All approvals from the same rule carry the same threshold;
+            # take the first non-null we see and ignore drift.
+            bucket_thresholds.setdefault(key, int(a.rule_threshold))
+        else:
+            buckets["global"].append(a)
+
+    # Apply legacy "0/NULL/>=total → all required" coercion to global.
+    global_total = len(buckets["global"])
+    if global_threshold_cfg <= 0 or global_threshold_cfg >= global_total:
+        bucket_thresholds["global"] = global_total
+        global_mode = "all"
+    else:
+        bucket_thresholds["global"] = global_threshold_cfg
+        global_mode = f"{global_threshold_cfg}-of-{global_total}"
+
+    # Per-rule buckets: clamp to the bucket size so a rule that asks
+    # for more approvers than it has doesn't create an unfulfillable
+    # quorum (== "all of this rule's approvers").
+    for key, members in buckets.items():
+        if key == "global":
+            continue
+        bucket_thresholds[key] = min(bucket_thresholds[key], len(members))
+
+    bucket_met: dict[str, bool] = {}
+    bucket_progress: dict[str, str] = {}
+    for key, members in buckets.items():
+        if not members:
+            bucket_met[key] = True
+            continue
+        approved = sum(1 for a in members if a.status == "approved")
+        bucket_met[key] = approved >= bucket_thresholds[key]
+        bucket_progress[key] = f"{approved}/{bucket_thresholds[key]}"
+
+    threshold_met = all(bucket_met.values())
+    approved_count = sum(1 for a in all_approvals if a.status == "approved")
+    mode = ", ".join(
+        f"{key}={bucket_progress[key]}"
+        for key in sorted(buckets)
+        if buckets[key]
+    ) or global_mode
 
     if threshold_met:
         # Mark remaining pending approvals as "superseded" so they

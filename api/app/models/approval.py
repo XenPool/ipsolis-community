@@ -45,6 +45,16 @@ class OrderApproval(Base):
     escalated_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    # Slice 2 of conditional approval rules: when an approval is created
+    # by a matching rule, ``rule_name`` carries the full (un-truncated)
+    # rule name (the ``approver_type`` column is capped at 30 chars and
+    # only carries a short prefix). ``rule_threshold`` captures the
+    # rule's per-rule N-of-M quorum at order-creation time so subsequent
+    # admin edits to the asset-type rules don't shift the order's
+    # decision logic mid-flight. NULL on both for static manager / owner
+    # approvals.
+    rule_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    rule_threshold: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     # Relationships
     order: Mapped["Order"] = relationship("Order", back_populates="approvals")  # noqa: F821

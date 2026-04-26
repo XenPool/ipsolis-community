@@ -454,42 +454,110 @@
                     class="text-xs text-blue-600 hover:underline">+ Add rule</button>
           </div>
           <p class="text-[11px] text-muted/60 mb-2 leading-snug">
-            Each rule adds approvers when its condition matches the order. Combined with the manager / owner
-            toggles above. Examples: <em>"extension &gt; 90 days needs CISO"</em>, <em>"PCI-tagged orders need
-            compliance"</em>, <em>"monthly cost &gt; €500 needs finance"</em>.
+            Each rule adds approvers when its condition matches. Conditions combine with <strong>ALL</strong>
+            (AND) or <strong>ANY</strong> (OR) within a rule, and reference built-in fields or any
+            <code class="font-mono bg-surface-raised px-1 rounded">attr.&lt;key&gt;</code> from the asset
+            type's attributes. Optional <em>quorum</em> sets per-rule N-of-M; leave blank to fold the rule's
+            approvers into the asset-type-level quorum. Examples: <em>"extension &gt; 90 days AND has_pii"</em>,
+            <em>"attr.cost_center contains 'EU' OR monthly_cost &gt; €500"</em>.
           </p>
-          <div id="approval-rule-rows" class="space-y-1.5">
+          <div id="approval-rule-rows" class="space-y-3">
             {% if asset_type and asset_type.approval_rules %}
               {% for rule in asset_type.approval_rules %}
-              {% set _cond = rule.condition or {} %}
-              {% set _approvers = rule.approvers or [] %}
-              {% set _emails = _approvers | map(attribute='email') | join(', ') %}
-              <div class="approval-rule-row grid grid-cols-12 gap-2 items-center">
-                <input type="text" name="rule_name[]" value="{{ rule.name or '' }}" placeholder="Rule name"
-                       class="col-span-3 rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500">
-                <select name="rule_field[]"
-                        class="col-span-2 rounded border border-token-border bg-surface text-body text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono">
-                  {% for f in ['duration_days','monthly_cost','has_pii','has_phi','has_pci','requester_department'] %}
-                  <option value="{{ f }}" {% if _cond.field == f %}selected{% endif %}>{{ f }}</option>
-                  {% endfor %}
-                </select>
-                <select name="rule_op[]"
-                        class="col-span-1 rounded border border-token-border bg-surface text-body text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono">
-                  {% for o in ['>','>=','<','<=','==','contains'] %}
-                  <option value="{{ o }}" {% if _cond.op == o %}selected{% endif %}>{{ o }}</option>
-                  {% endfor %}
-                </select>
-                <input type="text" name="rule_value[]" value="{{ _cond.value if _cond.value is not none else '' }}"
-                       placeholder="value"
-                       class="col-span-2 rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono">
-                <input type="text" name="rule_approvers[]" value="{{ _emails }}" placeholder="approver1@x.de, approver2@x.de"
-                       class="col-span-3 rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono">
-                <button type="button" onclick="this.closest('.approval-rule-row').remove()"
-                        class="col-span-1 text-red-400 hover:text-red-600 text-lg leading-none text-center">×</button>
-              </div>
+                {# Normalise the saved condition shape so the template renders it as a list of leaves. #}
+                {% set _cond = rule.condition or {} %}
+                {% if _cond.op in ['and', 'or'] %}
+                  {% set _combinator = _cond.op %}
+                  {% set _leaves = _cond.clauses or [] %}
+                {% elif _cond.field %}
+                  {% set _combinator = 'and' %}
+                  {% set _leaves = [_cond] %}
+                {% else %}
+                  {% set _combinator = 'and' %}
+                  {% set _leaves = [{}] %}
+                {% endif %}
+                {# Detect deep / unsupported shapes — UI keeps the rule but warns the admin. #}
+                {% set _ns = namespace(complex=false) %}
+                {% for leaf in _leaves %}
+                  {% if leaf.op in ['and','or','not'] %}{% set _ns.complex = true %}{% endif %}
+                {% endfor %}
+                {% set _approvers = rule.approvers or [] %}
+                {% set _emails = _approvers | map(attribute='email') | join(', ') %}
+                <div class="approval-rule-card rounded-lg border border-token-border bg-surface-raised/30 p-3">
+                  <div class="grid grid-cols-12 gap-2 items-center mb-2">
+                    <input type="text" data-field="rule_name" value="{{ rule.name or '' }}" placeholder="Rule name"
+                           class="col-span-5 rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                    <div class="col-span-3 flex items-center gap-1 text-xs text-muted">
+                      <span class="text-muted/60">Match</span>
+                      <select data-field="rule_combinator"
+                              class="rounded border border-token-border bg-surface text-body text-xs px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono">
+                        <option value="and" {% if _combinator == 'and' %}selected{% endif %}>ALL (AND)</option>
+                        <option value="or"  {% if _combinator == 'or'  %}selected{% endif %}>ANY (OR)</option>
+                      </select>
+                    </div>
+                    <div class="col-span-3 flex items-center gap-1 text-xs text-muted">
+                      <span class="text-muted/60">Quorum</span>
+                      <input type="number" min="1" data-field="rule_threshold"
+                             value="{{ rule.min_approvals_required or '' }}" placeholder="all"
+                             class="w-14 rounded border border-token-border bg-surface text-body text-xs px-2 py-1 font-mono focus:outline-none focus:ring-1 focus:ring-blue-500">
+                      <span class="text-muted/50">of approvers</span>
+                    </div>
+                    <button type="button" onclick="this.closest('.approval-rule-card').remove()"
+                            class="col-span-1 text-red-400 hover:text-red-600 text-lg leading-none text-center justify-self-end">×</button>
+                  </div>
+                  {% if _ns.complex %}
+                  <p class="text-[11px] text-amber-600 dark:text-amber-400 mb-2 leading-snug">
+                    ⚠ This rule has a deeply nested condition. The form below shows only the top-level clauses;
+                    saving will overwrite the nested structure. Edit via API to preserve it.
+                  </p>
+                  {% endif %}
+                  <div class="approval-rule-conds space-y-1.5">
+                    {% for leaf in _leaves %}
+                    <div class="approval-rule-cond grid grid-cols-12 gap-2 items-center">
+                      <input type="text" data-field="cond_field" value="{{ leaf.field or '' }}"
+                             list="approval-rule-fields" placeholder="field"
+                             class="col-span-4 rounded border border-token-border bg-surface text-body text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono">
+                      <select data-field="cond_op"
+                              class="col-span-2 rounded border border-token-border bg-surface text-body text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono">
+                        {% for o in ['>','>=','<','<=','==','contains'] %}
+                        <option value="{{ o }}" {% if leaf.op == o %}selected{% endif %}>{{ o }}</option>
+                        {% endfor %}
+                      </select>
+                      <input type="text" data-field="cond_value" value="{{ leaf.value if leaf.value is not none else '' }}"
+                             placeholder="value"
+                             class="col-span-5 rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono">
+                      <button type="button" onclick="removeRuleCondition(this)"
+                              class="col-span-1 text-red-400 hover:text-red-600 text-lg leading-none text-center">×</button>
+                    </div>
+                    {% endfor %}
+                  </div>
+                  <div class="flex items-center gap-3 mt-2">
+                    <button type="button" onclick="addRuleCondition(this)"
+                            class="text-[11px] text-blue-600 hover:underline">+ Add condition</button>
+                  </div>
+                  <div class="mt-2">
+                    <input type="text" data-field="rule_approvers" value="{{ _emails }}"
+                           placeholder="approver1@x.de, approver2@x.de"
+                           class="w-full rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono">
+                    <p class="text-[10px] text-muted/50 mt-0.5">Comma-separated approver emails for this rule.</p>
+                  </div>
+                </div>
               {% endfor %}
             {% endif %}
           </div>
+          <datalist id="approval-rule-fields">
+            <option value="duration_days"></option>
+            <option value="monthly_cost"></option>
+            <option value="has_pii"></option>
+            <option value="has_phi"></option>
+            <option value="has_pci"></option>
+            <option value="requester_department"></option>
+            {% if asset_type and asset_type.config %}
+              {% for a in asset_type.config %}
+                {% if a.key %}<option value="attr.{{ a.key }}"></option>{% endif %}
+              {% endfor %}
+            {% endif %}
+          </datalist>
         </div>
       </div>
     </div>
@@ -1338,25 +1406,76 @@ function addAttrRow() {
   document.getElementById('attr-rows').appendChild(row);
 }
 
-function addApprovalRuleRow() {
-  var row = document.createElement('div');
-  row.className = 'approval-rule-row grid grid-cols-12 gap-2 items-center';
+var _APPROVAL_OPS = ['>','>=','<','<=','==','contains'];
+
+function _approvalCondHtml() {
   var inputCls = 'rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500';
-  var fields = ['duration_days','monthly_cost','has_pii','has_phi','has_pci','requester_department'];
-  var ops = ['>','>=','<','<=','==','contains'];
-  row.innerHTML =
-    '<input type="text" name="rule_name[]" placeholder="Rule name" class="col-span-3 ' + inputCls + '">'
-    + '<select name="rule_field[]" class="col-span-2 ' + inputCls + ' font-mono">'
-    +   fields.map(function(f) { return '<option value="' + f + '">' + f + '</option>'; }).join('')
+  return '<input type="text" data-field="cond_field" list="approval-rule-fields" placeholder="field" class="col-span-4 ' + inputCls + ' font-mono">'
+    + '<select data-field="cond_op" class="col-span-2 ' + inputCls + ' font-mono">'
+    +   _APPROVAL_OPS.map(function(o) { return '<option value="' + o + '">' + o + '</option>'; }).join('')
     + '</select>'
-    + '<select name="rule_op[]" class="col-span-1 ' + inputCls + ' font-mono">'
-    +   ops.map(function(o) { return '<option value="' + o + '">' + o + '</option>'; }).join('')
-    + '</select>'
-    + '<input type="text" name="rule_value[]" placeholder="value" class="col-span-2 ' + inputCls + ' font-mono">'
-    + '<input type="text" name="rule_approvers[]" placeholder="approver1@x.de, approver2@x.de" class="col-span-3 ' + inputCls + ' font-mono">'
-    + '<button type="button" onclick="this.closest(\'.approval-rule-row\').remove()" '
+    + '<input type="text" data-field="cond_value" placeholder="value" class="col-span-5 ' + inputCls + ' font-mono">'
+    + '<button type="button" onclick="removeRuleCondition(this)" '
     +   'class="col-span-1 text-red-400 hover:text-red-600 text-lg leading-none text-center">\xd7</button>';
-  document.getElementById('approval-rule-rows').appendChild(row);
+}
+
+function addRuleCondition(btn) {
+  var card = btn.closest('.approval-rule-card');
+  var conds = card.querySelector('.approval-rule-conds');
+  var row = document.createElement('div');
+  row.className = 'approval-rule-cond grid grid-cols-12 gap-2 items-center';
+  row.innerHTML = _approvalCondHtml();
+  conds.appendChild(row);
+}
+
+function removeRuleCondition(btn) {
+  var card = btn.closest('.approval-rule-card');
+  var rows = card.querySelectorAll('.approval-rule-cond');
+  // Always leave at least one condition row — emptying a rule is done by removing the whole card.
+  if (rows.length <= 1) {
+    var row = btn.closest('.approval-rule-cond');
+    row.querySelectorAll('input').forEach(function(i) { i.value = ''; });
+    return;
+  }
+  btn.closest('.approval-rule-cond').remove();
+}
+
+function addApprovalRuleRow() {
+  var card = document.createElement('div');
+  card.className = 'approval-rule-card rounded-lg border border-token-border bg-surface-raised/30 p-3';
+  var inputCls = 'rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500';
+  card.innerHTML =
+    '<div class="grid grid-cols-12 gap-2 items-center mb-2">'
+    +   '<input type="text" data-field="rule_name" placeholder="Rule name" class="col-span-5 ' + inputCls + '">'
+    +   '<div class="col-span-3 flex items-center gap-1 text-xs text-muted">'
+    +     '<span class="text-muted/60">Match</span>'
+    +     '<select data-field="rule_combinator" class="rounded border border-token-border bg-surface text-body text-xs px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono">'
+    +       '<option value="and">ALL (AND)</option>'
+    +       '<option value="or">ANY (OR)</option>'
+    +     '</select>'
+    +   '</div>'
+    +   '<div class="col-span-3 flex items-center gap-1 text-xs text-muted">'
+    +     '<span class="text-muted/60">Quorum</span>'
+    +     '<input type="number" min="1" data-field="rule_threshold" placeholder="all" '
+    +       'class="w-14 rounded border border-token-border bg-surface text-body text-xs px-2 py-1 font-mono focus:outline-none focus:ring-1 focus:ring-blue-500">'
+    +     '<span class="text-muted/50">of approvers</span>'
+    +   '</div>'
+    +   '<button type="button" onclick="this.closest(\'.approval-rule-card\').remove()" '
+    +     'class="col-span-1 text-red-400 hover:text-red-600 text-lg leading-none text-center justify-self-end">\xd7</button>'
+    + '</div>'
+    + '<div class="approval-rule-conds space-y-1.5">'
+    +   '<div class="approval-rule-cond grid grid-cols-12 gap-2 items-center">' + _approvalCondHtml() + '</div>'
+    + '</div>'
+    + '<div class="flex items-center gap-3 mt-2">'
+    +   '<button type="button" onclick="addRuleCondition(this)" '
+    +     'class="text-[11px] text-blue-600 hover:underline">+ Add condition</button>'
+    + '</div>'
+    + '<div class="mt-2">'
+    +   '<input type="text" data-field="rule_approvers" placeholder="approver1@x.de, approver2@x.de" '
+    +     'class="w-full ' + inputCls + ' font-mono">'
+    +   '<p class="text-[10px] text-muted/50 mt-0.5">Comma-separated approver emails for this rule.</p>'
+    + '</div>';
+  document.getElementById('approval-rule-rows').appendChild(card);
 }
 
 async function submitForm() {
@@ -1495,22 +1614,43 @@ async function submitForm() {
     })(),
     approval_rules: (function() {
       var rules = [];
-      Array.from(document.querySelectorAll('.approval-rule-row')).forEach(function(row) {
-        var name = row.querySelector('[name="rule_name[]"]').value.trim();
-        var field = row.querySelector('[name="rule_field[]"]').value;
-        var op = row.querySelector('[name="rule_op[]"]').value;
-        var value = row.querySelector('[name="rule_value[]"]').value.trim();
-        var emailsRaw = row.querySelector('[name="rule_approvers[]"]').value.trim();
-        if (!field || !op || !value || !emailsRaw) return;  // incomplete row → skip
+      Array.from(document.querySelectorAll('.approval-rule-card')).forEach(function(card) {
+        var name = card.querySelector('[data-field="rule_name"]').value.trim();
+        var combinator = card.querySelector('[data-field="rule_combinator"]').value || 'and';
+        var thresholdRaw = card.querySelector('[data-field="rule_threshold"]').value.trim();
+        var emailsRaw = card.querySelector('[data-field="rule_approvers"]').value.trim();
+        if (!emailsRaw) return;  // a rule with no approvers is meaningless
+
+        // Collect leaves; drop incomplete rows so a half-edited card doesn't fail the rule.
+        var leaves = [];
+        Array.from(card.querySelectorAll('.approval-rule-cond')).forEach(function(row) {
+          var field = row.querySelector('[data-field="cond_field"]').value.trim();
+          var op = row.querySelector('[data-field="cond_op"]').value;
+          var value = row.querySelector('[data-field="cond_value"]').value.trim();
+          if (!field || !op || !value) return;
+          leaves.push({ field: field, op: op, value: value });
+        });
+        if (!leaves.length) return;
+
         var approvers = emailsRaw.split(',').map(function(e) { return e.trim(); })
           .filter(function(e) { return e.length > 0; })
           .map(function(e) { return { email: e, name: e }; });
         if (!approvers.length) return;
-        rules.push({
-          name: name || (field + ' ' + op + ' ' + value),
-          condition: { field: field, op: op, value: value },
+
+        // Single-leaf → flat shape (back-compat with slice-1 evaluator + simpler JSON).
+        // Multi-leaf → compound {op: combinator, clauses: [...]}.
+        var condition = leaves.length === 1
+          ? leaves[0]
+          : { op: combinator, clauses: leaves };
+
+        var rule = {
+          name: name || (leaves[0].field + ' ' + leaves[0].op + ' ' + leaves[0].value),
+          condition: condition,
           approvers: approvers,
-        });
+        };
+        var threshold = parseInt(thresholdRaw, 10);
+        if (!isNaN(threshold) && threshold > 0) rule.min_approvals_required = threshold;
+        rules.push(rule);
       });
       return rules.length ? rules : null;
     })(),

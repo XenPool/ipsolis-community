@@ -613,12 +613,20 @@ async def portal_create_order(
         from app.models.approval import OrderApproval
         from app.utils.approval_delegation import resolve_active_delegate
 
-        async def _make_approval(approver_type: str, email: str, name: str) -> OrderApproval:
+        async def _make_approval(
+            approver_type: str,
+            email: str,
+            name: str,
+            *,
+            rule_name: str | None = None,
+            rule_threshold: int | None = None,
+        ) -> OrderApproval:
             d = await resolve_active_delegate(db, email)
             if d is None:
                 return OrderApproval(
                     order_id=order.id, approver_type=approver_type,
                     approver_email=email, approver_name=name,
+                    rule_name=rule_name, rule_threshold=rule_threshold,
                 )
             # Active delegation — route to the deputy. The original
             # assignee is captured in the audit trail via the
@@ -632,6 +640,7 @@ async def portal_create_order(
                 order_id=order.id, approver_type=approver_type,
                 approver_email=d.delegate_email,
                 approver_name=d.delegate_name or d.delegate_email,
+                rule_name=rule_name, rule_threshold=rule_threshold,
             )
 
         # Track which emails are already covered so the rule loop
@@ -662,6 +671,8 @@ async def portal_create_order(
                 "rule:" + ra["rule_name"][:24],  # approver_type column is String(30)
                 ra["email"],
                 ra["name"],
+                rule_name=ra["rule_name"],          # full, untruncated for grouping
+                rule_threshold=ra.get("rule_threshold"),
             ))
             seen_emails.add(ra["email"].lower())
 
