@@ -83,7 +83,6 @@
         </svg>
         <span data-i18n="portal.nav.my_it">My IT</span>
       </a>
-      {% if user and user.has_any_approvals %}
       <a href="/portal/approvals"
          class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors
                 {% if active_page == 'approvals' %}bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300{% else %}text-muted hover:bg-surface-raised hover:text-body{% endif %}">
@@ -93,6 +92,11 @@
         </svg>
         <span data-i18n="portal.nav.my_approvals">My Approvals</span>
       </a>
+      {# Delegations is always visible — the user might not be an approver
+         today but could be named as one tomorrow, and setting up the
+         proactive "while I'm OOO, route to Bob" delegation is a thing
+         they should be able to do without waiting for the first approval
+         to land in their queue. #}
       <a href="/portal/delegations"
          class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors
                 {% if active_page == 'delegations' %}bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300{% else %}text-muted hover:bg-surface-raised hover:text-body{% endif %}">
@@ -102,7 +106,6 @@
         </svg>
         <span data-i18n="portal.nav.delegations">Delegations</span>
       </a>
-      {% endif %}
       <a href="/portal/orders/new"
          class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors
                 {% if active_page == 'new' %}bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300{% else %}text-muted hover:bg-surface-raised hover:text-body{% endif %}">

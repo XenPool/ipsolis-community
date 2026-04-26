@@ -27,12 +27,16 @@
         <th class="px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wide">Delegate</th>
         <th class="px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wide">Window</th>
         <th class="px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wide">Reason</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wide">
+          Source
+          <span class="text-muted/50 normal-case font-normal ml-1" title="Self-service (set by the approver) vs helpdesk (admin set on their behalf).">(who set this up)</span>
+        </th>
         <th class="px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wide">Status</th>
         <th class="px-4 py-3"></th>
       </tr>
     </thead>
     <tbody id="delegations-body" class="divide-y divide-token-border">
-      <tr><td colspan="6" class="px-4 py-8 text-center text-muted/70 text-sm">Loading…</td></tr>
+      <tr><td colspan="7" class="px-4 py-8 text-center text-muted/70 text-sm">Loading…</td></tr>
     </tbody>
   </table>
 </div>
@@ -124,16 +128,45 @@ function statusBadge(s) {
   return '<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium ' + classes + '">' + s + '</span>';
 }
 
+// Map a `created_by` actor string back to a human-readable "who set this
+// up" badge. The portal-side route writes ``api:portal_create_delegation
+// (portal:user:<email>)``, the admin-side route writes
+// ``api:create_approval_delegation (admin:session:<user>:<role>)``,
+// the legacy key writes ``...(admin:legacy_key)``.
+function sourceBadge(createdBy) {
+  var raw = createdBy || '';
+  var match;
+  if ((match = raw.match(/portal:user:([^\)\s]+)/))) {
+    return '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-300" title="Set by the approver via the portal — self-service.">Self-service</span>'
+      + '<div class="text-[10px] text-muted/70 font-mono mt-0.5" title="' + escapeHtml(raw) + '">' + escapeHtml(match[1]) + '</div>';
+  }
+  if (/admin:legacy_key/.test(raw)) {
+    return '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300" title="Set via the legacy ADMIN_API_KEY — virtual superadmin (back-compat).">Helpdesk (legacy key)</span>';
+  }
+  if ((match = raw.match(/admin:session:([^:\)]+):?([^\)\s]*)/))) {
+    var who = match[1];
+    var role = match[2];
+    return '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300" title="Set by an admin on the approver\'s behalf — helpdesk pattern.">Helpdesk</span>'
+      + '<div class="text-[10px] text-muted/70 font-mono mt-0.5" title="' + escapeHtml(raw) + '">' + escapeHtml(who) + (role ? ' (' + escapeHtml(role) + ')' : '') + '</div>';
+  }
+  if (/^token:/.test(raw)) {
+    return '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-700 dark:bg-slate-500/15 dark:text-slate-300" title="Set by an integration via API token.">Integration</span>'
+      + '<div class="text-[10px] text-muted/70 font-mono mt-0.5">' + escapeHtml(raw) + '</div>';
+  }
+  // Fallback: print whatever was stored, in mono — at least it's recognisable.
+  return '<span class="text-[11px] text-muted font-mono" title="' + escapeHtml(raw) + '">' + escapeHtml(raw || 'unknown') + '</span>';
+}
+
 async function loadList() {
   var resp = await fetch('/admin/approval-delegations');
   var body = document.getElementById('delegations-body');
   if (!resp.ok) {
-    body.innerHTML = '<tr><td colspan="6" class="px-4 py-8 text-center text-red-600 text-sm">Failed to load (HTTP ' + resp.status + ').</td></tr>';
+    body.innerHTML = '<tr><td colspan="7" class="px-4 py-8 text-center text-red-600 text-sm">Failed to load (HTTP ' + resp.status + ').</td></tr>';
     return;
   }
   var rows = await resp.json();
   if (!rows.length) {
-    body.innerHTML = '<tr><td colspan="6" class="px-4 py-12 text-center text-muted/70 text-sm">No delegations yet. <button onclick="openCreateModal()" class="text-blue-600 hover:underline ml-1">Create one →</button></td></tr>';
+    body.innerHTML = '<tr><td colspan="7" class="px-4 py-12 text-center text-muted/70 text-sm">No delegations yet. <button onclick="openCreateModal()" class="text-blue-600 hover:underline ml-1">Create one →</button></td></tr>';
     return;
   }
   body.innerHTML = rows.map(function(r) {
@@ -145,6 +178,7 @@ async function loadList() {
       + '<td class="px-4 py-3"><div class="font-medium text-heading">' + escapeHtml(r.delegate_name || r.delegate_email) + '</div><div class="text-[11px] text-muted/60 font-mono">' + escapeHtml(r.delegate_email) + '</div></td>'
       + '<td class="px-4 py-3 text-xs text-muted">' + escapeHtml(fmtDate(r.from_at)) + ' →<br>' + escapeHtml(fmtDate(r.until_at)) + '</td>'
       + '<td class="px-4 py-3 text-xs text-muted">' + escapeHtml(r.reason || '—') + '</td>'
+      + '<td class="px-4 py-3">' + sourceBadge(r.created_by) + '</td>'
       + '<td class="px-4 py-3">' + statusBadge(r.status) + '</td>'
       + '<td class="px-4 py-3 text-right">' + revokeBtn + '</td>'
       + '</tr>';
