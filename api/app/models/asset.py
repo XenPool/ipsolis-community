@@ -146,6 +146,9 @@ class AssetType(Base):
         Boolean, nullable=False, default=False, server_default="false"
     )
     approval_owners: Mapped[list[dict[str, Any]] | None] = mapped_column(JSON, nullable=True)
+    # N-of-M threshold: when set, any N of the configured approvers
+    # satisfies the order. NULL / 0 / >= total = "all required" (default).
+    min_approvals_required: Mapped[int | None] = mapped_column(Integer, nullable=True)
     requires_approval_on_modify: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default="false"
     )

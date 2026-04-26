@@ -466,6 +466,7 @@ async def create_asset_type(
         requires_manager_approval=payload.requires_manager_approval,
         requires_owner_approval=payload.requires_owner_approval,
         approval_owners=payload.approval_owners,
+        min_approvals_required=payload.min_approvals_required,
         requires_approval_on_modify=payload.requires_approval_on_modify,
         eligible_requestors_dn=payload.eligible_requestors_dn or None,
         logo=payload.logo or None,
@@ -571,6 +572,9 @@ async def update_asset_type(
         asset_type.requires_owner_approval = payload.requires_owner_approval
     if payload.approval_owners is not None:
         asset_type.approval_owners = payload.approval_owners or None
+    if payload.min_approvals_required is not None:
+        # Treat 0 as "all required" — store NULL for cleanliness.
+        asset_type.min_approvals_required = payload.min_approvals_required or None
     if payload.requires_approval_on_modify is not None:
         asset_type.requires_approval_on_modify = payload.requires_approval_on_modify
     if payload.eligible_requestors_dn is not None:
@@ -648,6 +652,7 @@ async def clone_asset_type(
         requires_manager_approval=src.requires_manager_approval,
         requires_owner_approval=src.requires_owner_approval,
         approval_owners=src.approval_owners,
+        min_approvals_required=src.min_approvals_required,
         requires_approval_on_modify=src.requires_approval_on_modify,
         eligible_requestors_dn=src.eligible_requestors_dn,
         logo=src.logo,

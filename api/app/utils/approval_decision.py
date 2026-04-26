@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.models.approval import OrderApproval
+from app.models.asset import AssetType
 from app.models.order import Order, OrderStatus
 
 logger = logging.getLogger(__name__)
@@ -75,14 +76,38 @@ async def apply_approval_decision(
         logger.info("Approval %s declined for order %s", approval.id, order.id)
         return DecisionResult(status="declined", all_granted=False)
 
-    # Approved — check whether all approvals are now granted.
+    # Approved — check whether the N-of-M threshold is now satisfied.
     rows = await db.execute(
         select(OrderApproval).where(OrderApproval.order_id == order.id)
     )
     all_approvals = list(rows.scalars().all())
-    all_granted = all(a.status == "approved" for a in all_approvals)
+    approved_count = sum(1 for a in all_approvals if a.status == "approved")
 
-    if all_granted:
+    # Resolve threshold: NULL / 0 / >= total → "all required" (legacy).
+    asset_type = await db.get(AssetType, order.asset_type_id)
+    configured = (asset_type.min_approvals_required if asset_type else None) or 0
+    if configured <= 0 or configured >= len(all_approvals):
+        threshold = len(all_approvals)
+        mode = "all"
+    else:
+        threshold = configured
+        mode = f"{threshold}-of-{len(all_approvals)}"
+
+    threshold_met = approved_count >= threshold
+
+    if threshold_met:
+        # Mark remaining pending approvals as "superseded" so they
+        # disappear from pending lists, no longer attract reminders /
+        # escalations, and can't be acted on retroactively. Reuse
+        # ``decided_at`` for the supersession timestamp.
+        now = datetime.now(timezone.utc)
+        superseded = 0
+        for a in all_approvals:
+            if a.status == "pending":
+                a.status = "superseded"
+                a.decided_at = now
+                superseded += 1
+
         # Local import — _post_approval_dispatch lives in the portal route module
         # so the side-effects (asset reservation, runbook dispatch) stay there.
         from app.routes.portal import _post_approval_dispatch
@@ -92,12 +117,15 @@ async def apply_approval_decision(
             args=[order.id, True],
             queue="provision",
         )
-        logger.info("All approvals granted for order %s — dispatching", order.id)
+        logger.info(
+            "Order %s approval threshold met (%s, %d approved, %d superseded) — dispatching",
+            order.id, mode, approved_count, superseded,
+        )
     else:
         logger.info(
-            "Approval %s approved for order %s (still pending others)",
-            approval.id, order.id,
+            "Order %s approval %d/%d (%s) — still waiting",
+            order.id, approved_count, threshold, mode,
         )
 
     await db.commit()
-    return DecisionResult(status="approved", all_granted=all_granted)
+    return DecisionResult(status="approved", all_granted=threshold_met)

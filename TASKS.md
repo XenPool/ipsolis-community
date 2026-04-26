@@ -304,8 +304,35 @@ delegation, N-of-M, conditional rules) remain.
   `reminded: 0, escalated: 1`, sets `escalated_at`; second scan
   correctly skips it (`escalated: 0`).
 
+**Done — N-of-M approvals (2026-04-26):**
+- Migration `0061_asset_type_min_approvals.py` adds an
+  `INTEGER NULL` column. NULL / 0 / >= total rows means "all
+  required" (legacy default); set N for any-N-of-M semantics.
+- ORM `AssetType.min_approvals_required` mapped; Pydantic Create/
+  Update/Read schemas carry the field; audit `_type_snap()` includes
+  it so changes are diffable.
+- Runtime evaluator in `apply_approval_decision`: after recording
+  an approve, counts approved rows, looks up the asset type's
+  threshold, and either dispatches the order (threshold met) or
+  logs the progress (still waiting). When the threshold is met it
+  marks remaining pending rows as `superseded` — a new status
+  string that disappears from pending lists, doesn't attract
+  reminders / escalations, and can't be retroactively acted on.
+- Decline is still a hard veto regardless of N — keeps a clear
+  accountability path even with soft N-of-M policies.
+- Admin form: new "Minimum approvals required" input next to the
+  approval-owners block, blank/0 placeholder = "all". JS submitter
+  sends the integer (or null) on save.
+- Verified end-to-end: synthetic order with 3 application_owner
+  rows + `min_approvals_required=2` → 1st approve = waiting, 2nd
+  approve = threshold met, 3rd row = `superseded`,
+  ``threshold_met=True`` correctly triggered
+  ``_post_approval_dispatch``.
+
 **Still to do:**
-- [ ] Schema: `approval_rules` JSONB on asset_type extending current `approval_owners`
+- [ ] Schema: `approval_rules` JSONB on asset_type — conditional
+      rules (e.g. "extension > 90 days needs CISO", "PCI-tagged
+      types need both manager + app owner")
 - [ ] Runtime evaluator that resolves rules → approval steps
 - [ ] UI: rule-builder (avoid full DSL; predefined patterns)
 - [ ] Escalation v2: optionally **assign** the escalated approval

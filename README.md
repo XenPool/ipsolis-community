@@ -30,6 +30,7 @@ Enterprise IT automation shouldn't require a 6-month implementation project and 
 - **Approval delegation (OOO mode)** — admins configure deputy windows ("Stefan is on vacation Aug 1–15, route his approvals to Jupp"); new orders during the window automatically address the deputy, original assignee captured in the audit trail
 - **Self-service delegation** in the portal — managers configure their own OOO without going through an admin (`/portal/delegations`); identity is enforced server-side so a user can never re-route someone else's approvals
 - **Approval escalation** — once an approval has burned through all its reminders without a decision, a single notification fires to the configured escalation contact(s) so an operator can intervene; each row escalates at most once
+- **N-of-M approvals** — set `min_approvals_required` per asset definition so any N of M configured approvers can satisfy the order; remaining pending rows transition to `superseded` once the threshold is met. Decline still vetoes regardless of N.
 
 ### Dynamic Runbook Engine
 - Visual runbook builder in the Admin UI
