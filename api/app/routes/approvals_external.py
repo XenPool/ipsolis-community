@@ -21,7 +21,7 @@ from app.models.approval import OrderApproval
 from app.models.asset import AssetType
 from app.models.order import Order
 from app.templates_instance import templates
-from app.utils.approval_decision import apply_approval_decision
+from app.utils.approval_decision import SoDViolation, apply_approval_decision
 from app.utils.approval_token import verify_token
 
 logger = logging.getLogger(__name__)
@@ -163,7 +163,19 @@ async def approve_post(
     # decision made via an emailed link is distinguishable from a
     # portal-session decision in the audit log.
     actor = f"api:approval_token (approver:{approval.approver_email})"
-    result = await apply_approval_decision(db, approval, norm, comment, actor=actor)
+    try:
+        result = await apply_approval_decision(db, approval, norm, comment, actor=actor)
+    except SoDViolation as exc:
+        return _render_status_page(
+            request,
+            title="Cannot approve",
+            headline="Separation of duties — you configured this asset type.",
+            message=(
+                f"You appear in the audit trail as a configurer of asset type "
+                f"{exc.asset_type_id}. Ask a different approver to decide."
+            ),
+            tone="error",
+        )
 
     if result.status == "already_decided":
         return _render_status_page(

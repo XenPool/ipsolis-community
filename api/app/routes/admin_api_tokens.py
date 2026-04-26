@@ -25,7 +25,7 @@ from app.utils.api_tokens import (
     status as token_status,
 )
 from app.utils.auth import require_admin_key
-from app.utils.rbac import require_role
+from app.utils.rbac import VALID_ROLES, role_at_least, require_role
 
 logger = logging.getLogger(__name__)
 router = APIRouter(
@@ -43,6 +43,9 @@ class TokenCreate(BaseModel):
     # Empty/missing → defaults to ``["admin:*"]`` for back-compat with the
     # slice-1 token UX. Unknown scopes are filtered out silently.
     scopes: list[str] | None = None
+    # RBAC slice 3: optional role binding. NULL = scope-only authz
+    # (back-compat for existing callers that don't pass this field).
+    role: str | None = Field(default=None, max_length=32)
 
 
 class TokenRow(BaseModel):
@@ -50,6 +53,7 @@ class TokenRow(BaseModel):
     name: str
     token_prefix: str
     scopes: list[str]
+    role: str | None
     created_by: str
     created_at: datetime
     expires_at: datetime | None
@@ -70,6 +74,7 @@ def _to_row(t: ApiToken) -> dict:
         "name": t.name,
         "token_prefix": t.token_prefix,
         "scopes": list(t.scopes or []),
+        "role": t.role,
         "created_by": t.created_by,
         "created_at": t.created_at,
         "expires_at": t.expires_at,
@@ -77,6 +82,24 @@ def _to_row(t: ApiToken) -> dict:
         "revoked_at": t.revoked_at,
         "status": token_status(t),
     }
+
+
+def _creator_role(request: Request) -> str:
+    """Effective role of the creator for the role-mint guard.
+
+    ``admin:legacy_key`` → virtual superadmin (matches the role-bypass
+    semantics elsewhere). Bearer-token creators take their own role
+    when set, else ``superadmin`` (since they hold ``admin:*`` scope
+    today which is implicit superadmin pre-slice-3). Session users
+    take their session role.
+    """
+    actor = getattr(request.state, "actor", "") or ""
+    if actor.startswith("admin:legacy_key"):
+        return "superadmin"
+    if actor.startswith("token:"):
+        token = getattr(request.state, "api_token", None)
+        return getattr(token, "role", None) or "superadmin"
+    return (request.session.get("admin_role") or "").strip() or "superadmin"
 
 
 @router.get("", response_model=list[TokenRow])
@@ -103,16 +126,44 @@ async def create_api_token(
 
     actor = getattr(request.state, "actor", "admin:unknown")
     requested_scopes = filter_valid_scopes(payload.scopes) or ["admin:*"]
+
+    # RBAC slice 3: optional role binding + mint guard. The creator can
+    # only issue tokens at or below their own role — superadmin can mint
+    # any role, an ``admin`` can't mint a superadmin-bound token.
+    requested_role: str | None = None
+    if payload.role:
+        if payload.role not in VALID_ROLES:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"role must be one of {sorted(VALID_ROLES)} or null",
+            )
+        creator_role = _creator_role(request)
+        # Token role must be at-or-below creator role. ``role_at_least(creator, payload.role)``
+        # returns True when creator is at least as privileged as the payload role.
+        if not role_at_least(creator_role, payload.role):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=(
+                    f"Cannot mint a token with role '{payload.role}' — your role "
+                    f"'{creator_role}' is not privileged enough."
+                ),
+            )
+        requested_role = payload.role
+
     token, raw = await create_token(
         db,
         name=payload.name,
         created_by=actor,
         expires_at=expires_at,
         scopes=requested_scopes,
+        role=requested_role,
     )
     await db.commit()
     await db.refresh(token)
-    logger.info("admin: created API token id=%s name=%r by=%s", token.id, token.name, actor)
+    logger.info(
+        "admin: created API token id=%s name=%r role=%s by=%s",
+        token.id, token.name, requested_role, actor,
+    )
 
     out = _to_row(token)
     out["raw_token"] = raw  # one-time reveal

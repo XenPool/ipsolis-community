@@ -17,8 +17,23 @@ from app.models.approval import OrderApproval
 from app.models.asset import AssetType
 from app.models.order import Order, OrderStatus
 from app.utils.audit import _order_snap, aaudit, classify_asset_type
+from app.utils.sod import is_configurer_of_asset_type
 
 logger = logging.getLogger(__name__)
+
+
+class SoDViolation(Exception):
+    """Raised when an approver attempted to decide on an order whose
+    asset type they configured. Routes catch and translate to HTTP 409."""
+
+    def __init__(self, approver_email: str, asset_type_id: int, audit_excerpt: str | None) -> None:
+        self.approver_email = approver_email
+        self.asset_type_id = asset_type_id
+        self.audit_excerpt = audit_excerpt
+        super().__init__(
+            f"SoD: {approver_email} configured asset type {asset_type_id} "
+            f"and so cannot approve requests against it"
+        )
 
 
 class DecisionResult:
@@ -56,17 +71,30 @@ async def apply_approval_decision(
     if approval.status != "pending":
         return DecisionResult(status="already_decided", all_granted=False)
 
-    norm = "approved" if decision == "approve" else "declined"
-    approval.status = norm
-    approval.decided_at = datetime.now(timezone.utc)
-    approval.comment = (comment or "").strip() or None
-
     order = await db.get(Order, approval.order_id)
     if not order:
         # Should never happen given FK; defensively roll back the partial mutation.
         logger.error("Approval %s references missing order %s", approval.id, approval.order_id)
         await db.rollback()
         return DecisionResult(status="already_decided", all_granted=False)
+
+    # SoD: block self-approval of orders whose asset type the
+    # approver configured. Runs **before** mutating the approval row
+    # (so a denied SoD attempt leaves the approval `pending` for a
+    # different approver). Only fires on ``approve`` — declines are
+    # always allowed since "I can't approve my own work" doesn't
+    # apply when the user is rejecting it.
+    if decision == "approve":
+        is_config, excerpt = await is_configurer_of_asset_type(
+            db, order.asset_type_id, approval.approver_email,
+        )
+        if is_config:
+            raise SoDViolation(approval.approver_email, order.asset_type_id, excerpt)
+
+    norm = "approved" if decision == "approve" else "declined"
+    approval.status = norm
+    approval.decided_at = datetime.now(timezone.utc)
+    approval.comment = (comment or "").strip() or None
 
     # Resolve the asset type once — needed for classification on every
     # audit row this decision generates and for the quorum check below.

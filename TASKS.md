@@ -168,18 +168,95 @@ enforcement (configurer ≠ approver) split into follow-up slices.
   * Audit attribution on grant changes:
     `api:set_admin_user_grants (admin:session:alice:superadmin)`.
 
-**Still to do — RBAC slice 3:**
-- [ ] SoD enforcement: configurer of an asset type must not also
-      approve their own access requests against it. Likely a check
-      at order-creation time using the audit trail.
-- [ ] Bearer-token role binding (today scopes are orthogonal to roles
-      — a token with `admin:*` is implicitly superadmin-equivalent;
-      slice 3 binds tokens to a specific role for clearer authz).
-- [ ] Self-service "change my password" page for non-superadmins.
+**Done — RBAC slice 3 (2026-04-26):**
+- Self-service password change: new `/admin/me` router carrying
+  `GET /admin/me` (whoami snapshot) and
+  `POST /admin/me/password` (rotate). Verifies current password as
+  a liveness check, enforces ≥12-char new password, rejects no-op
+  rotations (new == current). Legacy `ADMIN_API_KEY` and bearer-
+  token actors get descriptive 409s pointing to the right rotation
+  path. Audit row `password_changed_self` with `{"by_self": true}`
+  — no plaintext leakage. New `/ui/my-account` page with identity
+  card + change-password form, linked in the nav for any logged-in
+  admin. Disables itself when the legacy key is the actor.
+- Bearer-token role binding:
+  * Migration `0071_api_token_role.py` adds an optional
+    `api_tokens.role` column (NULL = pre-slice-3 scope-only authz).
+  * `create_token()` accepts a ``role`` kwarg; `TokenCreate` schema
+    grew a matching field; `TokenRow` exposes it.
+  * `require_role()` rewritten for the token branch: NULL token role
+    → bypass (back-compat); set role → standard ladder check via
+    `role_at_least`. Error message names both the token's role and
+    the route's required role.
+  * Mint guard: the creator can only issue tokens at or below their
+    own role. Validates against `_creator_role(request)` which
+    returns the session role / token role / virtual `superadmin`
+    for the legacy key. A non-superadmin attempting to mint a
+    superadmin token gets 403 with a descriptive message; the
+    router-level `superadmin` gate from slice 2 means today only
+    superadmins reach the endpoint anyway, so the guard is
+    defense-in-depth that activates once slice 4 relaxes the
+    router gate to `admin`.
+  * API tokens UI: new "Role" dropdown on the create modal
+    (defaults to "no role — scope-only authz, back-compat"); new
+    "Role" column on the list with colour-coded badges
+    (amber for `superadmin`, blue for the rest, italic "unbound"
+    for NULL).
+- Separation-of-duties (SoD) enforcement:
+  * New `app.utils.sod.is_configurer_of_asset_type(db, type_id, email)`
+    walks `audit_log` for `entity_type='asset_type', entity_id=N`
+    and matches the actor's `triggered_by` against the approver's
+    email, email-local-part, or admin username. Returns
+    `(matched, audit_excerpt)` so the SoD-block error can quote
+    the original config attribution back at the operator.
+  * `apply_approval_decision()` runs the check before mutating the
+    approval row, only on `approve` (decline always allowed since
+    "I can't reject my own work" doesn't apply). Raises
+    `SoDViolation` exception which the route layer translates to
+    HTTP 409 with a descriptive message. The approval row stays
+    `pending` so a different approver can decide.
+  * Wired into both decision paths: the portal route
+    (`POST /portal/approvals/{id}/decide`) and the signed-token
+    external route (`POST /approve/{token}`). The token path
+    renders an HTML status page using the existing `_render_status_page`
+    helper; the portal raises HTTPException so the same UI banner
+    shape carries the message.
+- Verified end-to-end:
+  * Password change: alice rotates `verysecurepw1 → newsecurepw2`
+    (HTTP 204), old password rejected with 401, new password
+    accepted with 303, alice rotates back. Whoami returns
+    `{"username":"alice","role":"superadmin","via":"user"}`.
+  * Token role: `slice3-auditor` token (role=auditor + admin:*
+    scope) → 200 on `GET /admin/audit-log` (auditor satisfies the
+    auditor role gate), 403 on `POST /admin/asset-types`
+    (`Token role 'auditor' is below the required 'admin'`).
+    `slice3-admin` token attempt to mint a superadmin token → 403
+    (router-level superadmin gate; mint guard would also have
+    caught it).
+  * SoD: alice updates asset_type 16 → audit row has
+    `admin:session:alice:superadmin`. Direct invocation of
+    `apply_approval_decision()` with an approval row having
+    `approver_email=alice@xenpool.local` against an order on
+    type 16 → `SoDViolation(approver_email='alice@xenpool.local',
+    asset_type_id=16, audit_excerpt='api:update_asset_type
+    (admin:session:alice:superadmin)')`. Decline path on the same
+    setup returns `DecisionResult(status='declined')` cleanly —
+    SoD doesn't fire on rejections.
+  * Helper unit-checks: matches `alice@xenpool.local`, matches `alice`
+    (no @), correctly rejects `bob@example.com` and `ciso@example.com`.
+
+**Still to do — RBAC slice 4:**
 - [ ] Forced password rotation policy + lockout-on-N-failed-attempts.
 - [ ] Auditor read paths for endpoints currently gated at `admin`
       (e.g. `GET /admin/maintenance/backups` shouldn't need write
       authority to view the backup list).
+- [ ] SoD on per-rule approvers — today the rule path runs through
+      the same `apply_approval_decision` flow so the check fires,
+      but admins might want a per-rule opt-out (e.g. "this rule's
+      approver is a static compliance officer, never a configurer").
+- [ ] Token-role-aware mint guard relaxation — once slice 4 relaxes
+      the router gate so admins can mint their own narrow tokens,
+      the existing mint guard becomes the operative defense.
 
 ### [open] External secret management — Prio 0 (show-stopper)
 Today AD password / vSphere creds / SMTP password / Entra client secret all

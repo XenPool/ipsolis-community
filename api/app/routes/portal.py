@@ -1291,11 +1291,25 @@ async def portal_decide_approval(
     if approval.approver_email != current_user["email"]:
         raise HTTPException(status_code=403, detail="You are not the designated approver")
 
-    from app.utils.approval_decision import apply_approval_decision
-    await apply_approval_decision(
-        db, approval, decision, comment,
-        actor=portal_actor_by(current_user, "decide_approval"),
-    )
+    from app.utils.approval_decision import SoDViolation, apply_approval_decision
+    try:
+        await apply_approval_decision(
+            db, approval, decision, comment,
+            actor=portal_actor_by(current_user, "decide_approval"),
+        )
+    except SoDViolation as exc:
+        # SoD is per-asset-type; the approval row stays ``pending`` so
+        # another approver can decide. We return 409 with a message
+        # quoting the original config-time attribution back at the
+        # operator so the path forward is clear.
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"Separation of duties: you configured asset type "
+                f"{exc.asset_type_id} (audit: {exc.audit_excerpt!r}). "
+                f"Ask a different approver to decide on this order."
+            ),
+        ) from exc
     return RedirectResponse(url="/portal/approvals", status_code=303)
 
 

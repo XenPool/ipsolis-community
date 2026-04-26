@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+
+{% block title %}My Account – {{ app_title }}{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+  <h1 class="text-lg font-semibold text-heading">My Account</h1>
+  <p class="text-xs text-muted/70 mt-1 max-w-2xl">
+    View your current session identity and rotate your password. Available to any signed-in admin.
+    The legacy <code class="font-mono bg-surface-raised px-1 rounded">ADMIN_API_KEY</code> isn't
+    rotatable from this page — it lives in <code class="font-mono">.env</code>.
+  </p>
+</div>
+
+<div id="ban" class="hidden mb-4 px-4 py-3 rounded text-sm font-medium"></div>
+
+<!-- Identity card -->
+<div class="bg-surface rounded-lg border border-token-border p-5 mb-6 max-w-xl">
+  <h2 class="text-sm font-semibold text-body mb-3">Session identity</h2>
+  <dl id="whoami-grid" class="grid grid-cols-[120px_1fr] gap-y-1.5 gap-x-4 text-sm">
+    <dt class="text-muted/70">Username</dt>
+    <dd id="who-username" class="font-mono text-body">—</dd>
+    <dt class="text-muted/70">Role</dt>
+    <dd id="who-role" class="text-body">—</dd>
+    <dt class="text-muted/70">Auth method</dt>
+    <dd id="who-via" class="text-body">—</dd>
+  </dl>
+</div>
+
+<!-- Change password -->
+<div id="pw-card" class="bg-surface rounded-lg border border-token-border p-5 max-w-xl">
+  <h2 class="text-sm font-semibold text-body mb-1">Change password</h2>
+  <p id="pw-hint" class="text-xs text-muted/70 mb-4">Minimum 12 characters; must differ from your current password.</p>
+  <div class="space-y-3">
+    <div>
+      <label class="block text-xs font-medium text-muted mb-1">Current password</label>
+      <input type="password" id="pw-current" autocomplete="current-password"
+             class="w-full rounded border border-token-border bg-surface text-body text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500">
+    </div>
+    <div>
+      <label class="block text-xs font-medium text-muted mb-1">New password</label>
+      <input type="password" id="pw-new" minlength="12" autocomplete="new-password"
+             class="w-full rounded border border-token-border bg-surface text-body text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500">
+    </div>
+    <div>
+      <label class="block text-xs font-medium text-muted mb-1">Confirm new password</label>
+      <input type="password" id="pw-confirm" minlength="12" autocomplete="new-password"
+             class="w-full rounded border border-token-border bg-surface text-body text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500">
+    </div>
+  </div>
+  <div class="mt-4 flex gap-2">
+    <button onclick="submitPasswordChange()"
+            class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700">
+      Update password
+    </button>
+  </div>
+</div>
+
+<script>
+function showBanner(data) {
+  var el = document.getElementById('ban');
+  el.className = 'mb-4 px-4 py-3 rounded text-sm font-medium';
+  if (data.ok === true) {
+    el.classList.add('bg-green-50', 'text-green-800', 'border', 'border-green-200',
+                     'dark:bg-green-500/10', 'dark:text-green-300', 'dark:border-green-500/30');
+  } else if (data.ok === false) {
+    el.classList.add('bg-red-50', 'text-red-800', 'border', 'border-red-200',
+                     'dark:bg-red-500/10', 'dark:text-red-300', 'dark:border-red-500/30');
+  } else {
+    el.classList.add('bg-blue-50', 'text-blue-800', 'border', 'border-blue-200',
+                     'dark:bg-blue-500/10', 'dark:text-blue-300', 'dark:border-blue-500/30');
+  }
+  el.textContent = data.message;
+  el.classList.remove('hidden');
+  setTimeout(function() { el.classList.add('hidden'); }, 6000);
+}
+
+async function loadWhoami() {
+  try {
+    var resp = await fetch('/admin/me');
+    if (!resp.ok) return;
+    var w = await resp.json();
+    document.getElementById('who-username').textContent = w.username || '(legacy key)';
+    document.getElementById('who-role').textContent = w.role || '—';
+    document.getElementById('who-via').textContent =
+      w.via === 'legacy_key' ? 'Legacy ADMIN_API_KEY (back-compat)'
+      : w.via === 'token'    ? 'Bearer token'
+      : w.via === 'user'     ? 'Username + password'
+      : '—';
+    if (w.is_anonymous_legacy_key) {
+      // Disable the password card with a clear hint.
+      var card = document.getElementById('pw-card');
+      card.querySelectorAll('input,button').forEach(function(el) { el.disabled = true; el.classList.add('opacity-50','cursor-not-allowed'); });
+      document.getElementById('pw-hint').textContent =
+        'Password change isn\'t available for the legacy ADMIN_API_KEY. ' +
+        'Rotate it in your .env file or secret manager.';
+    }
+  } catch (e) { /* swallow */ }
+}
+
+async function submitPasswordChange() {
+  var current = document.getElementById('pw-current').value;
+  var pw = document.getElementById('pw-new').value;
+  var confirm = document.getElementById('pw-confirm').value;
+  if (!current) { showBanner({ok: false, message: 'Enter your current password.'}); return; }
+  if (pw.length < 12) { showBanner({ok: false, message: 'New password must be at least 12 characters.'}); return; }
+  if (pw !== confirm) { showBanner({ok: false, message: 'New passwords do not match.'}); return; }
+  var resp = await fetch('/admin/me/password', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      current_password: current, new_password: pw, new_password_confirm: confirm,
+    }),
+  });
+  if (resp.status === 204) {
+    showBanner({ok: true, message: 'Password updated. Sign out and back in to refresh other sessions.'});
+    document.getElementById('pw-current').value = '';
+    document.getElementById('pw-new').value = '';
+    document.getElementById('pw-confirm').value = '';
+    return;
+  }
+  var data = await resp.json().catch(function() { return {}; });
+  showBanner({ok: false, message: data.detail || ('HTTP ' + resp.status)});
+}
+
+document.addEventListener('DOMContentLoaded', loadWhoami);
+</script>
+{% endblock %}

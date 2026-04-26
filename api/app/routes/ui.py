@@ -1031,6 +1031,16 @@ async def approval_delegations_page(request: Request) -> HTMLResponse:
     )
 
 
+@router.get("/my-account", response_class=HTMLResponse)
+async def my_account_page(request: Request) -> HTMLResponse:
+    """Self-service account page: identity snapshot + password change."""
+    return templates.TemplateResponse(
+        request,
+        "ui/my_account.html",
+        {"active_page": "my-account"},
+    )
+
+
 @router.get("/admin-users", response_class=HTMLResponse)
 async def admin_users_page(request: Request) -> HTMLResponse:
     """Admin user management page (superadmin only).

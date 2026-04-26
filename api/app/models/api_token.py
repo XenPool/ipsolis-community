@@ -26,6 +26,11 @@ class ApiToken(Base):
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # RBAC slice 3: optional role binding. NULL = scope-only authz
+    # (pre-slice-3 behaviour, back-compat for existing integrations).
+    # When set, ``require_role`` checks the token's role on routes that
+    # gate by role; scope checks still apply independently.
+    role: Mapped[str | None] = mapped_column(String(32), nullable=True)
 
     def __repr__(self) -> str:
         return f"<ApiToken id={self.id} name={self.name!r} prefix={self.token_prefix!r}>"

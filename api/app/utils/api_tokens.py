@@ -97,12 +97,17 @@ async def create_token(
     created_by: str,
     scopes: list[str] | None = None,
     expires_at: datetime | None = None,
+    role: str | None = None,
 ) -> tuple[ApiToken, str]:
     """Issue a fresh token. Returns ``(orm_row, raw_token)``.
 
     The raw token is only available in this function's return value — it
     is never persisted in plaintext. Caller is responsible for showing
     it to the user once and committing the session.
+
+    ``role`` (RBAC slice 3) is optional. When set, the token is gated
+    by ``require_role`` against this role in addition to its scopes.
+    NULL keeps the pre-slice-3 scope-only behaviour.
     """
     raw, prefix = generate_raw_token()
     row = ApiToken(
@@ -112,6 +117,7 @@ async def create_token(
         scopes=scopes or ["admin:*"],
         created_by=created_by,
         expires_at=expires_at,
+        role=role,
     )
     db.add(row)
     await db.flush()

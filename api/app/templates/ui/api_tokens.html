@@ -51,6 +51,7 @@
         <th class="px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wide">Name</th>
         <th class="px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wide">Prefix</th>
         <th class="px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wide">Scopes</th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wide">Role</th>
         <th class="px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wide">Status</th>
         <th class="px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wide">Last used</th>
         <th class="px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wide">Expires</th>
@@ -58,7 +59,7 @@
       </tr>
     </thead>
     <tbody id="tokens-body" class="divide-y divide-token-border">
-      <tr><td colspan="7" class="px-4 py-8 text-center text-muted/70 text-sm">Loading…</td></tr>
+      <tr><td colspan="8" class="px-4 py-8 text-center text-muted/70 text-sm">Loading…</td></tr>
     </tbody>
   </table>
 </div>
@@ -89,6 +90,23 @@
           <option value="730">2 years</option>
         </select>
         <p class="text-[11px] text-muted/60 mt-1">Pick a horizon that matches your rotation policy.</p>
+      </div>
+
+      <div>
+        <label class="block text-xs font-medium text-muted mb-1">Role</label>
+        <select id="new-token-role"
+                class="w-full rounded border border-token-border bg-surface text-body text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500">
+          <option value="" selected>(no role — scope-only authz, back-compat)</option>
+          <option value="superadmin">superadmin — full control incl. admin user mgmt</option>
+          <option value="admin">admin — operational owner</option>
+          <option value="approver">approver — sign-off only</option>
+          <option value="auditor">auditor — read-only</option>
+          <option value="helpdesk">helpdesk — narrow operational</option>
+        </select>
+        <p class="text-[11px] text-muted/60 mt-1">
+          Optional — when set, ipSolis enforces this role on routes that require one,
+          on top of the scopes below. You can only mint tokens at or below your own role.
+        </p>
       </div>
 
       <div>
@@ -165,6 +183,16 @@ function renderScopeGrid() {
   }).join('');
 }
 
+function roleBadge(role) {
+  if (!role) {
+    return '<span class="text-muted/50 text-xs italic">unbound</span>';
+  }
+  var color = role === 'superadmin'
+    ? 'bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300'
+    : 'bg-blue-100 text-blue-800 dark:bg-blue-500/15 dark:text-blue-300';
+  return '<span class="inline-block ' + color + ' rounded px-1.5 py-0.5 text-[10px] font-mono">' + escapeHtml(role) + '</span>';
+}
+
 function scopeBadges(scopes) {
   if (!scopes || !scopes.length) return '<span class="text-muted/50 text-xs">—</span>';
   return scopes.map(function(s) {
@@ -179,12 +207,12 @@ async function loadTokens() {
   var resp = await fetch('/admin/api-tokens');
   var body = document.getElementById('tokens-body');
   if (!resp.ok) {
-    body.innerHTML = '<tr><td colspan="7" class="px-4 py-8 text-center text-red-600 text-sm">Failed to load tokens (HTTP ' + resp.status + ').</td></tr>';
+    body.innerHTML = '<tr><td colspan="8" class="px-4 py-8 text-center text-red-600 text-sm">Failed to load tokens (HTTP ' + resp.status + ').</td></tr>';
     return;
   }
   var rows = await resp.json();
   if (!rows.length) {
-    body.innerHTML = '<tr><td colspan="7" class="px-4 py-12 text-center text-muted/70 text-sm">No tokens yet. <button onclick="openCreateModal()" class="text-blue-600 hover:underline ml-1">Create one →</button></td></tr>';
+    body.innerHTML = '<tr><td colspan="8" class="px-4 py-12 text-center text-muted/70 text-sm">No tokens yet. <button onclick="openCreateModal()" class="text-blue-600 hover:underline ml-1">Create one →</button></td></tr>';
     return;
   }
   body.innerHTML = rows.map(function(r) {
@@ -195,6 +223,7 @@ async function loadTokens() {
       + '<td class="px-4 py-3"><div class="font-medium text-heading">' + escapeHtml(r.name) + '</div><div class="text-[11px] text-muted/60">created by ' + escapeHtml(r.created_by) + ' · ' + fmtDate(r.created_at) + '</div></td>'
       + '<td class="px-4 py-3"><span class="font-mono text-xs text-muted">' + escapeHtml(r.token_prefix) + '…</span></td>'
       + '<td class="px-4 py-3">' + scopeBadges(r.scopes) + '</td>'
+      + '<td class="px-4 py-3">' + roleBadge(r.role) + '</td>'
       + '<td class="px-4 py-3">' + statusBadge(r.status) + '</td>'
       + '<td class="px-4 py-3 text-xs text-muted">' + fmtDate(r.last_used_at) + '</td>'
       + '<td class="px-4 py-3 text-xs text-muted">' + (r.expires_at ? fmtDate(r.expires_at) : 'never') + '</td>'
@@ -212,6 +241,7 @@ function escapeHtml(s) {
 function openCreateModal() {
   document.getElementById('new-token-name').value = '';
   document.getElementById('new-token-expiry').value = '90';
+  document.getElementById('new-token-role').value = '';
   document.getElementById('create-error').classList.add('hidden');
   renderScopeGrid();  // re-render so checkboxes reset to defaults
   document.getElementById('create-modal').classList.remove('hidden');
@@ -244,6 +274,9 @@ async function submitCreateToken() {
     return;
   }
   body.scopes = selected;
+
+  var role = document.getElementById('new-token-role').value;
+  if (role) body.role = role;
 
   var resp = await fetch('/admin/api-tokens', {
     method: 'POST',

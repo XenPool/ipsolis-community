@@ -78,10 +78,23 @@ def require_role(required: str):
         # don't 403 the moment a route grows a role gate.
         if actor.startswith("admin:legacy_key"):
             return
-        # Bearer tokens are governed by scopes, not roles. ``require_scopes``
-        # is the right gate for them; this dependency just abstains.
+        # Bearer tokens — RBAC slice 3: respect the token's bound role
+        # if one was set at issue time. NULL token role bypasses the
+        # check (pre-slice-3 behaviour: scopes alone govern such tokens).
         if actor.startswith("token:"):
-            return
+            token = getattr(request.state, "api_token", None)
+            token_role = getattr(token, "role", None)
+            if token_role is None:
+                return  # legacy / unbound token — scope checks rule
+            if role_at_least(token_role, required):
+                return
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=(
+                    f"Token role '{token_role}' is below the required '{required}'. "
+                    f"Re-issue the token with a higher role or use a different token."
+                ),
+            )
 
         role = request.session.get("admin_role") or ""
         if role_at_least(role, required):

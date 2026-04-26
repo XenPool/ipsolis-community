@@ -33,7 +33,7 @@ from app.models.admin_user_grant import AdminUserAssetTypeGrant
 from app.models.asset import AssetType
 from app.utils.audit import aaudit, actor_by
 from app.utils.auth import require_admin_key
-from app.utils.password import hash_password
+from app.utils.password import hash_password, verify_password
 from app.utils.rbac import VALID_ROLES, require_role
 
 logger = logging.getLogger(__name__)
