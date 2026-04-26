@@ -149,9 +149,32 @@ follow-up slices.
   An auditor can now trace every change back to the specific
   credential (token name, admin session user, or legacy key).
 
+**Done — wider scope rollout (2026-04-26):**
+- Scope decorators now cover the rest of `/admin/*`'s `app_config`,
+  asset, and email-template surface in `routes/admin.py`:
+  `config:read` on GET `/config`, GET `/config/{key}`,
+  GET `/config/siem/status`, GET `/email-templates`,
+  GET `/email-templates/{event_key}`; `config:write` on
+  POST/PUT/DELETE `/config`, PUT `/email-templates/{event_key}`;
+  `assets:read` on GET `/assets`; `assets:write` on POST `/assets`,
+  POST `/assets/bulk`, PUT `/assets/{id}`, DELETE `/assets/{id}`,
+  POST `/assets/{id}/force-delete`, POST `/assets/{id}/revoke`.
+- Operational test endpoints (`/config/ad/test`, `/config/entra/test`,
+  `/config/teams/test`, `/config/email/test`, `/config/sccm/test`,
+  `/config/siem/test`) are intentionally left scope-free — they are
+  diagnostic actions only meaningful from the admin UI session, never
+  driven by an integration token.
+- `admin_approval_delegations.py` already carried `approvals:read` /
+  `approvals:write`; verified no further changes needed there.
+- Smoke-tested with two narrowly-scoped tokens: `config:read`-only
+  → 200 on GET `/config` + GET `/config/siem/status`, 403 on POST
+  `/config` and GET `/assets`; `assets:read`-only → 200 on GET
+  `/assets`, 403 on POST `/assets` and GET `/config`. Error bodies
+  name the token, missing scope, and granted scopes as designed.
+- Legacy `X-Admin-Key` and admin sessions retain implicit `admin:*`
+  by design — UI flows and existing scripts continue working.
+
 **Still to do — separate slices:**
-- [ ] Wider scope rollout to the rest of the `/admin/*` surface
-      (mechanical, decorator-only).
 - [ ] Audit attribution on `/orders` API and portal-side flows
       (today they use hardcoded labels because there's no shared
       auth context — would need a portal-user actor wrapper).

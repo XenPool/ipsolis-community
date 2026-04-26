@@ -123,14 +123,22 @@ def _mask(cfg: AppConfig) -> AppConfigRead:
 
 # ── app_config ─────────────────────────────────────────────────────────────────
 
-@router.get("/config", response_model=list[AppConfigRead])
+@router.get(
+    "/config",
+    response_model=list[AppConfigRead],
+    dependencies=[require_scopes("config:read")],
+)
 async def list_config(db: AsyncSession = Depends(get_db)) -> list[AppConfigRead]:
     result = await db.execute(select(AppConfig).order_by(AppConfig.key))
     rows = result.scalars().all()
     return [_mask(r) for r in rows]
 
 
-@router.get("/config/{key}", response_model=AppConfigRead)
+@router.get(
+    "/config/{key}",
+    response_model=AppConfigRead,
+    dependencies=[require_scopes("config:read")],
+)
 async def get_config(key: str, db: AsyncSession = Depends(get_db)) -> AppConfigRead:
     result = await db.execute(select(AppConfig).where(AppConfig.key == key))
     cfg = result.scalar_one_or_none()
@@ -139,7 +147,12 @@ async def get_config(key: str, db: AsyncSession = Depends(get_db)) -> AppConfigR
     return _mask(cfg)
 
 
-@router.post("/config", response_model=AppConfigRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/config",
+    response_model=AppConfigRead,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[require_scopes("config:write")],
+)
 async def create_config(
     request: Request, payload: AppConfigCreate, db: AsyncSession = Depends(get_db)
 ) -> AppConfigRead:
@@ -166,7 +179,11 @@ async def create_config(
     return _mask(cfg)
 
 
-@router.put("/config/{key}", response_model=AppConfigRead)
+@router.put(
+    "/config/{key}",
+    response_model=AppConfigRead,
+    dependencies=[require_scopes("config:write")],
+)
 async def update_config(
     request: Request, key: str, payload: AppConfigUpdate, db: AsyncSession = Depends(get_db)
 ) -> AppConfigRead:
@@ -191,7 +208,11 @@ async def update_config(
     return _mask(cfg)
 
 
-@router.delete("/config/{key}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/config/{key}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[require_scopes("config:write")],
+)
 async def delete_config(request: Request, key: str, db: AsyncSession = Depends(get_db)) -> None:
     _require_config_key_licensed(key)
     result = await db.execute(select(AppConfig).where(AppConfig.key == key))
@@ -300,7 +321,7 @@ async def test_siem_connection(db: AsyncSession = Depends(get_db)) -> dict:
     return {"ok": ok, "message": msg}
 
 
-@router.get("/config/siem/status")
+@router.get("/config/siem/status", dependencies=[require_scopes("config:read")])
 async def siem_status(db: AsyncSession = Depends(get_db)) -> dict:
     """Return SIEM streaming health (cursor, last error, last success)."""
     cfg = await db.execute(
@@ -718,7 +739,12 @@ async def delete_asset_type(
 
 # ── Asset-Pool ─────────────────────────────────────────────────────────────────
 
-@router.post("/assets", response_model=AssetPoolRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/assets",
+    response_model=AssetPoolRead,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[require_scopes("assets:write")],
+)
 async def create_asset(
     request: Request, payload: AssetPoolCreate, db: AsyncSession = Depends(get_db)
 ) -> AssetPool:
@@ -751,7 +777,7 @@ async def create_asset(
     return asset
 
 
-@router.post("/assets/bulk")
+@router.post("/assets/bulk", dependencies=[require_scopes("assets:write")])
 async def bulk_create_assets(payload: AssetBulkCreate, db: AsyncSession = Depends(get_db)) -> dict:
     """Create multiple assets at once. Skips duplicates, collects errors per item."""
     # Validate all referenced type IDs exist (batch lookup)
@@ -796,7 +822,11 @@ async def bulk_create_assets(payload: AssetBulkCreate, db: AsyncSession = Depend
     return {"created": created, "skipped": skipped, "errors": errors}
 
 
-@router.put("/assets/{asset_id}", response_model=AssetPoolRead)
+@router.put(
+    "/assets/{asset_id}",
+    response_model=AssetPoolRead,
+    dependencies=[require_scopes("assets:write")],
+)
 async def update_asset(
     request: Request, asset_id: int, payload: AssetPoolUpdate, db: AsyncSession = Depends(get_db)
 ) -> AssetPool:
@@ -834,7 +864,11 @@ async def update_asset(
     return asset
 
 
-@router.delete("/assets/{asset_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/assets/{asset_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[require_scopes("assets:write")],
+)
 async def delete_asset(
     request: Request, asset_id: int, db: AsyncSession = Depends(get_db)
 ) -> None:
@@ -883,7 +917,11 @@ def _sync_revoke(user_email: str, asset_type_id: int) -> dict:
         return target_executor.revoke(db_sync, user_email, asset_type_id)
 
 
-@router.post("/assets/{asset_id}/force-delete", status_code=status.HTTP_204_NO_CONTENT)
+@router.post(
+    "/assets/{asset_id}/force-delete",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[require_scopes("assets:write")],
+)
 async def force_delete_asset(
     request: Request,
     asset_id: int,
@@ -962,7 +1000,11 @@ async def force_delete_asset(
     logger.info("admin: force-deleted asset id=%s (revoke=%s)", asset_id, payload.revoke_permissions)
 
 
-@router.post("/assets/{asset_id}/revoke", status_code=status.HTTP_204_NO_CONTENT)
+@router.post(
+    "/assets/{asset_id}/revoke",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[require_scopes("assets:write")],
+)
 async def revoke_asset(
     request: Request,
     asset_id: int,
@@ -1030,7 +1072,7 @@ async def revoke_asset(
     logger.info("admin: revoked asset id=%s back to free (revoke_permissions=%s)", asset_id, payload.revoke_permissions)
 
 
-@router.get("/assets")
+@router.get("/assets", dependencies=[require_scopes("assets:read")])
 async def list_assets(
     asset_type_id: int | None = None,
     include_capacity_pooled: bool = False,
@@ -1111,7 +1153,10 @@ async def list_audit_log(
 
 # ── Email Templates ─────────────────────────────────────────────────────────────
 
-@router.get("/email-templates", dependencies=[require_enterprise("email_template_editor")])
+@router.get(
+    "/email-templates",
+    dependencies=[require_enterprise("email_template_editor"), require_scopes("config:read")],
+)
 async def list_email_templates(db: AsyncSession = Depends(get_db)) -> list[dict]:
     """Lists all email templates (without body, for table display)."""
     from sqlalchemy import text as sa_text
@@ -1129,7 +1174,10 @@ async def list_email_templates(db: AsyncSession = Depends(get_db)) -> list[dict]
     ]
 
 
-@router.get("/email-templates/{event_key}", dependencies=[require_enterprise("email_template_editor")])
+@router.get(
+    "/email-templates/{event_key}",
+    dependencies=[require_enterprise("email_template_editor"), require_scopes("config:read")],
+)
 async def get_email_template(event_key: str, db: AsyncSession = Depends(get_db)) -> dict:
     """Returns a single email template including body and available_variables."""
     from sqlalchemy import text as sa_text
@@ -1151,7 +1199,10 @@ async def get_email_template(event_key: str, db: AsyncSession = Depends(get_db))
     }
 
 
-@router.put("/email-templates/{event_key}", dependencies=[require_enterprise("email_template_editor")])
+@router.put(
+    "/email-templates/{event_key}",
+    dependencies=[require_enterprise("email_template_editor"), require_scopes("config:write")],
+)
 async def update_email_template(
     event_key: str,
     payload: dict,
