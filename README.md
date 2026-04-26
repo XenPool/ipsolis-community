@@ -68,6 +68,7 @@ Enterprise IT automation shouldn't require a 6-month implementation project and 
 - **Prometheus `/metrics` endpoint** — request count + latency histogram per route, plus business gauges (orders by status, pending approvals, pool free/busy by asset type)
 - Cardinality-bounded route labels (path templates, not actual paths)
 - Toggleable via the `metrics.enabled` config flag
+- **OpenTelemetry tracing** — auto-instrumented FastAPI requests and SQLAlchemy queries flow through an OTLP HTTP exporter to any standard collector (Jaeger, Tempo, SigNoz, Honeycomb); a console exporter mode is available for local verification without a collector
 
 ### Compliance & Audit
 - **SIEM audit-log streaming (Splunk HEC)** — every `audit_log` row is forwarded once a minute to a configured Splunk HTTP Event Collector, with persistent cursor, automatic retry on transient failure, and a "Send Test Event" button to verify connectivity before enabling

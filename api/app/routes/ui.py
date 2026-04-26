@@ -896,6 +896,13 @@ async def settings_page(
     approval_rows = approval_result.scalars().all()
     approval_config = {r.key: (r.value or "") for r in approval_rows}
 
+    # Load otel.* config keys
+    otel_result = await db.execute(
+        select(AppConfig).where(AppConfig.key.like("otel.%")).order_by(AppConfig.key)
+    )
+    otel_rows = otel_result.scalars().all()
+    otel_config = {r.key: (_MASK if r.is_secret else (r.value or "")) for r in otel_rows}
+
     # Load hosting config keys (vsphere.* / xenserver.*)
     def _cfg_dict(rows: list) -> dict:
         return {r.key.split(".", 1)[1]: (_MASK if r.is_secret else (r.value or "")) for r in rows}
@@ -927,6 +934,7 @@ async def settings_page(
          "teams_config": teams_config,
          "siem_config": siem_config,
          "approval_config": approval_config,
+         "otel_config": otel_config,
          "hosting_vsphere": hosting_vsphere, "hosting_xenserver": hosting_xenserver,
          "hosting_sccm": hosting_sccm,
          "portal_config": portal_config,

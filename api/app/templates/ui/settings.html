@@ -919,6 +919,74 @@
       <div><span class="text-muted/60">Last error:</span> <span id="siem-status-last-error" class="font-mono">—</span></div>
     </div>
   </div>
+
+  <!-- OpenTelemetry tracing -->
+  <div class="bg-surface rounded-xl border border-token-border shadow-sm shadow-slate-900/5 dark:shadow-black/20 p-6 max-w-2xl mb-6">
+    <h2 class="text-sm font-semibold text-body mb-1">OpenTelemetry Tracing</h2>
+    <p class="text-xs text-muted/70 mb-4 leading-snug">
+      Distributed tracing complement to the Prometheus <code class="font-mono bg-surface-raised px-1 rounded">/metrics</code> endpoint.
+      FastAPI requests + SQLAlchemy queries are auto-instrumented; spans flow to a configured
+      OTLP HTTP collector (Jaeger, Tempo, SigNoz, Honeycomb, …).
+      Changes take effect on the next API restart.
+    </p>
+
+    <div class="space-y-4">
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs font-medium text-muted mb-1">Status</label>
+          <select id="otel-enabled"
+                  class="w-full rounded border border-token-border bg-surface text-body text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500">
+            {% set _otel = (otel_config.get('otel.enabled', 'false') if otel_config else 'false').lower() %}
+            <option value="false" {% if _otel != 'true' %}selected{% endif %}>Disabled — no spans emitted</option>
+            <option value="true"  {% if _otel == 'true' %}selected{% endif %}>Enabled — instrument FastAPI + SQLAlchemy</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-muted mb-1">Service name</label>
+          <input type="text" id="otel-service-name"
+                 value="{{ otel_config.get('otel.service_name', 'ipsolis-api') if otel_config else 'ipsolis-api' }}"
+                 placeholder="ipsolis-api"
+                 class="w-full rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono">
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-xs font-medium text-muted mb-1">OTLP HTTP endpoint</label>
+        <input type="text" id="otel-endpoint"
+               value="{{ otel_config.get('otel.endpoint', '') if otel_config else '' }}"
+               placeholder="https://otel-collector.example.com:4318/v1/traces"
+               class="w-full rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono">
+        <p class="text-[11px] text-muted/60 mt-1">Leave blank to disable OTLP export. Path is collector-specific (typically <code class="font-mono">/v1/traces</code>).</p>
+      </div>
+
+      <div>
+        <label class="block text-xs font-medium text-muted mb-1">Exporter headers (optional)</label>
+        <textarea id="otel-headers" rows="2" placeholder="x-honeycomb-team=YOUR_KEY&#10;x-tenant-id=acme"
+                  class="w-full rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono">{{ ('' if (otel_config.get('otel.headers') if otel_config else '') == '***' else (otel_config.get('otel.headers', '') if otel_config else '')) }}</textarea>
+        <p class="text-[11px] text-muted/60 mt-1">One <code class="font-mono">key=value</code> per line. Used for vendor auth (Honeycomb, Lightstep, etc.). Stored as a secret.</p>
+      </div>
+
+      <div>
+        <label class="flex items-center gap-2 text-sm cursor-pointer">
+          <input type="checkbox" id="otel-console" value="true"
+                 {% if otel_config and (otel_config.get('otel.console_exporter', 'false')).lower() == 'true' %}checked{% endif %}
+                 class="rounded border-token-border">
+          <span class="text-body">Console exporter</span>
+          <span class="text-[11px] text-muted/60">— print spans to API stdout (debug; pair with <code class="font-mono">docker compose logs api</code>)</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="flex gap-3 mt-6">
+      <button onclick="saveOtelConfig()"
+              class="px-5 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700">
+        Save Settings
+      </button>
+      <span class="text-xs text-muted/70 self-center">
+        Tracing wires up at API startup — restart with <code class="font-mono bg-surface-raised px-1 rounded">docker compose restart api</code> after changes.
+      </span>
+    </div>
+  </div>
 </div>
 
 <!-- ── Tab: SCCM ─────────────────────────────────────────────────────────── -->
@@ -1533,6 +1601,31 @@ async function testEmailConfig() {
 }
 
 // ── SIEM Settings ───────────────────────────────────────────────────────────────
+async function saveOtelConfig() {
+  var fields = {
+    'otel.enabled':          document.getElementById('otel-enabled').value,
+    'otel.service_name':     document.getElementById('otel-service-name').value.trim() || 'ipsolis-api',
+    'otel.endpoint':         document.getElementById('otel-endpoint').value.trim(),
+    'otel.console_exporter': document.getElementById('otel-console').checked ? 'true' : 'false',
+  };
+  // Headers may be empty (clears) or populated (replaces).
+  var hdrs = document.getElementById('otel-headers').value;
+  fields['otel.headers'] = hdrs;
+
+  var errors = [];
+  for (var key in fields) {
+    var resp = await fetch('/admin/config/' + key, {
+      method: 'PUT',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({value: fields[key]}),
+    });
+    if (!resp.ok) errors.push(key);
+  }
+  showComplianceBanner(errors.length === 0
+    ? {ok: true,  message: 'Tracing settings saved. Restart the API to apply: docker compose restart api'}
+    : {ok: false, message: 'Failed to save: ' + errors.join(', ')});
+}
+
 async function saveSiemConfig() {
   var fields = {
     'siem.enabled':      document.getElementById('siem-enabled').value,

@@ -373,10 +373,43 @@ deferred to a separate slice (different dep tree, optional).
   gauges populate correctly; disable toggle returns 404; re-enable
   returns 200; histograms have non-zero values for sample requests.
 
-### [open] Observability — OpenTelemetry tracing — Prio 1 (split off)
-- [ ] OpenTelemetry tracing with auto-instrumentation for FastAPI, Celery, SQLAlchemy
-- [ ] Sample Grafana dashboards: provisioning latency p50/p95, queue depth, error rate
-- [ ] `ipsolis_celery_queue_depth{queue}` (needs Redis LLEN per Celery queue)
+### [partial] Observability — OpenTelemetry tracing — Prio 1
+API-side auto-instrumentation **shipped 2026-04-26**. Celery worker
+instrumentation, sample dashboards, and the queue-depth gauge remain.
+
+**Done — API tracing (2026-04-26):**
+- Migration `0060_seed_otel_config.py` seeds 5 `otel.*` config keys
+  (`enabled`, `service_name`, `endpoint`, `headers`, `console_exporter`).
+- `app.utils.tracing.setup_tracing()` reads the config and configures
+  the global `TracerProvider`. Two exporter modes that compose:
+  OTLP HTTP (production target — Jaeger / Tempo / SigNoz / Honeycomb /
+  any OTel collector) and a console exporter for local verification.
+- `app.utils.tracing.instrument_app(app, engine)` wires
+  `FastAPIInstrumentor` and `SQLAlchemyInstrumentor` after the provider
+  is installed; both auto-emit spans for HTTP requests and DB queries.
+- Lifespan hook in `main.py` reads `otel.*` from `app_config` at
+  startup, calls setup + instrument, logs whether tracing is active.
+- New deps: `opentelemetry-api`, `opentelemetry-sdk`,
+  `opentelemetry-exporter-otlp-proto-http`,
+  `opentelemetry-instrumentation-fastapi`,
+  `opentelemetry-instrumentation-sqlalchemy` — all pinned to 1.29.0
+  / 0.50b0. HTTP exporter chosen over gRPC to avoid the grpcio
+  compile dependency.
+- Settings UI: new "OpenTelemetry Tracing" card in the Compliance tab
+  with status / service-name / endpoint / headers (secret) / console
+  exporter checkbox. Save handler `PUT`s every key; restart message
+  reminds operator that tracing wires up at API startup.
+- Verified end-to-end: enabled tracing + console exporter → restart
+  → confirmed real spans emitted to API stdout including FastAPI
+  request kind and SQLAlchemy DB query kind with correct resource
+  attributes (service.name, service.version).
+
+**Still to do:**
+- [ ] Celery worker instrumentation (separate dep + setup)
+- [ ] `ipsolis_celery_queue_depth{queue}` Prometheus gauge (needs
+      Redis LLEN per queue; orthogonal to tracing)
+- [ ] Sample Grafana dashboards: provisioning latency p50/p95,
+      queue depth, error rate
 
 ### [partial] Cost / chargeback per asset type — Prio 1
 Reporting side **shipped 2026-04-26**. Per-order cost projection on the

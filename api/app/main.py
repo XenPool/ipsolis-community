@@ -64,6 +64,22 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     except Exception as exc:
         logger.warning("License load failed; running Community: %s", exc)
 
+    # OpenTelemetry tracing — opt-in via otel.* config keys. Auto-instrument
+    # FastAPI + SQLAlchemy after the provider is wired up so spans flow.
+    try:
+        from app.utils.tracing import setup_tracing, instrument_app
+        from app.database import engine
+
+        async with AsyncSessionLocal() as db:
+            otel_rows = await db.execute(
+                select(AppConfig).where(AppConfig.key.like("otel.%"))
+            )
+            otel_cfg = {r.key: (r.value or "") for r in otel_rows.scalars().all()}
+        if setup_tracing(otel_cfg):
+            instrument_app(app, engine)
+    except Exception as exc:
+        logger.warning("OpenTelemetry setup failed (continuing without tracing): %s", exc)
+
     yield
     logger.info("Application shutting down")
 
