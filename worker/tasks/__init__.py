@@ -24,6 +24,16 @@ app = Celery(
     ],
 )
 
+# OpenTelemetry tracing — opt-in via otel.* config keys. Must run before the
+# Celery workers fork so the instrumentor wires into the task signals.
+try:
+    from tasks.tracing import setup_worker_tracing
+    setup_worker_tracing()
+except Exception:
+    # Tracing setup failures must never block worker startup.
+    import logging
+    logging.getLogger(__name__).exception("Worker tracing setup failed")
+
 app.conf.update(
     task_serializer="json",
     accept_content=["json"],

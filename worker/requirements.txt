@@ -30,3 +30,11 @@ structlog==24.4.0
 
 # Flower (Monitoring UI – included in worker image)
 flower==2.0.1
+
+# OpenTelemetry tracing — match api versions exactly so propagated context
+# parses identically on both sides of the Celery boundary.
+opentelemetry-api==1.29.0
+opentelemetry-sdk==1.29.0
+opentelemetry-exporter-otlp-proto-http==1.29.0
+opentelemetry-instrumentation-celery==0.50b0
+opentelemetry-instrumentation-sqlalchemy==0.50b0

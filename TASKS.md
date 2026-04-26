@@ -404,8 +404,35 @@ instrumentation, sample dashboards, and the queue-depth gauge remain.
   request kind and SQLAlchemy DB query kind with correct resource
   attributes (service.name, service.version).
 
+**Done — Celery worker tracing (2026-04-26):**
+- New `worker/tasks/tracing.py` mirrors the api's setup module —
+  reads `otel.*` from `app_config` via a one-shot psycopg2 query,
+  configures `TracerProvider`, hooks `CeleryInstrumentor` and
+  `SQLAlchemyInstrumentor`. Pinned to the same OTel version (1.29.0
+  / 0.50b0) as the api so propagated trace context parses identically
+  on both sides of the Celery boundary.
+- Worker service name auto-derived as ``ipsolis-worker`` (or
+  ``<custom>-worker`` when admin set a custom service name) so
+  trace UIs show distinct services for api vs. worker.
+- Setup invoked at module-import time in
+  `worker/tasks/__init__.py`, before workers fork — required for
+  the Celery instrumentor to hook signals correctly.
+- Bug fixed in `_load_otel_config_sync()`: now strips both
+  `postgresql+asyncpg://` (api) and `postgresql+psycopg2://`
+  (worker) URL prefixes before handing the DSN to psycopg2.
+- New deps in `worker/requirements.txt`:
+  `opentelemetry-api`, `opentelemetry-sdk`,
+  `opentelemetry-exporter-otlp-proto-http`,
+  `opentelemetry-instrumentation-celery`,
+  `opentelemetry-instrumentation-sqlalchemy`.
+- Verified end-to-end: enabled tracing + console exporter →
+  restarted worker → triggered a task → confirmed spans emitted
+  with `service.name: ipsolis-worker` (distinct from
+  `service.name: ipsolis-api`). When both sides run with the same
+  OTLP collector, an http-dispatched runbook produces a single
+  distributed trace.
+
 **Still to do:**
-- [ ] Celery worker instrumentation (separate dep + setup)
 - [ ] `ipsolis_celery_queue_depth{queue}` Prometheus gauge (needs
       Redis LLEN per queue; orthogonal to tracing)
 - [ ] Sample Grafana dashboards: provisioning latency p50/p95,
