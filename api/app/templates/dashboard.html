@@ -27,6 +27,145 @@
 </div>
 {% endif %}
 
+<!-- Setup checklist — auto-hides once everything is done. Persistently
+     dismissible per-browser via the Hide button (localStorage). -->
+<div id="setup-checklist" class="mb-6 hidden">
+  <div class="rounded-lg border border-token-border bg-surface shadow-sm shadow-slate-900/5 dark:shadow-black/20 overflow-hidden">
+    <button type="button" id="setup-toggle"
+            class="w-full flex items-center justify-between px-5 py-3 hover:bg-surface-raised/40 text-left">
+      <div class="flex items-center gap-3 min-w-0">
+        <div class="shrink-0 relative">
+          <svg class="w-8 h-8 -rotate-90" viewBox="0 0 36 36" aria-hidden="true">
+            <circle cx="18" cy="18" r="14" fill="none" stroke="rgb(var(--token-border))" stroke-width="3"/>
+            <circle id="setup-progress-ring" cx="18" cy="18" r="14" fill="none"
+                    stroke="rgb(37 99 235)" stroke-width="3" stroke-linecap="round"
+                    stroke-dasharray="88" stroke-dashoffset="88"/>
+          </svg>
+          <span id="setup-progress-pct" class="absolute inset-0 flex items-center justify-center text-[10px] font-medium text-heading">0%</span>
+        </div>
+        <div class="min-w-0">
+          <div class="text-sm font-semibold text-heading">Setup checklist</div>
+          <div class="text-xs text-muted/70" id="setup-summary">Loading…</div>
+        </div>
+      </div>
+      <svg id="setup-chevron" class="w-4 h-4 text-muted shrink-0 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+      </svg>
+    </button>
+    <div id="setup-body" class="px-5 pb-4 hidden border-t border-token-border">
+      <div id="setup-essential-group" class="mt-3"></div>
+      <div id="setup-recommended-group" class="mt-4"></div>
+      <div class="mt-3 pt-3 border-t border-token-border flex items-center justify-between text-[11px] text-muted/70">
+        <span>Items refresh on page load. Each link takes you to the page where you fix the gap.</span>
+        <button type="button" id="setup-dismiss" class="text-muted hover:text-body underline">Hide until next setup change</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  var DISMISS_KEY = 'ipsolis.setup.dismissed_signature';
+
+  function fmtItem(item) {
+    var icon = item.done
+      ? '<svg class="w-4 h-4 text-green-600 dark:text-green-400 shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>'
+      : '<svg class="w-4 h-4 text-muted/50 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke-width="2"/></svg>';
+    var label = item.done
+      ? '<span class="text-body line-through opacity-70">' + escapeHtml(item.label) + '</span>'
+      : '<a href="' + escapeHtml(item.link) + '" class="text-body hover:text-blue-600 dark:hover:text-blue-400 hover:underline">' + escapeHtml(item.label) + ' →</a>';
+    return '<li class="flex items-start gap-2 py-1">' + icon
+      + '<div class="min-w-0">' + label
+      + '<div class="text-[11px] text-muted/60 mt-0.5">' + escapeHtml(item.hint) + '</div>'
+      + '</div></li>';
+  }
+
+  function escapeHtml(s) {
+    return (s || '').replace(/[&<>"']/g, function(c) {
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  }
+
+  function makeSignature(data) {
+    // A short hash of done-state — used to invalidate "dismissed" when
+    // setup changes (e.g. someone deletes the only asset definition).
+    return (data.items || []).map(function(i) { return i.key + (i.done ? '1' : '0'); }).join(',');
+  }
+
+  function render(data) {
+    var card = document.getElementById('setup-checklist');
+    if (!card) return;
+
+    // If everything done AND the dismissed signature matches, hide entirely.
+    var dismissed = localStorage.getItem(DISMISS_KEY);
+    var sig = makeSignature(data);
+    if (data.complete && dismissed === sig) {
+      card.classList.add('hidden');
+      return;
+    }
+    if (dismissed && dismissed === sig) {
+      card.classList.add('hidden');
+      return;
+    }
+    card.classList.remove('hidden');
+
+    var totalDone = data.essential.done + data.recommended.done;
+    var totalAll  = data.essential.total + data.recommended.total;
+    var pct = totalAll === 0 ? 100 : Math.round(100 * totalDone / totalAll);
+    var ring = document.getElementById('setup-progress-ring');
+    if (ring) ring.setAttribute('stroke-dashoffset', String(88 - (88 * pct / 100)));
+    document.getElementById('setup-progress-pct').textContent = pct + '%';
+
+    var summary;
+    if (data.complete) {
+      summary = 'All set ✓ — ' + totalAll + ' of ' + totalAll + ' configured.';
+    } else {
+      summary = data.essential.done + ' of ' + data.essential.total + ' essential · '
+              + data.recommended.done + ' of ' + data.recommended.total + ' recommended';
+    }
+    document.getElementById('setup-summary').textContent = summary;
+
+    var ess = (data.items || []).filter(function(i){ return i.tier === 'essential'; });
+    var rec = (data.items || []).filter(function(i){ return i.tier === 'recommended'; });
+    document.getElementById('setup-essential-group').innerHTML =
+      '<div class="text-[10px] uppercase tracking-wider text-muted/60 mb-1">Essential</div>'
+      + '<ul>' + ess.map(fmtItem).join('') + '</ul>';
+    document.getElementById('setup-recommended-group').innerHTML =
+      '<div class="text-[10px] uppercase tracking-wider text-muted/60 mb-1">Recommended</div>'
+      + '<ul>' + rec.map(fmtItem).join('') + '</ul>';
+
+    document.getElementById('setup-dismiss').onclick = function(e) {
+      e.stopPropagation();
+      localStorage.setItem(DISMISS_KEY, sig);
+      card.classList.add('hidden');
+    };
+  }
+
+  document.addEventListener('DOMContentLoaded', async function() {
+    var toggle = document.getElementById('setup-toggle');
+    var body = document.getElementById('setup-body');
+    var chev = document.getElementById('setup-chevron');
+    if (toggle && body && chev) {
+      toggle.addEventListener('click', function() {
+        body.classList.toggle('hidden');
+        chev.classList.toggle('rotate-180');
+      });
+    }
+    try {
+      var resp = await fetch('/admin/setup/state');
+      if (!resp.ok) return;
+      var data = await resp.json();
+      render(data);
+      // Auto-expand when there's something incomplete
+      if (!data.complete && body && body.classList.contains('hidden')) {
+        body.classList.remove('hidden');
+        chev && chev.classList.add('rotate-180');
+      }
+    } catch (e) { /* swallow */ }
+  });
+})();
+</script>
+
 <!-- Pool Summary -->
 <div class="mb-8">
   <div class="flex items-center justify-between mb-3">

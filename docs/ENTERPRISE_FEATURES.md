@@ -513,6 +513,35 @@ So when "who triggered this?" comes up in a compliance review, the
 audit trail names the specific token (and therefore the specific
 integration) instead of just the catch-all `WEBHOOK_SECRET_TOKEN`.
 
+### Audit attribution everywhere
+
+The same attribution applies to **every** mutating admin endpoint:
+asset definitions, asset pool, configuration. Each `audit_log` row's
+`triggered_by` now carries the route label *and* the calling
+credential, formatted as `api:<route> (<actor>)`:
+
+| Caller | Actor portion |
+|---|---|
+| Per-integration bearer token | `token:<name>` (e.g. `token:servicenow-int`) |
+| Admin session (browser UI) | `admin:session:<user>` |
+| Legacy `X-Admin-Key` from `.env` | `admin:legacy_key` |
+| ServiceNow webhook with HMAC | `webhook:hmac` |
+
+The actor lookup goes through `actor_by(request, label)` in
+`app.utils.audit`, which reads `request.state.actor` (populated by
+`require_admin_key` and `_authenticate_webhook`). Routes that don't
+have an authentication context fall back to plain `api:<label>` so
+the helper is safe to use everywhere.
+
+Sample rows after a token write followed by a legacy-key write:
+
+```
+id  | action  | triggered_by
+----+---------+------------------------------------------------
+804 | updated | api:update_config (admin:legacy_key)
+803 | updated | api:update_config (token:audit-attrib-test)
+```
+
 **Not yet:**
 
 - Wider rollout of scope decorators (only the most commonly-integrated

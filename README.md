@@ -76,6 +76,7 @@ Enterprise IT automation shouldn't require a 6-month implementation project and 
 
 ### Admin UI
 - Dashboard with live pool status tiles (auto-refreshing HTMX fragments)
+- **Setup checklist** on the dashboard — auto-derived from current DB state, separates "essential" from "recommended", each pending item links to the relevant config page; collapses once everything is done and stays out of the way until something changes
 - Full asset type configuration (categories, attributes, automation strategy, approvals)
 - Runbook management with drag-and-drop step ordering
 - Email template editor with variable placeholders (per-action templates)

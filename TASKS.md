@@ -115,13 +115,29 @@ follow-up slices.
   / valid-HMAC all return correct status codes and create or reject
   orders consistently. Audit log shows correct attribution per path.
 
+**Done — audit attribution everywhere (2026-04-26):**
+- New `actor_by(request, label)` helper in `app.utils.audit` builds the
+  `triggered_by` string from `request.state.actor` (set by
+  `require_admin_key` / `_authenticate_webhook`). Falls back to plain
+  `api:<label>` when no actor is on state, so the helper is safe to
+  use on unauthenticated routes too.
+- Updated all 12 mutating admin route call sites in `admin.py` to
+  thread `request: Request` and use the helper:
+  `create/update/delete config`, `create/update/clone/delete asset_type`,
+  `create/update/delete asset`, `force_delete_asset`, `revoke_asset`.
+- Webhook path already used an equivalent format; left as-is.
+- Verified end-to-end: token-driven `PUT /admin/config/...` produced
+  `api:update_config (token:audit-attrib-test)`; legacy-key write to
+  the same endpoint produced `api:update_config (admin:legacy_key)`.
+  An auditor can now trace every change back to the specific
+  credential (token name, admin session user, or legacy key).
+
 **Still to do — separate slices:**
 - [ ] Wider scope rollout to the rest of the `/admin/*` surface
       (mechanical, decorator-only).
-- [ ] Audit log enrichment: record `triggered_by` from
-      `request.state.actor` on **all** mutating admin routes so
-      token-driven actions are attributable by token name everywhere
-      (today only the webhook path does this end-to-end).
+- [ ] Audit attribution on `/orders` API and portal-side flows
+      (today they use hardcoded labels because there's no shared
+      auth context — would need a portal-user actor wrapper).
 - [ ] Optional: hard-delete vs. soft-delete policy (today everything
       is soft-deleted; some tenants will want a "purge revoked tokens
       older than 90 days" Beat task).
@@ -492,8 +508,27 @@ there are six or fewer definitions to avoid clutter on small catalogs.
   `catalog_clear_filters`) added across all five locales (en/de/fr/es/it).
   `tools/validate_locales.py` confirms 143 keys per locale, all aligned.
 
-### [open] In-app onboarding / guided tour — Prio 3
-First-run admin walkthrough; drop-in for new admins.
+### [done] In-app setup checklist — Prio 3 (2026-04-26)
+Replaced the originally-planned "guided tour" with a persistent setup
+checklist on the dashboard — more useful for both first-run setup
+*and* ongoing operational health checks (e.g. someone deletes the only
+asset definition → the relevant item flips back to ☐). No external JS
+library; pure server-side detection from current DB state.
+
+- New endpoint `GET /admin/setup/state` returns 9 checklist items
+  (6 essential, 3 recommended) with `done` / `label` / `hint` / `link` /
+  `tier` per item plus per-tier and overall summaries.
+- Items: app branding, SMTP, AD, Entra ID, asset definitions exist,
+  asset pool has assets, Teams card delivery, SIEM streaming,
+  per-integration API token issued.
+- Dashboard card with circular progress ring and percent badge,
+  auto-expands when there's anything incomplete, collapses when
+  everything is green.
+- "Hide until next setup change" persists a signature of the current
+  done-state in `localStorage`. If the state later changes (regression
+  or new config), the signature mismatch re-shows the card.
+- Each pending row is a direct link to the relevant settings tab
+  anchor (e.g. `/ui/settings#ad`) so admins skip the navigation step.
 
 ---
 

@@ -4,9 +4,31 @@ All writes land in the same transaction as the main change –
 no separate commit needed. Entries in audit_log are immutable (no UPDATE/DELETE).
 """
 
+from fastapi import Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.audit import AuditLog
+
+
+def actor_by(request: Request | None, label: str) -> str:
+    """Build an audit ``triggered_by`` string from the request's actor.
+
+    ``request.state.actor`` is populated by ``require_admin_key`` and
+    ``_authenticate_webhook`` and identifies the credential used for
+    the call (e.g. ``token:servicenow-int``, ``admin:session:alice``,
+    ``admin:legacy_key``, ``webhook:hmac``). Wrapping it with the
+    route's logical label gives auditors both *what* happened and
+    *who* triggered it.
+
+    Falls back to plain ``api:<label>`` when no actor is on state
+    (unauthenticated routes), preserving back-compat.
+    """
+    if request is None:
+        return f"api:{label}"
+    actor = getattr(getattr(request, "state", None), "actor", None)
+    if actor:
+        return f"api:{label} ({actor})"
+    return f"api:{label}"
 
 
 async def aaudit(

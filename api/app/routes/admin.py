@@ -29,7 +29,7 @@ from app.schemas.admin import (
 )
 from app.schemas.asset import AssetPoolRead, AssetTypeRead
 from app.utils.asset_type_constraints import validate_asset_type
-from app.utils.audit import _asset_snap, _config_snap, _type_snap, aaudit
+from app.utils.audit import _asset_snap, _config_snap, _type_snap, aaudit, actor_by
 from app.utils.auth import require_admin_key, require_scopes
 from app.utils.features import require_enterprise
 from app.utils.license import is_feature_enabled
@@ -141,7 +141,7 @@ async def get_config(key: str, db: AsyncSession = Depends(get_db)) -> AppConfigR
 
 @router.post("/config", response_model=AppConfigRead, status_code=status.HTTP_201_CREATED)
 async def create_config(
-    payload: AppConfigCreate, db: AsyncSession = Depends(get_db)
+    request: Request, payload: AppConfigCreate, db: AsyncSession = Depends(get_db)
 ) -> AppConfigRead:
     _require_config_key_licensed(payload.key)
     existing = await db.execute(select(AppConfig).where(AppConfig.key == payload.key))
@@ -158,7 +158,8 @@ async def create_config(
     )
     db.add(cfg)
     await db.flush()
-    await aaudit(db, "app_config", cfg.id, "created", new=_config_snap(cfg), by="api:create_config")
+    await aaudit(db, "app_config", cfg.id, "created", new=_config_snap(cfg),
+                 by=actor_by(request, "create_config"))
     await db.commit()
     await db.refresh(cfg)
     logger.info("admin: created config key=%s", payload.key)
@@ -167,7 +168,7 @@ async def create_config(
 
 @router.put("/config/{key}", response_model=AppConfigRead)
 async def update_config(
-    key: str, payload: AppConfigUpdate, db: AsyncSession = Depends(get_db)
+    request: Request, key: str, payload: AppConfigUpdate, db: AsyncSession = Depends(get_db)
 ) -> AppConfigRead:
     _require_config_key_licensed(key)
     result = await db.execute(select(AppConfig).where(AppConfig.key == key))
@@ -178,7 +179,8 @@ async def update_config(
     cfg.value = payload.value
     if payload.description is not None:
         cfg.description = payload.description
-    await aaudit(db, "app_config", cfg.id, "updated", old=old_snap, new=_config_snap(cfg), by="api:update_config")
+    await aaudit(db, "app_config", cfg.id, "updated", old=old_snap, new=_config_snap(cfg),
+                 by=actor_by(request, "update_config"))
     await db.commit()
     await db.refresh(cfg)
     logger.info("admin: updated config key=%s", key)
@@ -190,13 +192,14 @@ async def update_config(
 
 
 @router.delete("/config/{key}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_config(key: str, db: AsyncSession = Depends(get_db)) -> None:
+async def delete_config(request: Request, key: str, db: AsyncSession = Depends(get_db)) -> None:
     _require_config_key_licensed(key)
     result = await db.execute(select(AppConfig).where(AppConfig.key == key))
     cfg = result.scalar_one_or_none()
     if not cfg:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Key {key!r} not found")
-    await aaudit(db, "app_config", cfg.id, "deleted", old=_config_snap(cfg), by="api:delete_config")
+    await aaudit(db, "app_config", cfg.id, "deleted", old=_config_snap(cfg),
+                 by=actor_by(request, "delete_config"))
     await db.delete(cfg)
     await db.commit()
     logger.info("admin: deleted config key=%s", key)
@@ -413,7 +416,7 @@ async def asset_type_logo(type_id: int, db: AsyncSession = Depends(get_db)):
     dependencies=[require_scopes("asset_types:write")],
 )
 async def create_asset_type(
-    payload: AssetTypeCreate, db: AsyncSession = Depends(get_db)
+    request: Request, payload: AssetTypeCreate, db: AsyncSession = Depends(get_db)
 ) -> AssetType:
     _require_asset_type_fields_licensed(payload)
     existing = await db.execute(select(AssetType).where(AssetType.name == payload.name))
@@ -469,7 +472,8 @@ async def create_asset_type(
     )
     db.add(asset_type)
     await db.flush()
-    await aaudit(db, "asset_type", asset_type.id, "created", new=_type_snap(asset_type), by="api:create_asset_type")
+    await aaudit(db, "asset_type", asset_type.id, "created", new=_type_snap(asset_type),
+                 by=actor_by(request, "create_asset_type"))
     await db.commit()
     await db.refresh(asset_type)
     logger.info("admin: created asset_type id=%s name=%s", asset_type.id, asset_type.name)
@@ -482,7 +486,7 @@ async def create_asset_type(
     dependencies=[require_scopes("asset_types:write")],
 )
 async def update_asset_type(
-    type_id: int, payload: AssetTypeUpdate, db: AsyncSession = Depends(get_db)
+    request: Request, type_id: int, payload: AssetTypeUpdate, db: AsyncSession = Depends(get_db)
 ) -> AssetType:
     _require_asset_type_fields_licensed(payload)
     result = await db.execute(select(AssetType).where(AssetType.id == type_id))
@@ -573,7 +577,8 @@ async def update_asset_type(
         asset_type.eligible_requestors_dn = payload.eligible_requestors_dn or None
     if payload.logo is not None:
         asset_type.logo = payload.logo or None
-    await aaudit(db, "asset_type", asset_type.id, "updated", old=old_snap, new=_type_snap(asset_type), by="api:update_asset_type")
+    await aaudit(db, "asset_type", asset_type.id, "updated", old=old_snap, new=_type_snap(asset_type),
+                 by=actor_by(request, "update_asset_type"))
     await db.commit()
     await db.refresh(asset_type)
     logger.info("admin: updated asset_type id=%s", type_id)
@@ -586,7 +591,9 @@ async def update_asset_type(
     status_code=status.HTTP_201_CREATED,
     dependencies=[require_scopes("asset_types:write")],
 )
-async def clone_asset_type(type_id: int, db: AsyncSession = Depends(get_db)) -> AssetType:
+async def clone_asset_type(
+    request: Request, type_id: int, db: AsyncSession = Depends(get_db)
+) -> AssetType:
     """Shallow-clone an asset type: same configuration, fresh row, name suffixed.
 
     Runbooks (provision / modify / deprovision) and pool assets are NOT
@@ -648,7 +655,7 @@ async def clone_asset_type(type_id: int, db: AsyncSession = Depends(get_db)) -> 
     db.add(new_type)
     await db.flush()
     await aaudit(db, "asset_type", new_type.id, "cloned", new=_type_snap(new_type),
-                 by=f"api:clone_asset_type from id={src.id}")
+                 by=actor_by(request, f"clone_asset_type from id={src.id}"))
     await db.commit()
     await db.refresh(new_type)
     logger.info("admin: cloned asset_type id=%s -> id=%s name=%r", src.id, new_type.id, new_type.name)
@@ -660,7 +667,9 @@ async def clone_asset_type(type_id: int, db: AsyncSession = Depends(get_db)) -> 
     status_code=status.HTTP_204_NO_CONTENT,
     dependencies=[require_scopes("asset_types:write")],
 )
-async def delete_asset_type(type_id: int, db: AsyncSession = Depends(get_db)) -> None:
+async def delete_asset_type(
+    request: Request, type_id: int, db: AsyncSession = Depends(get_db)
+) -> None:
     result = await db.execute(select(AssetType).where(AssetType.id == type_id))
     asset_type = result.scalar_one_or_none()
     if not asset_type:
@@ -691,7 +700,8 @@ async def delete_asset_type(type_id: int, db: AsyncSession = Depends(get_db)) ->
         AssetPool.__table__.delete().where(AssetPool.__table__.c.asset_type_id == type_id)
     )
     # 6. runbook_definitions/steps cascade via FK ondelete=CASCADE
-    await aaudit(db, "asset_type", asset_type.id, "deleted", old=_type_snap(asset_type), by="api:delete_asset_type")
+    await aaudit(db, "asset_type", asset_type.id, "deleted", old=_type_snap(asset_type),
+                 by=actor_by(request, "delete_asset_type"))
     await db.delete(asset_type)
     await db.commit()
     logger.info("admin: deleted asset_type id=%s", type_id)
@@ -701,7 +711,7 @@ async def delete_asset_type(type_id: int, db: AsyncSession = Depends(get_db)) ->
 
 @router.post("/assets", response_model=AssetPoolRead, status_code=status.HTTP_201_CREATED)
 async def create_asset(
-    payload: AssetPoolCreate, db: AsyncSession = Depends(get_db)
+    request: Request, payload: AssetPoolCreate, db: AsyncSession = Depends(get_db)
 ) -> AssetPool:
     # Validate asset type
     type_result = await db.execute(select(AssetType).where(AssetType.id == payload.asset_type_id))
@@ -724,7 +734,8 @@ async def create_asset(
     )
     db.add(asset)
     await db.flush()
-    await aaudit(db, "asset", asset.id, "created", new=_asset_snap(asset), by="api:create_asset")
+    await aaudit(db, "asset", asset.id, "created", new=_asset_snap(asset),
+                 by=actor_by(request, "create_asset"))
     await db.commit()
     await db.refresh(asset)
     logger.info("admin: created asset id=%s name=%s", asset.id, asset.name)
@@ -778,7 +789,7 @@ async def bulk_create_assets(payload: AssetBulkCreate, db: AsyncSession = Depend
 
 @router.put("/assets/{asset_id}", response_model=AssetPoolRead)
 async def update_asset(
-    asset_id: int, payload: AssetPoolUpdate, db: AsyncSession = Depends(get_db)
+    request: Request, asset_id: int, payload: AssetPoolUpdate, db: AsyncSession = Depends(get_db)
 ) -> AssetPool:
     result = await db.execute(select(AssetPool).where(AssetPool.id == asset_id))
     asset = result.scalar_one_or_none()
@@ -806,7 +817,8 @@ async def update_asset(
     if payload.expires_at is not None:
         asset.expires_at = payload.expires_at
     action = "status_changed" if payload.status is not None else "updated"
-    await aaudit(db, "asset", asset.id, action, old=old_snap, new=_asset_snap(asset), by="api:update_asset")
+    await aaudit(db, "asset", asset.id, action, old=old_snap, new=_asset_snap(asset),
+                 by=actor_by(request, "update_asset"))
     await db.commit()
     await db.refresh(asset)
     logger.info("admin: updated asset id=%s", asset_id)
@@ -814,7 +826,9 @@ async def update_asset(
 
 
 @router.delete("/assets/{asset_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_asset(asset_id: int, db: AsyncSession = Depends(get_db)) -> None:
+async def delete_asset(
+    request: Request, asset_id: int, db: AsyncSession = Depends(get_db)
+) -> None:
     result = await db.execute(select(AssetPool).where(AssetPool.id == asset_id))
     asset = result.scalar_one_or_none()
     if not asset:
@@ -829,7 +843,8 @@ async def delete_asset(asset_id: int, db: AsyncSession = Depends(get_db)) -> Non
         .where(Order.__table__.c.assigned_asset_id == asset_id)
         .values(assigned_asset_id=None)
     )
-    await aaudit(db, "asset", asset.id, "deleted", old=_asset_snap(asset), by="api:delete_asset")
+    await aaudit(db, "asset", asset.id, "deleted", old=_asset_snap(asset),
+                 by=actor_by(request, "delete_asset"))
     await db.delete(asset)
     await db.commit()
     logger.info("admin: deleted asset id=%s", asset_id)
@@ -861,6 +876,7 @@ def _sync_revoke(user_email: str, asset_type_id: int) -> dict:
 
 @router.post("/assets/{asset_id}/force-delete", status_code=status.HTTP_204_NO_CONTENT)
 async def force_delete_asset(
+    request: Request,
     asset_id: int,
     payload: ForceDeleteAsset,
     db: AsyncSession = Depends(get_db),
@@ -930,7 +946,8 @@ async def force_delete_asset(
     audit_extra = {"force": True, "revoke_permissions": payload.revoke_permissions}
     if revoke_result is not None:
         audit_extra["revoke_result"] = revoke_result
-    await aaudit(db, "asset", asset.id, "force_deleted", old=snap, new=audit_extra, by="api:force_delete_asset")
+    await aaudit(db, "asset", asset.id, "force_deleted", old=snap, new=audit_extra,
+                 by=actor_by(request, "force_delete_asset"))
     await db.delete(asset)
     await db.commit()
     logger.info("admin: force-deleted asset id=%s (revoke=%s)", asset_id, payload.revoke_permissions)
@@ -938,6 +955,7 @@ async def force_delete_asset(
 
 @router.post("/assets/{asset_id}/revoke", status_code=status.HTTP_204_NO_CONTENT)
 async def revoke_asset(
+    request: Request,
     asset_id: int,
     payload: ForceDeleteAsset,
     db: AsyncSession = Depends(get_db),
@@ -997,7 +1015,8 @@ async def revoke_asset(
     audit_extra = {"revoke_permissions": payload.revoke_permissions}
     if revoke_result is not None:
         audit_extra["revoke_result"] = revoke_result
-    await aaudit(db, "asset", asset.id, "revoked", old=snap, new=audit_extra, by="api:revoke_asset")
+    await aaudit(db, "asset", asset.id, "revoked", old=snap, new=audit_extra,
+                 by=actor_by(request, "revoke_asset"))
     await db.commit()
     logger.info("admin: revoked asset id=%s back to free (revoke_permissions=%s)", asset_id, payload.revoke_permissions)
 
