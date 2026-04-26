@@ -1010,3 +1010,20 @@ async def approval_delegations_page(request: Request) -> HTMLResponse:
         "ui/approval_delegations.html",
         {"active_page": "approval-delegations"},
     )
+
+
+@router.get("/admin-users", response_class=HTMLResponse)
+async def admin_users_page(request: Request) -> HTMLResponse:
+    """Admin user management page (superadmin only).
+
+    The route is reachable for any logged-in admin so superadmins can
+    deeplink and the nav shows the right active state, but the
+    underlying ``GET /admin/admin-users`` API is gated to
+    ``superadmin``. Lower-role users hit a friendly empty state when
+    the AJAX call returns 403, instead of being bounced from the page.
+    """
+    return templates.TemplateResponse(
+        request,
+        "ui/admin_users.html",
+        {"active_page": "admin-users"},
+    )

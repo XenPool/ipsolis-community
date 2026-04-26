@@ -11,18 +11,107 @@ and historical "done" entries at the bottom.
 These are the gaps that block ipSolis from being drop-in for a 5,000-seat regulated
 enterprise. Order = priority (procurement-blocker first).
 
-### [open] Admin RBAC — Prio 0 (show-stopper)
-Today the admin UI is binary: `X-Admin-Key` or admin session = god mode.
-Roles to design: `superadmin`, `admin`, `approver`, `auditor` (read-only),
-`helpdesk` (revoke-only). Per-asset-type ACLs as a stretch goal so platform
-owners can be delegated without seeing other teams' configurations.
-SoD requirement: configurer of an asset type must not also approve their own
-access requests against it.
-- [ ] Roles enum + `admin_users` table (or `admin_role` column)
-- [ ] Permission check decorator/dependency for each admin endpoint
-- [ ] Admin UI — login flow shows role; nav items hide what the role can't reach
-- [ ] Audit-log entry includes the role of the actor
-- [ ] Migration to map all existing `X-Admin-Key` use to `superadmin`
+### [partial] Admin RBAC — Prio 0 (show-stopper)
+Slice 1 — per-user accounts, role ladder, first-run setup, role-gated
+admin user CRUD — **shipped 2026-04-26**. Comprehensive role-gating
+across the rest of `/admin/*`, per-asset-type ACLs, and SoD
+enforcement (configurer ≠ approver) split into follow-up slices.
+
+**Done — RBAC slice 1 (2026-04-26):**
+- Migration `0069_admin_users_rbac.py` adds `admin_users` (id, username
+  unique, password_hash, role, is_active, created_at, updated_at,
+  last_login_at, created_by). Username is normalised to lowercase at
+  write time so the unique index doesn't need funcidx-LOWER.
+- Five-tier role enum in `app.utils.rbac.ROLE_HIERARCHY`:
+  `superadmin > admin > approver > auditor > helpdesk`.
+  `role_at_least(actual, required)` is the single source of truth for
+  privilege comparisons — every other role check delegates to it.
+- Password hashing in `app.utils.password` (PBKDF2-HMAC-SHA256, 600k
+  iterations per OWASP 2023, stdlib only — no bcrypt/passlib build
+  dependency). Self-describing string format
+  `pbkdf2_sha256$<iters>$<salt_hex>$<hash_hex>` so a future argon2id
+  migration is a verify-then-rehash on next login.
+- Login flow rewritten in `routes/admin_auth.py`:
+  * Form takes username + password.
+  * Empty username + password matching `settings.ADMIN_API_KEY` falls
+    through as the **legacy back-compat path**: virtual superadmin
+    session, attributed as `admin:legacy_key`. Existing scripts and
+    bookmarked admin sessions don't break on upgrade.
+  * Username + password matched against `admin_users` (active rows
+    only). On success, `last_login_at` is updated and the session
+    carries `admin_user`, `admin_role`, `admin_via=user`.
+  * **First-run setup**: when `admin_users` is empty, the login page
+    renders a "Create first administrator" form instead of the
+    sign-in form. Submitting it creates the first superadmin and
+    auto-logs them in. Idempotent against races (re-checks the count
+    on the setup POST).
+- `require_role(required)` dependency factory in `app.utils.rbac`:
+  reads `request.session["admin_role"]`, gates by the ladder, raises
+  HTTP 403 with a descriptive message naming both the actor's role
+  and the required role. Bypass paths: legacy key (virtual
+  superadmin) and bearer tokens (governed by scopes, not roles).
+- Audit attribution updated: `actor_by()` now reads
+  `admin_role` from the session and emits
+  `admin:session:<user>:<role>` (e.g. `admin:session:alice:superadmin`)
+  so audit-log filters can match on both *who* and *with what
+  authority*.
+- Admin user CRUD route + Pydantic schemas in
+  `routes/admin_users.py` (gated to `superadmin`):
+  list / create / update (role + activation + password rotation) /
+  hard-delete. Self-protection guards: a superadmin cannot demote /
+  deactivate / delete *themselves*, and the last active superadmin
+  is never the last (any of those operations on the last
+  superadmin fail with 409). Soft revocation (`is_active=false`)
+  preserves the audit trail; hard delete is for test rows.
+- Admin UI page at `/ui/admin-users` (linked in nav, superadmin-only
+  — non-superadmins see a "Only superadmins can view this" empty
+  state when the underlying API returns 403). Inline role dropdown,
+  reactivate/deactivate, password reset, delete. New-user modal with
+  role selector defaulting to `admin`.
+- Nav hiding in `base.html`: Audit Log nav entry hides for roles
+  below auditor; Admin Users nav entry hides for non-superadmins.
+  Sidebar footer shows the signed-in user + role badge.
+- Three role gates applied as proof-of-wiring (broader rollout is
+  slice 2): `POST/PUT/DELETE /admin/asset-types*` → `admin`+,
+  `GET /admin/audit-log` → `auditor`+,
+  `/admin/admin-users*` → `superadmin`.
+- Smoke-tested end-to-end:
+  * First-run setup created `alice` (superadmin) with a 118-char
+    PBKDF2 hash. Login page now renders the regular sign-in form
+    instead of the setup form.
+  * Login as alice → 303 → `/admin/admin-users` returns the user list.
+    Wrong password → 401 with descriptive error.
+  * `bob` (admin role) created via API; bob can hit asset-type endpoints
+    (passes role gate) but is 403'd from `/admin/admin-users`
+    (descriptive message names the gap).
+  * `carol` (auditor) created; her asset-type create attempt returns
+    403 with `Role 'auditor' is below the required 'admin'`.
+  * Legacy `X-Admin-Key` continues to grant unrestricted access (returned
+    full admin-user list), proving back-compat.
+  * Self-protection guards: alice (sole superadmin) blocked from
+    self-demote (409), self-deactivate (409), self-delete (409).
+    Promoting bob to superadmin doesn't unlock alice's self-demote
+    (deliberate — avoids accidental session lockout).
+  * Audit row attribution: `api:create_admin_user (admin:session:alice:superadmin)`.
+
+**Still to do — RBAC slice 2:**
+- [ ] Comprehensive role gating across the rest of `/admin/*` —
+      runbooks, modules, maintenance, standalone runbooks, license,
+      seed-export, cost-report. Most slot in as
+      `dependencies=[require_role("admin")]` mechanically; auditor
+      read paths for endpoints that have separate GET/PUT need
+      careful per-route classification.
+- [ ] Per-asset-type ACL grants (`admin_user_asset_type_grants`)
+      so platform owners can be delegated without seeing other
+      teams' configs.
+- [ ] SoD enforcement: configurer of an asset type must not also
+      approve their own access requests against it. Likely a check
+      at order-creation time using the audit trail.
+- [ ] Bearer-token role binding (today scopes are orthogonal to roles
+      — a token with `admin:*` is implicitly superadmin-equivalent;
+      slice 2 binds tokens to a specific role for clearer authz).
+- [ ] Self-service "change my password" page for non-superadmins.
+- [ ] Forced password rotation policy + lockout-on-N-failed-attempts.
 
 ### [open] External secret management — Prio 0 (show-stopper)
 Today AD password / vSphere creds / SMTP password / Entra client secret all

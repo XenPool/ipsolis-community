@@ -36,7 +36,14 @@ async def require_admin_key(
     # Path 2: admin session
     if request.session.get("admin_authenticated"):
         admin_user = request.session.get("admin_user") or "admin"
-        request.state.actor = f"admin:session:{admin_user}"
+        admin_role = request.session.get("admin_role") or ""
+        # Attribution carries the role so the audit log lets auditors
+        # filter by both *who* made the change and *with what authority*
+        # — `admin:session:alice:admin` reads top-down by privilege.
+        if admin_role:
+            request.state.actor = f"admin:session:{admin_user}:{admin_role}"
+        else:
+            request.state.actor = f"admin:session:{admin_user}"
         return
 
     # Path 3: bearer token from api_tokens

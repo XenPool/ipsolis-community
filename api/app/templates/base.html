@@ -146,6 +146,11 @@
         </svg>
         API Tokens
       </a>
+      {# RBAC slice 1: nav items hide for roles that can't reach them. #}
+      {% set _admin_role = request.session.get('admin_role', 'superadmin') if request else 'superadmin' %}
+      {% set _role_rank = {'superadmin': 0, 'admin': 1, 'approver': 2, 'auditor': 3, 'helpdesk': 4} %}
+      {% set _my_rank = _role_rank.get(_admin_role, 0) %}
+      {% if _my_rank <= _role_rank['auditor'] %}
       <a href="/ui/audit-log"
          class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors
                 {% if active_page == 'audit-log' %}bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300{% else %}text-muted hover:bg-surface-raised hover:text-body{% endif %}">
@@ -155,6 +160,18 @@
         </svg>
         Audit Log
       </a>
+      {% endif %}
+      {% if _my_rank <= _role_rank['superadmin'] %}
+      <a href="/ui/admin-users"
+         class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors
+                {% if active_page == 'admin-users' %}bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300{% else %}text-muted hover:bg-surface-raised hover:text-body{% endif %}">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+        </svg>
+        Admin Users
+      </a>
+      {% endif %}
       <a href="/ui/approval-delegations"
          class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors
                 {% if active_page == 'approval-delegations' %}bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300{% else %}text-muted hover:bg-surface-raised hover:text-body{% endif %}">
@@ -198,6 +215,12 @@
           Sign out
         </button>
       </form>
+      {% if request and request.session.get('admin_user') %}
+      <div class="mt-2 text-[10px] text-muted/70">
+        Signed in as <span class="font-medium text-body">{{ request.session.get('admin_user') }}</span>
+        <span class="ml-1 px-1.5 py-0.5 rounded bg-surface-raised text-muted">{{ _admin_role }}</span>
+      </div>
+      {% endif %}
       <div class="mt-2 text-[10px] text-muted/70">v{{ app_version }}</div>
     </div>
 

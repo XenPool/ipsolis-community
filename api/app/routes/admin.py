@@ -35,6 +35,7 @@ from app.utils.audit import (
 )
 from app.utils.auth import require_admin_key, require_scopes
 from app.utils.features import require_enterprise
+from app.utils.rbac import require_role
 from app.utils.license import is_feature_enabled
 from app.templates_instance import set_app_title, set_app_logo_config
 
@@ -469,7 +470,7 @@ async def asset_type_logo(type_id: int, db: AsyncSession = Depends(get_db)):
     "/asset-types",
     response_model=AssetTypeRead,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[require_scopes("asset_types:write")],
+    dependencies=[require_scopes("asset_types:write"), require_role("admin")],
 )
 async def create_asset_type(
     request: Request, payload: AssetTypeCreate, db: AsyncSession = Depends(get_db)
@@ -542,7 +543,7 @@ async def create_asset_type(
 @router.put(
     "/asset-types/{type_id}",
     response_model=AssetTypeRead,
-    dependencies=[require_scopes("asset_types:write")],
+    dependencies=[require_scopes("asset_types:write"), require_role("admin")],
 )
 async def update_asset_type(
     request: Request, type_id: int, payload: AssetTypeUpdate, db: AsyncSession = Depends(get_db)
@@ -654,7 +655,7 @@ async def update_asset_type(
     "/asset-types/{type_id}/clone",
     response_model=AssetTypeRead,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[require_scopes("asset_types:write")],
+    dependencies=[require_scopes("asset_types:write"), require_role("admin")],
 )
 async def clone_asset_type(
     request: Request, type_id: int, db: AsyncSession = Depends(get_db)
@@ -733,7 +734,7 @@ async def clone_asset_type(
 @router.delete(
     "/asset-types/{type_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    dependencies=[require_scopes("asset_types:write")],
+    dependencies=[require_scopes("asset_types:write"), require_role("admin")],
 )
 async def delete_asset_type(
     request: Request, type_id: int, db: AsyncSession = Depends(get_db)
@@ -1163,7 +1164,11 @@ async def list_assets(
 @router.get(
     "/audit-log",
     response_model=list[AuditLogRead],
-    dependencies=[require_enterprise("audit_log_viewer"), require_scopes("audit:read")],
+    dependencies=[
+        require_enterprise("audit_log_viewer"),
+        require_scopes("audit:read"),
+        require_role("auditor"),
+    ],
 )
 async def list_audit_log(
     entity_type: str | None = None,
