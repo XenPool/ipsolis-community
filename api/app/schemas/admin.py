@@ -91,6 +91,7 @@ class AssetTypeCreate(BaseModel):
     requires_manager_approval: bool = False
     requires_owner_approval: bool = False
     approval_owners: list[dict[str, Any]] | None = None
+    approval_rules: list[dict[str, Any]] | None = None
     min_approvals_required: int | None = None
     requires_approval_on_modify: bool = False
     eligible_requestors_dn: str | None = None
@@ -126,6 +127,7 @@ class AssetTypeUpdate(BaseModel):
     requires_manager_approval: bool | None = None
     requires_owner_approval: bool | None = None
     approval_owners: list[dict[str, Any]] | None = None
+    approval_rules: list[dict[str, Any]] | None = None
     min_approvals_required: int | None = None
     requires_approval_on_modify: bool | None = None
     eligible_requestors_dn: str | None = None

@@ -31,6 +31,7 @@ Enterprise IT automation shouldn't require a 6-month implementation project and 
 - **Self-service delegation** in the portal — managers configure their own OOO without going through an admin (`/portal/delegations`); identity is enforced server-side so a user can never re-route someone else's approvals
 - **Approval escalation** — once an approval has burned through all its reminders without a decision, a single notification fires to the configured escalation contact(s) so an operator can intervene; each row escalates at most once
 - **N-of-M approvals** — set `min_approvals_required` per asset definition so any N of M configured approvers can satisfy the order; remaining pending rows transition to `superseded` once the threshold is met. Decline still vetoes regardless of N.
+- **Conditional approval rules** — JSONB rule list per asset definition adds extra approvers when a condition matches the order: `duration_days > 90 → CISO`, `has_pci → compliance`, `monthly_cost > 500 → finance`, etc. Six fields, six operators; malformed rules are logged and skipped, never blocking order creation.
 
 ### Dynamic Runbook Engine
 - Visual runbook builder in the Admin UI

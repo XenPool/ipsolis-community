@@ -599,7 +599,16 @@ async def portal_create_order(
     db.add(order)
     await db.flush()
 
-    if needs_any_approval:
+    # Conditional approval rules — may add approvers regardless of the
+    # static manager / owner toggles. We evaluate after the order row
+    # exists so dates and requester attrs are available in the context.
+    from app.utils.approval_rules import build_context, evaluate_rules
+    rule_approvers = evaluate_rules(
+        asset_type.approval_rules,
+        build_context(order, asset_type),
+    )
+
+    if needs_any_approval or rule_approvers:
         # Create approval records, applying delegation re-routing if active
         from app.models.approval import OrderApproval
         from app.utils.approval_delegation import resolve_active_delegate
@@ -625,12 +634,17 @@ async def portal_create_order(
                 approver_name=d.delegate_name or d.delegate_email,
             )
 
+        # Track which emails are already covered so the rule loop
+        # below doesn't add duplicates of manager / owner approvers.
+        seen_emails: set[str] = set()
+
         if needs_manager_approval and manager_info:
             db.add(await _make_approval(
                 "manager",
                 manager_info["email"],
                 manager_info["display_name"],
             ))
+            seen_emails.add(manager_info["email"].lower())
 
         if needs_owner_approval and asset_type.approval_owners:
             for owner in asset_type.approval_owners:
@@ -639,8 +653,25 @@ async def portal_create_order(
                     owner["email"],
                     owner.get("name", owner["email"]),
                 ))
+                seen_emails.add(owner["email"].lower())
+
+        for ra in rule_approvers:
+            if ra["email"].lower() in seen_emails:
+                continue  # already covered by manager / owner — don't double-charge
+            db.add(await _make_approval(
+                "rule:" + ra["rule_name"][:24],  # approver_type column is String(30)
+                ra["email"],
+                ra["name"],
+            ))
+            seen_emails.add(ra["email"].lower())
 
         await db.flush()
+
+        # Make sure the order ends up in pending_approval if rules added
+        # approvers even though the static toggles were off (i.e.
+        # `needs_any_approval` was False but `rule_approvers` triggered).
+        if not needs_any_approval and rule_approvers:
+            order.status = OrderStatus.PENDING_APPROVAL
 
         # Send approval request emails via Celery
         from celery import Celery

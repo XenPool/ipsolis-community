@@ -442,6 +442,55 @@
           <span class="text-xs text-muted/70">(RDP/Admin user changes need new approval)</span>
           {% if not is_enterprise %}{{ ent_badge() }}{% endif %}
         </label>
+
+        <!-- Conditional approval rules — extra approvers driven by order properties -->
+        <div class="mt-3 pt-3 border-t border-token-border">
+          <div class="flex items-center justify-between mb-2">
+            <label class="block text-xs font-medium text-muted">
+              Conditional approval rules
+              <span class="text-muted/60 ml-1">(extra approvers when the condition matches)</span>
+            </label>
+            <button type="button" onclick="addApprovalRuleRow()"
+                    class="text-xs text-blue-600 hover:underline">+ Add rule</button>
+          </div>
+          <p class="text-[11px] text-muted/60 mb-2 leading-snug">
+            Each rule adds approvers when its condition matches the order. Combined with the manager / owner
+            toggles above. Examples: <em>"extension &gt; 90 days needs CISO"</em>, <em>"PCI-tagged orders need
+            compliance"</em>, <em>"monthly cost &gt; €500 needs finance"</em>.
+          </p>
+          <div id="approval-rule-rows" class="space-y-1.5">
+            {% if asset_type and asset_type.approval_rules %}
+              {% for rule in asset_type.approval_rules %}
+              {% set _cond = rule.condition or {} %}
+              {% set _approvers = rule.approvers or [] %}
+              {% set _emails = _approvers | map(attribute='email') | join(', ') %}
+              <div class="approval-rule-row grid grid-cols-12 gap-2 items-center">
+                <input type="text" name="rule_name[]" value="{{ rule.name or '' }}" placeholder="Rule name"
+                       class="col-span-3 rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                <select name="rule_field[]"
+                        class="col-span-2 rounded border border-token-border bg-surface text-body text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono">
+                  {% for f in ['duration_days','monthly_cost','has_pii','has_phi','has_pci','requester_department'] %}
+                  <option value="{{ f }}" {% if _cond.field == f %}selected{% endif %}>{{ f }}</option>
+                  {% endfor %}
+                </select>
+                <select name="rule_op[]"
+                        class="col-span-1 rounded border border-token-border bg-surface text-body text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono">
+                  {% for o in ['>','>=','<','<=','==','contains'] %}
+                  <option value="{{ o }}" {% if _cond.op == o %}selected{% endif %}>{{ o }}</option>
+                  {% endfor %}
+                </select>
+                <input type="text" name="rule_value[]" value="{{ _cond.value if _cond.value is not none else '' }}"
+                       placeholder="value"
+                       class="col-span-2 rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono">
+                <input type="text" name="rule_approvers[]" value="{{ _emails }}" placeholder="approver1@x.de, approver2@x.de"
+                       class="col-span-3 rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono">
+                <button type="button" onclick="this.closest('.approval-rule-row').remove()"
+                        class="col-span-1 text-red-400 hover:text-red-600 text-lg leading-none text-center">×</button>
+              </div>
+              {% endfor %}
+            {% endif %}
+          </div>
+        </div>
       </div>
     </div>
 
@@ -1289,6 +1338,27 @@ function addAttrRow() {
   document.getElementById('attr-rows').appendChild(row);
 }
 
+function addApprovalRuleRow() {
+  var row = document.createElement('div');
+  row.className = 'approval-rule-row grid grid-cols-12 gap-2 items-center';
+  var inputCls = 'rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500';
+  var fields = ['duration_days','monthly_cost','has_pii','has_phi','has_pci','requester_department'];
+  var ops = ['>','>=','<','<=','==','contains'];
+  row.innerHTML =
+    '<input type="text" name="rule_name[]" placeholder="Rule name" class="col-span-3 ' + inputCls + '">'
+    + '<select name="rule_field[]" class="col-span-2 ' + inputCls + ' font-mono">'
+    +   fields.map(function(f) { return '<option value="' + f + '">' + f + '</option>'; }).join('')
+    + '</select>'
+    + '<select name="rule_op[]" class="col-span-1 ' + inputCls + ' font-mono">'
+    +   ops.map(function(o) { return '<option value="' + o + '">' + o + '</option>'; }).join('')
+    + '</select>'
+    + '<input type="text" name="rule_value[]" placeholder="value" class="col-span-2 ' + inputCls + ' font-mono">'
+    + '<input type="text" name="rule_approvers[]" placeholder="approver1@x.de, approver2@x.de" class="col-span-3 ' + inputCls + ' font-mono">'
+    + '<button type="button" onclick="this.closest(\'.approval-rule-row\').remove()" '
+    +   'class="col-span-1 text-red-400 hover:text-red-600 text-lg leading-none text-center">\xd7</button>';
+  document.getElementById('approval-rule-rows').appendChild(row);
+}
+
 async function submitForm() {
   var form = document.getElementById('at-form');
   var name = form.querySelector('[name="name"]').value.trim();
@@ -1422,6 +1492,27 @@ async function submitForm() {
       if (!el) return null;
       var v = el.value.trim();
       return v ? parseInt(v) : null;
+    })(),
+    approval_rules: (function() {
+      var rules = [];
+      Array.from(document.querySelectorAll('.approval-rule-row')).forEach(function(row) {
+        var name = row.querySelector('[name="rule_name[]"]').value.trim();
+        var field = row.querySelector('[name="rule_field[]"]').value;
+        var op = row.querySelector('[name="rule_op[]"]').value;
+        var value = row.querySelector('[name="rule_value[]"]').value.trim();
+        var emailsRaw = row.querySelector('[name="rule_approvers[]"]').value.trim();
+        if (!field || !op || !value || !emailsRaw) return;  // incomplete row → skip
+        var approvers = emailsRaw.split(',').map(function(e) { return e.trim(); })
+          .filter(function(e) { return e.length > 0; })
+          .map(function(e) { return { email: e, name: e }; });
+        if (!approvers.length) return;
+        rules.push({
+          name: name || (field + ' ' + op + ' ' + value),
+          condition: { field: field, op: op, value: value },
+          approvers: approvers,
+        });
+      });
+      return rules.length ? rules : null;
     })(),
     requires_approval_on_modify: document.getElementById('requires-approval-on-modify-cb')
       ? document.getElementById('requires-approval-on-modify-cb').checked : false,

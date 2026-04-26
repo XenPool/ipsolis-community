@@ -146,6 +146,10 @@ class AssetType(Base):
         Boolean, nullable=False, default=False, server_default="false"
     )
     approval_owners: Mapped[list[dict[str, Any]] | None] = mapped_column(JSON, nullable=True)
+    # Conditional rules: list of {name, condition, approvers}. Evaluated at
+    # order creation; matching rules add their approvers to the list of
+    # OrderApproval rows alongside the manager / owners.
+    approval_rules: Mapped[list[dict[str, Any]] | None] = mapped_column(JSON, nullable=True)
     # N-of-M threshold: when set, any N of the configured approvers
     # satisfies the order. NULL / 0 / >= total = "all required" (default).
     min_approvals_required: Mapped[int | None] = mapped_column(Integer, nullable=True)

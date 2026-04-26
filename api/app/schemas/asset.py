@@ -36,6 +36,7 @@ class AssetTypeRead(BaseModel):
     requires_manager_approval: bool
     requires_owner_approval: bool
     approval_owners: list[dict[str, Any]] | None
+    approval_rules: list[dict[str, Any]] | None = None
     min_approvals_required: int | None = None
     requires_approval_on_modify: bool
     eligible_requestors_dn: str | None

@@ -345,12 +345,53 @@ delegation, N-of-M, conditional rules) remain.
   ``threshold_met=True`` correctly triggered
   ``_post_approval_dispatch``.
 
-**Still to do:**
-- [ ] Schema: `approval_rules` JSONB on asset_type — conditional
-      rules (e.g. "extension > 90 days needs CISO", "PCI-tagged
-      types need both manager + app owner")
-- [ ] Runtime evaluator that resolves rules → approval steps
-- [ ] UI: rule-builder (avoid full DSL; predefined patterns)
+**Done — conditional approval rules slice 1 (2026-04-26):**
+- Migration `0064_asset_type_approval_rules.py` adds an
+  `approval_rules` JSON column on `asset_types`. Each rule is a dict
+  ``{name, condition: {field, op, value}, approvers: [{email, name}]}``.
+- Evaluator in `app.utils.approval_rules`:
+  * `build_context(order, asset_type)` materialises the dict the
+    rule conditions evaluate against.
+  * `evaluate_rules(rules, ctx)` walks the list, returns a deduped
+    set of approver dicts to add. Each result includes
+    ``rule_name`` so the audit trail / UI can show which rule
+    triggered the inclusion.
+  * `_matches()` honours six fields (`duration_days`,
+    `monthly_cost`, `has_pii`, `has_phi`, `has_pci`,
+    `requester_department`) and six operators (`>`, `>=`, `<`,
+    `<=`, `==`, `contains`). Malformed conditions are logged at
+    WARNING and skipped — a hand-edited JSON typo can never block
+    order creation.
+- Wired into the portal order-creation flow alongside the
+  manager / owner approvals: rule-derived approvers go through the
+  same `_make_approval()` helper (so delegation re-routing applies),
+  approver_type is set to `rule:<truncated rule name>` so the audit
+  trail names the rule, and `seen_emails` deduplication prevents
+  the rule from creating a second approval row when the same
+  person is already covered as manager / owner.
+- `order.status` is auto-promoted to `pending_approval` if rules
+  trigger when the static toggles were off — so an asset definition
+  can rely entirely on rules without setting `requires_manager_approval`.
+- ORM, schemas (Create/Update/Read), audit `_type_snap()` all carry
+  the new field; admin route handles create / update / clone.
+- Admin UI rule builder in the asset-definition form (Approval
+  section): a list of rows with name + field + op + value +
+  approver-emails (CSV) + remove button, plus an "+ Add rule"
+  factory. Submit serializer drops incomplete rows so partial
+  edits don't ship as broken rules.
+- Verified end-to-end: evaluator unit tests (no-trigger, single,
+  double, malformed-rule cases) all behave correctly; round-trip
+  through `PUT /admin/asset-types/{id}` persists rules in the JSON
+  column verbatim.
+
+**Still to do — slice 2:**
+- [ ] Boolean composition (AND / OR) — extend `_matches()` to handle
+      ``{"all_of": [...]}`` and ``{"any_of": [...]}`` shapes; UI gets
+      one extra dropdown per row.
+- [ ] Custom-attribute conditions (e.g. ``attr.environment == "prod"``)
+      — add an `attribute` field type that reads from `order.config`.
+- [ ] Per-rule N-of-M (separate threshold per rule, not just
+      asset-type-wide).
 - [ ] Escalation v2: optionally **assign** the escalated approval
       to the contact (creating a new approval row with their email)
       so they can decide directly via the existing token URL —
