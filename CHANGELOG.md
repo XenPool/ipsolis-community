@@ -12,7 +12,7 @@ start, so a `docker compose pull && docker compose up -d` is the only
 operator step. See [`docs/UPGRADING.md`](docs/UPGRADING.md) (TODO) for
 the full upgrade procedure including DB backup recommendations.
 
-## [Unreleased]
+## [0.4.2] — 2026-04-27
 
 ### Added
 
@@ -51,6 +51,7 @@ the full upgrade procedure including DB backup recommendations.
   (`<optgroup>`); description, category badge, parameter list, and
   an "Edit module ↗" deeplink render in a card below the dropdown
   instead of being squeezed into the option text.
+- Implement update notifier and password policy features (`30afc66`)
 
 ### Changed
 
