@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 # Env-var fallbacks (used if app_config has no value)
 MAIL_FROM = os.getenv("MAIL_FROM", "noreply@example.com")
-MAIL_FROM_NAME = os.getenv("MAIL_FROM_NAME", "Ipsolis")
+MAIL_FROM_NAME = os.getenv("MAIL_FROM_NAME", "ip·Solis")
 REMINDER_HOURS = int(os.getenv("REMINDER_HOURS_BEFORE_EXPIRY", "24"))
 
 BRAND_COLOR = "#1e3a8a"
@@ -121,7 +121,7 @@ def send_order_confirmation(
     from tasks.modules.config_reader import get_config
 
     company_name = get_config(db, "company.name", "XenPool")
-    app_title = get_config(db, "app.title", "Ipsolis")
+    app_title = get_config(db, "app.title", "ip·Solis")
     mail_from = get_config(db, "email.from", MAIL_FROM)
     bcc = get_config(db, "email.bcc")
 
@@ -183,7 +183,7 @@ def send_provision_confirmation(
     from tasks.modules.config_reader import get_config
 
     company_name = get_config(db, "company.name", "XenPool")
-    app_title = get_config(db, "app.title", "Ipsolis")
+    app_title = get_config(db, "app.title", "ip·Solis")
     mail_from = get_config(db, "email.from", MAIL_FROM)
     bcc = get_config(db, "email.bcc")
 
@@ -236,7 +236,7 @@ def send_modify_confirmation(
     from tasks.modules.config_reader import get_config
 
     company_name = get_config(db, "company.name", "XenPool")
-    app_title = get_config(db, "app.title", "Ipsolis")
+    app_title = get_config(db, "app.title", "ip·Solis")
     mail_from = get_config(db, "email.from", MAIL_FROM)
     bcc = get_config(db, "email.bcc")
 
@@ -273,7 +273,7 @@ def send_expiry_reminder(
     from tasks.modules.config_reader import get_config
 
     company_name = get_config(db, "company.name", "XenPool")
-    app_title = get_config(db, "app.title", "Ipsolis")
+    app_title = get_config(db, "app.title", "ip·Solis")
     mail_from = get_config(db, "email.from", MAIL_FROM)
     bcc = get_config(db, "email.bcc")
 
@@ -306,7 +306,7 @@ def send_reclaim_notification(
     from tasks.modules.config_reader import get_config
 
     company_name = get_config(db, "company.name", "XenPool")
-    app_title = get_config(db, "app.title", "Ipsolis")
+    app_title = get_config(db, "app.title", "ip·Solis")
     mail_from = get_config(db, "email.from", MAIL_FROM)
     bcc = get_config(db, "email.bcc")
 
@@ -342,7 +342,7 @@ def send_approval_request(
     from tasks.modules.config_reader import get_config
 
     company_name = get_config(db, "company.name", "XenPool")
-    app_title = get_config(db, "app.title", "Ipsolis")
+    app_title = get_config(db, "app.title", "ip·Solis")
     mail_from = get_config(db, "email.from", MAIL_FROM)
     bcc = get_config(db, "email.bcc")
 
@@ -394,7 +394,7 @@ def send_approval_escalated(
         return {"success": True, "skipped": True, "reason": "no escalation_email configured"}
 
     company_name = get_config(db, "company.name", "XenPool")
-    app_title = get_config(db, "app.title", "Ipsolis")
+    app_title = get_config(db, "app.title", "ip·Solis")
     mail_from = get_config(db, "email.from", MAIL_FROM)
     bcc = get_config(db, "email.bcc")
 
@@ -433,7 +433,7 @@ def send_approval_result(
     from tasks.modules.config_reader import get_config
 
     company_name = get_config(db, "company.name", "XenPool")
-    app_title = get_config(db, "app.title", "Ipsolis")
+    app_title = get_config(db, "app.title", "ip·Solis")
     mail_from = get_config(db, "email.from", MAIL_FROM)
     bcc = get_config(db, "email.bcc")
 

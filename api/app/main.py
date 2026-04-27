@@ -86,7 +86,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 # ── App ───────────────────────────────────────────────────────────────────────
 app = FastAPI(
-    title="Ipsolis API",
+    title="ip·Solis API",
     description=(
         "Dispatcher and REST API for IT asset lifecycle orchestration. "
         "Receives webhooks from ServiceNow and self-service portal requests, "

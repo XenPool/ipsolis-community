@@ -1,4 +1,4 @@
-# Ipsolis – Task Backlog
+# ip·Solis – Task Backlog
 
 Format: `[open]` / `[done]` / `[blocked]`. Add new tasks at the top of their section.
 Strategic roadmap up top; smaller polish/gap items in the middle; pre-existing infra

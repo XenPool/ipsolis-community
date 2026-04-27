@@ -1,4 +1,4 @@
-# Ipsolis – Edition Feature Matrix
+# ip·Solis – Edition Feature Matrix
 
 This document defines the feature split between the **Community Edition** (open-source, AGPL-3.0) and the **Enterprise Edition** (commercial license). It serves as the canonical reference for edition gating throughout the codebase.
 

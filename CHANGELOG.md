@@ -1,18 +1,22 @@
 # Changelog
 
-All notable changes to ipSolis are documented in this file.
+All notable changes to ip·Solis are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 Per release, entries are grouped under `Added` / `Changed` / `Fixed` /
 `Security` / `Migration` headings. The `Migration` section calls out
-any DB schema changes; ipSolis runs Alembic migrations on container
+any DB schema changes; ip·Solis runs Alembic migrations on container
 start, so a `docker compose pull && docker compose up -d` is the only
 operator step. See [`docs/UPGRADING.md`](docs/UPGRADING.md) (TODO) for
 the full upgrade procedure including DB backup recommendations.
 
-## [0.4.2] — 2026-04-27
+## [Unreleased] 
+
+
+
+## [0.4.1] — 2026-04-27
 
 ### Added
 

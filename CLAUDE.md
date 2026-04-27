@@ -1,4 +1,4 @@
-# Ipsolis – Claude Code Context
+# ip·Solis – Claude Code Context
 
 ## Task Backlog
 Open and completed tasks: see [`TASKS.md`](TASKS.md)

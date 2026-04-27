@@ -145,7 +145,7 @@ In Microsoft Teams:
 4. Walk through the wizard — it generates an HTTPS webhook URL.
 5. Copy the webhook URL.
 
-In ipSolis Admin UI:
+In ip·Solis Admin UI:
 
 1. Go to *Settings* → *E-Mail* tab.
 2. Find the **Microsoft Teams — Approval Cards** section.
@@ -194,7 +194,7 @@ no-login confirmation page.
 ### Why this matters
 
 Approvals stack up in inboxes. A 24-hour SLA on access requests is
-common in regulated environments; without automatic nudges, ipSolis
+common in regulated environments; without automatic nudges, ip·Solis
 relied on the original email being seen the same day. Reminders close
 that gap without operator intervention.
 
@@ -346,7 +346,7 @@ in the streamer.
 
 ### Microsoft Sentinel setup
 
-ipSolis uses the Azure Monitor **HTTP Data Collector API** (HMAC-signed
+ip·Solis uses the Azure Monitor **HTTP Data Collector API** (HMAC-signed
 shared key). It's the simpler ingestion path — no service principal, no
 Data Collection Endpoint / Data Collection Rule, no schema registration.
 The custom log table (`{Log-Type}_CL`, default `IpsolisAudit_CL`) is

@@ -1512,7 +1512,7 @@ def send_approval_requests(order_id: int) -> dict:
         # when not enabled. Failure to deliver to Teams must not abort the order.
         teams_mode = (get_config(db, "teams.mode", "disabled") or "disabled").strip()
         teams_webhook = (get_config(db, "teams.webhook_url") or "").strip()
-        app_title = get_config(db, "app.title", "Ipsolis") or "Ipsolis"
+        app_title = get_config(db, "app.title", "ip·Solis") or "ip·Solis"
 
         sent = 0
         teams_sent = 0

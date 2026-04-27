@@ -365,7 +365,7 @@ def send_test_alert_email(self) -> dict:
             return {"success": False, "error": "no recipient configured"}
         now = datetime.now(timezone.utc).isoformat()
         body = (
-            "<p>This is a test alert from Ipsolis.</p>"
+            "<p>This is a test alert from ip·Solis.</p>"
             f"<p><strong>Time (UTC):</strong> {now}</p>"
             "<p>If you received this email, health-alert delivery is working.</p>"
         )

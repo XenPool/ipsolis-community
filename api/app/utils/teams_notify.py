@@ -71,7 +71,7 @@ def build_approval_card(
     approver_email: str = "",
     from_date: str = "",
     until_date: str = "",
-    app_title: str = "Ipsolis",
+    app_title: str = "ip·Solis",
 ) -> dict[str, Any]:
     """Build an Adaptive Card payload for an approval request.
 

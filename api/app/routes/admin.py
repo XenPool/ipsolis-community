@@ -81,7 +81,7 @@ def _require_config_key_licensed(key: str) -> None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=(
-                f"{label} requires an Ipsolis Enterprise license. "
+                f"{label} requires an ip·Solis Enterprise license. "
                 f"Contact info@xenpool.com for licensing options."
             ),
         )
@@ -116,7 +116,7 @@ def _require_asset_type_fields_licensed(payload) -> None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=(
-                f"{labels} require an Ipsolis Enterprise license. "
+                f"{labels} require an ip·Solis Enterprise license. "
                 f"Contact info@xenpool.com for licensing options."
             ),
         )
@@ -458,7 +458,7 @@ async def test_teams_webhook(db: AsyncSession = Depends(get_db)) -> dict:
     rows = {r.key: (r.value or "") for r in cfg.scalars().all()}
     mode = (rows.get("teams.mode") or "disabled").strip()
     url = (rows.get("teams.webhook_url") or "").strip()
-    app_title = (rows.get("app.title") or "Ipsolis").strip()
+    app_title = (rows.get("app.title") or "ip·Solis").strip()
 
     if mode == "disabled":
         return {"ok": None, "message": "Teams notifications are disabled — no test sent."}
@@ -1434,9 +1434,9 @@ async def test_email(payload: dict = None, db: AsyncSession = Depends(get_db)) -
     from app.utils.secrets import resolve_secret_value
     smtp_password = await resolve_secret_value(db, raw_smtp_password)
     mail_from = await _get("email.from", "noreply@example.com")
-    from_name = await _get("email.from_name", "Ipsolis")
+    from_name = await _get("email.from_name", "ip·Solis")
     bcc = await _get("email.bcc", "")
-    app_title = await _get("app.title", "Ipsolis")
+    app_title = await _get("app.title", "ip·Solis")
 
     to_address = (payload or {}).get("to") or bcc or mail_from
 

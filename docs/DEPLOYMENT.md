@@ -1,6 +1,6 @@
-# Ipsolis -- Production Deployment Guide
+# ip·Solis -- Production Deployment Guide
 
-This guide walks you through setting up the Ipsolis platform on a fresh on-premises server. No prior knowledge of the codebase is required.
+This guide walks you through setting up the ip·Solis platform on a fresh on-premises server. No prior knowledge of the codebase is required.
 
 ---
 
@@ -343,7 +343,7 @@ Navigate to **Admin > Settings** and configure the following:
 | `smtp.password` | SMTP password | *(marked as secret)* |
 | `smtp.tls` | Use STARTTLS | `true` |
 | `smtp.from` | Sender email address | `noreply@yourcompany.com` |
-| `smtp.from_name` | Sender display name | `Ipsolis` |
+| `smtp.from_name` | Sender display name | `ip·Solis` |
 
 #### Email Templates
 
@@ -356,7 +356,7 @@ and body using `{{variable}}` placeholders.
 | Setting | Description | Default |
 |---------|-------------|---------|
 | `portal.max_advance_days` | How far ahead users can schedule orders | `0` (unlimited) |
-| `portal.app_title` | Application title shown in the portal | `Ipsolis` |
+| `portal.app_title` | Application title shown in the portal | `ip·Solis` |
 
 ### Create your first Asset Type
 
@@ -384,7 +384,7 @@ The self-service portal supports Microsoft Entra ID (Azure AD) for single sign-o
 ### Register an App in Entra ID
 
 1. Go to the [Azure Portal](https://portal.azure.com) > **App registrations** > **New registration**
-2. Name: `Ipsolis`
+2. Name: `ip·Solis`
 3. Redirect URI: `https://selfservice.yourcompany.com/auth/callback` (Web)
 4. Note down the **Application (client) ID** and **Directory (tenant) ID**
 5. Under **Certificates & secrets**, create a new client secret

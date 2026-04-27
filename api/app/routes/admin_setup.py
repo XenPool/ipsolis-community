@@ -83,7 +83,7 @@ async def setup_state(db: AsyncSession = Depends(get_db)) -> dict:
         {
             "key": "branding",
             "label": "Set application title and logo",
-            "done": bool(app_title and app_title != "Ipsolis") or bool(app_logo),
+            "done": bool(app_title and app_title != "ip·Solis") or bool(app_logo),
             "hint": "Customise the portal so users recognise your tenant's branding.",
             "link": "/ui/settings#general",
             "tier": "essential",

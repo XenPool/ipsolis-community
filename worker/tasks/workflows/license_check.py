@@ -37,9 +37,9 @@ def check_license_expiry(self) -> dict:
         level_msg = f"License EXPIRED {abs(days_remaining)} day(s) ago ({info.expires_at.date().isoformat()})"
         logger.error(level_msg)
         _maybe_send_alert(
-            subject="[Ipsolis] License expired",
+            subject="[ip·Solis] License expired",
             html_body=(
-                f"<p>The Ipsolis Enterprise license has <strong>expired</strong>.</p>"
+                f"<p>The ip·Solis Enterprise license has <strong>expired</strong>.</p>"
                 f"<p>Licensee: {info.licensee}<br>"
                 f"Expired on: {info.expires_at.date().isoformat()}</p>"
                 f"<p>The instance has fallen back to Community edition. "
@@ -54,14 +54,14 @@ def check_license_expiry(self) -> dict:
         return {"status": "ok", "days": days_remaining}
 
     msg = (
-        f"Ipsolis license expires in {days_remaining} day(s) on "
+        f"ip·Solis license expires in {days_remaining} day(s) on "
         f"{info.expires_at.date().isoformat()} (licensee: {info.licensee})"
     )
     logger.warning(msg)
     _maybe_send_alert(
-        subject=f"[Ipsolis] License expires in {days_remaining} days",
+        subject=f"[ip·Solis] License expires in {days_remaining} days",
         html_body=(
-            f"<p>The Ipsolis Enterprise license will expire in "
+            f"<p>The ip·Solis Enterprise license will expire in "
             f"<strong>{days_remaining} day(s)</strong>.</p>"
             f"<p>Licensee: {info.licensee}<br>"
             f"Expires on: {info.expires_at.date().isoformat()}</p>"

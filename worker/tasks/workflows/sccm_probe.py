@@ -131,7 +131,7 @@ def probe() -> dict:
 
     from tasks.utils.license import is_feature_enabled
     if not is_feature_enabled("sccm_integration"):
-        return {"ok": False, "message": "SCCM Integration requires an Ipsolis Enterprise license."}
+        return {"ok": False, "message": "SCCM Integration requires an ip·Solis Enterprise license."}
 
     cfg = _load_sccm_config()
 

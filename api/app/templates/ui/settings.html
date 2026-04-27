@@ -67,7 +67,7 @@
       <label class="block text-xs font-medium text-muted mb-1">Application Title</label>
       <input type="text" id="cfg-app-title"
              value="{{ app_title }}"
-             placeholder="Ipsolis"
+             placeholder="ip·Solis"
              class="w-full rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500">
     </div>
     <div class="mt-6">
@@ -182,7 +182,7 @@
       version is available a banner appears at the top of every admin page;
       click through for release notes. <strong>Off by default</strong> so
       air-gapped installs don't make outbound calls without explicit consent.
-      ipSolis never auto-updates — operators control upgrades via
+      ip·Solis never auto-updates — operators control upgrades via
       <code class="font-mono bg-surface-raised px-1 rounded">docker compose pull &amp;&amp; docker compose up -d</code>.
     </p>
     <div class="space-y-3">
@@ -681,7 +681,7 @@
   <div class="bg-surface rounded-xl border border-token-border shadow-sm shadow-slate-900/5 dark:shadow-black/20 p-6 max-w-2xl mb-6">
     <h2 class="text-sm font-semibold text-body mb-1">Microsoft Teams — Approval Cards</h2>
     <p class="text-xs text-muted/70 mb-4 leading-snug">
-      When a request needs approval, ipSolis can post an Adaptive Card to Microsoft Teams in addition to
+      When a request needs approval, ip·Solis can post an Adaptive Card to Microsoft Teams in addition to
       the email notification. The approver clicks <span class="font-medium">Review request →</span> in the
       card, lands on a one-click confirmation page (no portal login required), and approves or declines.
     </p>
@@ -733,7 +733,7 @@
     <h2 class="text-sm font-semibold text-body mb-1">Approval Reminders</h2>
     <p class="text-xs text-muted/70 mb-4 leading-snug">
       A Beat task scans every hour for pending approvals that haven't been acted on. When one
-      crosses the threshold below, ipSolis re-sends the email and the Teams card (if configured)
+      crosses the threshold below, ip·Solis re-sends the email and the Teams card (if configured)
       with the same signed approval link as the original notification. Capped at <em>Max reminders</em>
       per approval so approvers don't get spammed.
     </p>
@@ -962,7 +962,7 @@
         <span class="font-medium text-body">Sentinel setup:</span> Azure portal → your Log Analytics workspace →
         <span class="font-medium">Settings → Agents → Log Analytics agent instructions</span>. Copy
         <span class="font-medium">Workspace ID</span> and <span class="font-medium">Primary key</span>.
-        ipSolis writes to a custom table called <code class="font-mono">{Log-Type}_CL</code> (default
+        ip·Solis writes to a custom table called <code class="font-mono">{Log-Type}_CL</code> (default
         <code class="font-mono">IpsolisAudit_CL</code>) — the table is created on first ingest, no schema
         registration needed. Uses the HTTP Data Collector API (HMAC-signed); Microsoft supports it through
         Sept 2026.
@@ -971,7 +971,7 @@
 
     <div id="siem-help-webhook" class="hidden rounded border border-token-border bg-surface-raised/40 p-3 mb-4">
       <p class="text-xs text-muted leading-relaxed">
-        <span class="font-medium text-body">Webhook setup:</span> point ipSolis at any HTTPS endpoint that accepts
+        <span class="font-medium text-body">Webhook setup:</span> point ip·Solis at any HTTPS endpoint that accepts
         a JSON array of events. Each POST is signed with HMAC-SHA256 over the raw body and the digest is sent in
         a configurable header (default <code class="font-mono">X-Hub-Signature-256: sha256=&lt;hex&gt;</code>,
         GitHub-compatible). Receivers verify by recomputing HMAC with the shared secret. Use the
@@ -1379,7 +1379,7 @@
         </div>
         <p class="text-[11px] text-muted/70 leading-snug">
           Reference shape: <code class="font-mono bg-surface-raised px-1 rounded">ccp://[&lt;safe&gt;/]&lt;object&gt;</code>.
-          ipSolis returns the account's <code class="font-mono">Content</code> field (the password).
+          ip·Solis returns the account's <code class="font-mono">Content</code> field (the password).
         </p>
       </div>
     </div>
@@ -1620,7 +1620,7 @@ async function saveAppTitle() {
   var resp = await fetch('/admin/config/app.title', {
     method: 'PUT',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({value: title || 'Ipsolis'}),
+    body: JSON.stringify({value: title || 'ip·Solis'}),
   });
   var banner = document.getElementById('general-banner');
   if (resp.ok) {

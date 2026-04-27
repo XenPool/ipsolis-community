@@ -510,11 +510,11 @@ async def portal_create_order(
     is_deputy = bool(owner_email.strip() and owner_email.strip().lower() != user_email.strip().lower())
     if is_deputy and not is_feature_enabled("deputy_support"):
         return await _render_error(
-            "Ordering on behalf of another user requires an Ipsolis Enterprise license."
+            "Ordering on behalf of another user requires an ip·Solis Enterprise license."
         )
     if is_future and not is_feature_enabled("scheduled_orders"):
         return await _render_error(
-            "Scheduled (future-dated) orders require an Ipsolis Enterprise license."
+            "Scheduled (future-dated) orders require an ip·Solis Enterprise license."
         )
 
     # ── Approval gate ────────────────────────────────────────────────────────

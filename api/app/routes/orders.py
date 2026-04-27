@@ -90,7 +90,7 @@ async def create_order(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=(
-                "Deputy Support requires an Ipsolis Enterprise license. "
+                "Deputy Support requires an ip·Solis Enterprise license. "
                 "Contact info@xenpool.com for licensing options."
             ),
         )
@@ -99,7 +99,7 @@ async def create_order(
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=(
-                    "Scheduled Orders require an Ipsolis Enterprise license. "
+                    "Scheduled Orders require an ip·Solis Enterprise license. "
                     "Contact info@xenpool.com for licensing options."
                 ),
             )

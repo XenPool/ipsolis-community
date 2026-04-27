@@ -11,7 +11,7 @@ import time
 
 from fastapi.templating import Jinja2Templates
 
-APP_TITLE_DEFAULT = "Ipsolis"
+APP_TITLE_DEFAULT = "ip·Solis"
 
 templates = Jinja2Templates(directory="/app/app/templates")
 

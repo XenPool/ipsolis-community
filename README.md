@@ -1,4 +1,4 @@
-# Ipsolis
+# ip·Solis
 
 Open-source platform for IT asset lifecycle automation. Built for on-premises datacenters, replacing expensive commercial tools.
 

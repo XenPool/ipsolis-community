@@ -145,7 +145,7 @@ async def create_api_token(
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=(
-                    "Role-Bound API Tokens require an Ipsolis Enterprise license. "
+                    "Role-Bound API Tokens require an ip·Solis Enterprise license. "
                     "Issue a scope-only token instead, or contact info@xenpool.com "
                     "for licensing options."
                 ),

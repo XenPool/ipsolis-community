@@ -1,6 +1,6 @@
 # Third-Party Licenses
 
-Ipsolis (by XenPool GmbH) includes or depends on the following open-source software.
+ip·Solis (by XenPool GmbH) includes or depends on the following open-source software.
 All licenses listed below are compatible with the AGPLv3 license of this project.
 
 ## Python Dependencies (API)

@@ -48,7 +48,7 @@ def _enterprise_error(feature: str) -> HTTPException:
     return HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
         detail=(
-            f"{label} requires an Ipsolis Enterprise license. "
+            f"{label} requires an ip·Solis Enterprise license. "
             f"Contact info@xenpool.com for licensing options."
         ),
     )
