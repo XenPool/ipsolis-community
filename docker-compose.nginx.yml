@@ -1,5 +1,9 @@
-# Prelive overlay – adds nginx reverse proxy with SSL.
-# Usage: docker compose -f docker-compose.yml -f docker-compose.prelive.yml up -d
+# Compose overlay – adds an nginx reverse proxy with TLS termination
+# in front of the api service. Used for any environment where ipSolis
+# should be reached over HTTPS on a real hostname (pre-live, prod);
+# the dev workflow doesn't need it (api is exposed directly on :8000).
+#
+# Usage: docker compose -f docker-compose.yml -f docker-compose.nginx.yml up -d
 #
 # Prerequisites on the host VM (run once):
 #   mkcert -cert-file certs/cert.pem -key-file certs/key.pem ipsolis-pre.xenpool.local

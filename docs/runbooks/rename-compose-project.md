@@ -110,7 +110,7 @@ ls -la "$BACKUP_FILE"
 cd /opt/it-selfservice
 
 # 4a. Stop the whole stack
-docker compose -f docker-compose.yml -f docker-compose.prelive.yml down
+docker compose -f docker-compose.yml -f docker-compose.nginx.yml down
 
 # 4b. Confirm no containers from this project remain
 docker ps -a --filter label=com.docker.compose.project=it-selfservice
@@ -126,7 +126,7 @@ sed -i 's/^name: it-selfservice$/name: ipsolis/' docker-compose.yml
 grep "^name:" docker-compose.yml
 
 # 4e. Bring it back up with the new project name
-docker compose -f docker-compose.yml -f docker-compose.prelive.yml up -d
+docker compose -f docker-compose.yml -f docker-compose.nginx.yml up -d
 ```
 
 ---
@@ -206,12 +206,12 @@ The only non-reversible step is the `sudo mv` in 4c. To roll back:
 
 ```bash
 cd /opt
-docker compose -f ipsolis/docker-compose.yml -f ipsolis/docker-compose.prelive.yml down 2>/dev/null || true
+docker compose -f ipsolis/docker-compose.yml -f ipsolis/docker-compose.nginx.yml down 2>/dev/null || true
 sudo mv /opt/ipsolis /opt/it-selfservice
 cd /opt/it-selfservice
 # Revert docker-compose.yml project-name line if needed
 sed -i 's/^name: ipsolis$/name: it-selfservice/' docker-compose.yml
-docker compose -f docker-compose.yml -f docker-compose.prelive.yml up -d
+docker compose -f docker-compose.yml -f docker-compose.nginx.yml up -d
 # Revert the GitHub PRELIVE_PATH secret back to /opt/it-selfservice
 ```
 
@@ -242,7 +242,7 @@ docker run --rm \
 sed -i 's/name: it-selfservice_postgres_data/name: ipsolis_postgres_data/' docker-compose.yml
 
 # Bring everything up on the new volume
-docker compose -f docker-compose.yml -f docker-compose.prelive.yml up -d
+docker compose -f docker-compose.yml -f docker-compose.nginx.yml up -d
 
 # After verifying health, prune the old volume
 docker volume rm it-selfservice_postgres_data

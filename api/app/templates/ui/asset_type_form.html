@@ -1590,7 +1590,11 @@ async function submitForm() {
     automation_strategy: automationStrategy,
     composite_steps: compositeSteps,
     targets: showTargets && targets.length ? targets : null,
-    config: config.length ? config : null,
+    // Always send the array — the form is the source of truth for the
+    // current attribute set. Sending null when empty would let the
+    // backend's "if payload.config is not None" guard treat zero rows
+    // as "no change" and silently restore the previous list.
+    config: config,
     deprovision_policy: dpPolicy,
     personal_provisioning_strategy: assignmentModel === 'assigned_personal' && psStratEl
       ? psStrategy : null,

@@ -179,6 +179,17 @@ docker compose up --build
 
 After startup, configure external systems (Active Directory, SMTP, vSphere, Entra ID SSO) through the Admin UI at `/ui/settings`.
 
+### Two run modes
+
+The repository ships two compose files. The main one is the full stack (postgres / redis / api / worker / beat / flower); the second is a small overlay (just nginx) that adds TLS termination in front of the api.
+
+| Mode | Command | When |
+|---|---|---|
+| **Direct** | `docker compose up -d` | Dev. API on `http://localhost:8000/`, no proxy. |
+| **TLS-fronted** | `docker compose -f docker-compose.yml -f docker-compose.nginx.yml up -d` | Pre-live / prod. Nginx handles TLS using `certs/cert.pem` + `certs/key.pem`; reach the app at `https://<your-host>/`. |
+
+The overlay is purely additive — same database, same migrations, same image tags. Switch between modes by stopping (`down`) and starting with the alternate command.
+
 ## Production Deployment
 
 See the full deployment guide: **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)**

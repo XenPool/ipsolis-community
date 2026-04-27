@@ -11,10 +11,13 @@
 <body class="h-full flex bg-surface-raised font-sans text-body">
 
   <!-- ── Left Sidebar ──────────────────────────────────────────────────────── -->
-  <aside class="w-56 bg-surface border-r border-token-border flex flex-col flex-shrink-0 min-h-screen">
+  {# h-screen (not min-h-screen) caps the sidebar at viewport height so the
+     nav can scroll internally instead of pushing the footer below the fold
+     on small monitors / when the nav grows past ~14 entries. #}
+  <aside class="w-56 bg-surface border-r border-token-border flex flex-col flex-shrink-0 h-screen sticky top-0">
 
     <!-- Brand -->
-    <div class="px-4 py-5 border-b border-token-border">
+    <div class="px-4 py-3 border-b border-token-border">
       <a href="/ui/" class="flex flex-col items-start gap-3">
         {% if app_logo %}
           <img src="/portal/logo" alt="{{ app_title }}"
@@ -31,9 +34,12 @@
     </div>
 
     <!-- Navigation -->
-    <nav class="flex-1 px-3 py-4 space-y-0.5">
+    {# min-h-0 + overflow-y-auto is the flexbox idiom for "shrink past
+       content height and scroll instead". Without min-h-0 the flex child
+       refuses to shrink below its intrinsic content height. #}
+    <nav class="flex-1 min-h-0 overflow-y-auto px-3 py-3 space-y-0.5">
       <a href="/ui/"
-         class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors
+         class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors
                 {% if active_page == 'dashboard' %}bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300{% else %}text-muted hover:bg-surface-raised hover:text-body{% endif %}">
         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -42,7 +48,7 @@
         Dashboard
       </a>
       <a href="/ui/orders"
-         class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors
+         class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors
                 {% if active_page == 'orders' %}bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300{% else %}text-muted hover:bg-surface-raised hover:text-body{% endif %}">
         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -51,7 +57,7 @@
         Orders
       </a>
       <a href="/ui/asset-types"
-         class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors
+         class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors
                 {% if active_page == 'asset-types' %}bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300{% else %}text-muted hover:bg-surface-raised hover:text-body{% endif %}">
         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -60,7 +66,7 @@
         Asset Definitions
       </a>
       <a href="/ui/asset-pool"
-         class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors
+         class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors
                 {% if active_page == 'asset-pool' %}bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300{% else %}text-muted hover:bg-surface-raised hover:text-body{% endif %}">
         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -69,7 +75,7 @@
         Asset Pool
       </a>
       <a href="/ui/modules"
-         class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors
+         class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors
                 {% if active_page == 'modules' %}bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300{% else %}text-muted hover:bg-surface-raised hover:text-body{% endif %}">
         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -79,7 +85,7 @@
       </a>
       {% if is_enterprise %}
       <a href="/ui/ps-modules"
-         class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors
+         class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors
                 {% if active_page == 'ps-modules' %}bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300{% else %}text-muted hover:bg-surface-raised hover:text-body{% endif %}">
         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -88,7 +94,7 @@
         PS Modules
       </a>
       <a href="/ui/standalone-runbooks"
-         class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors
+         class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors
                 {% if active_page == 'standalone-runbooks' %}bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300{% else %}text-muted hover:bg-surface-raised hover:text-body{% endif %}">
         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -101,7 +107,7 @@
       {{ nav_locked("Runbooks") }}
       {% endif %}
       <a href="/ui/settings"
-         class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors
+         class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors
                 {% if active_page == 'settings' %}bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300{% else %}text-muted hover:bg-surface-raised hover:text-body{% endif %}">
         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -111,7 +117,7 @@
         Settings
       </a>
       <a href="/ui/maintenance"
-         class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors
+         class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors
                 {% if active_page == 'maintenance' %}bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300{% else %}text-muted hover:bg-surface-raised hover:text-body{% endif %}">
         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -120,7 +126,7 @@
         Maintenance
       </a>
       <a href="/ui/cost-report"
-         class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors
+         class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors
                 {% if active_page == 'cost-report' %}bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300{% else %}text-muted hover:bg-surface-raised hover:text-body{% endif %}">
         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -129,7 +135,7 @@
         Cost Report
       </a>
       <a href="/ui/license"
-         class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors
+         class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors
                 {% if active_page == 'license' %}bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300{% else %}text-muted hover:bg-surface-raised hover:text-body{% endif %}">
         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -138,7 +144,7 @@
         License
       </a>
       <a href="/ui/api-tokens"
-         class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors
+         class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors
                 {% if active_page == 'api-tokens' %}bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300{% else %}text-muted hover:bg-surface-raised hover:text-body{% endif %}">
         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -152,7 +158,7 @@
       {% set _my_rank = _role_rank.get(_admin_role, 0) %}
       {% if _my_rank <= _role_rank['auditor'] %}
       <a href="/ui/audit-log"
-         class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors
+         class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors
                 {% if active_page == 'audit-log' %}bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300{% else %}text-muted hover:bg-surface-raised hover:text-body{% endif %}">
         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -163,7 +169,7 @@
       {% endif %}
       {% if _my_rank <= _role_rank['superadmin'] %}
       <a href="/ui/admin-users"
-         class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors
+         class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors
                 {% if active_page == 'admin-users' %}bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300{% else %}text-muted hover:bg-surface-raised hover:text-body{% endif %}">
         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -173,7 +179,7 @@
       </a>
       {% endif %}
       <a href="/ui/approval-delegations"
-         class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors
+         class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors
                 {% if active_page == 'approval-delegations' %}bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300{% else %}text-muted hover:bg-surface-raised hover:text-body{% endif %}">
         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -182,7 +188,7 @@
         Approval Delegations
       </a>
       <a href="/ui/my-account"
-         class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors
+         class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors
                 {% if active_page == 'my-account' %}bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300{% else %}text-muted hover:bg-surface-raised hover:text-body{% endif %}">
         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -193,8 +199,8 @@
     </nav>
 
     <!-- Footer links + sign out -->
-    <div class="px-4 py-4 border-t border-token-border space-y-1.5">
-      <div class="flex items-center justify-between mb-2">
+    <div class="px-4 py-3 border-t border-token-border space-y-1 flex-shrink-0">
+      <div class="flex items-center justify-between mb-1">
         <span class="text-[10px] uppercase tracking-[0.15em] text-muted">Theme</span>
         {% include "_partials/theme_toggle.html" %}
       </div>
