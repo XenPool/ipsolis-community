@@ -12,7 +12,7 @@
 # no-op unless --force is passed. Safe to invoke from CI on every run.
 #
 # Usage:
-#   tools/install/bootstrap-certs.sh                       # interactive prompt (or auto-detect on CI)
+#   tools/install/bootstrap-certs.sh                       # silent if .env CORS_ORIGINS is set; else prompts
 #   tools/install/bootstrap-certs.sh ipsolis.example.com   # explicit FQDN, no prompt
 #   IPSOLIS_FQDN=ipsolis.example.com tools/install/...     # same, via env var
 #   tools/install/bootstrap-certs.sh --force ...           # overwrite existing certs
@@ -20,8 +20,14 @@
 # FQDN resolution order:
 #   1. positional arg
 #   2. IPSOLIS_FQDN env var
-#   3. interactive prompt (only when stdin is a tty — CI runners skip this)
-#   4. ``hostname -f`` auto-detect (last-resort fallback)
+#   3. CORS_ORIGINS in ./.env  (the admin already typed the hostname there
+#      during the standard install — re-using it avoids a second prompt for
+#      the same value, and doubles as a sanity check that .env was edited)
+#   4. interactive prompt (only when stdin is a tty — CI runners skip this)
+#   5. ``hostname -f`` auto-detect (last-resort fallback)
+#
+# When CORS_ORIGINS contains multiple comma-separated hosts, the first
+# becomes the cert CN and all are added as SANs.
 #
 # Production: replace ./certs/cert.pem + key.pem with files from your
 # real CA / Let's Encrypt afterwards. Same paths, same nginx config —
@@ -70,38 +76,65 @@ if [[ -f certs/cert.pem && -f certs/key.pem && "$force" == "false" ]]; then
   exit 0
 fi
 
-# ── FQDN resolution: arg > env > interactive prompt > auto-detect ────────
+# ── FQDN resolution ──────────────────────────────────────────────────────
 # Real-world customer deploys typically run ipSolis on a host with its
 # own private hostname (e.g. ``linapp01``) but expose it to users under
 # a service-specific DNS alias (e.g. ``ipsolis.acme.com``). The cert's
-# CN must match the alias, not the host. Tier order:
-#
-#   1. Explicit positional arg          — for scripted / CI calls
-#   2. ``IPSOLIS_FQDN`` env var         — same, without editing the call
-#   3. Interactive prompt (tty stdin)   — for operators on the box
-#   4. ``hostname -f`` auto-detect      — last-resort fallback
-#
-# CI runners (GitHub Actions, etc.) have no tty so step 3 is skipped
-# and they fall through to auto-detect — which is also why workflows
-# should pass ``IPSOLIS_FQDN`` via a secret when the host's FQDN
-# doesn't match the public DNS alias.
+# CN must match the alias, not the host. Five-tier resolution (see header
+# docstring); the ``cors_extra_sans`` array also collects additional CORS
+# hosts so a multi-host install gets a single multi-SAN cert.
 detected="$(hostname -f 2>/dev/null || hostname)"
+cors_extra_sans=()
+
+# Tier 3 helper — pull hosts out of CORS_ORIGINS in ./.env. Returns nothing
+# when .env is missing, the key is unset, the value is the placeholder, or
+# CORS is wide-open (``*``).
+_read_cors_hosts() {
+  [[ -f .env ]] || return
+  local raw
+  raw="$(grep -E '^CORS_ORIGINS=' .env | head -1 | cut -d= -f2- | tr -d '"' | tr -d "'")"
+  [[ -z "$raw" || "$raw" == "*" ]] && return
+  # Skip the .env.example placeholder — the operator hasn't customised yet.
+  [[ "$raw" == *"yourcompany.com"* ]] && return
+  local entry host
+  IFS=',' read -ra _entries <<< "$raw"
+  for entry in "${_entries[@]}"; do
+    entry="${entry# }"; entry="${entry% }"
+    host="${entry#*://}"           # strip http:// or https://
+    host="${host%%[:/]*}"          # strip port + path
+    [[ -n "$host" ]] && echo "$host"
+  done
+}
+
 if [[ -z "$fqdn" ]]; then
   if [[ -n "${IPSOLIS_FQDN:-}" ]]; then
     fqdn="$IPSOLIS_FQDN"
     echo "ℹ Using IPSOLIS_FQDN env: $fqdn"
-  elif [[ -t 0 ]]; then
-    # Interactive — ask the operator. Enter accepts the auto-detect.
-    echo ""
-    echo "Self-signed TLS cert needed for the nginx reverse proxy."
-    echo "Enter the hostname (DNS alias) users will type to reach this install."
-    echo "Examples: ipsolis.acme.com, ipsolis-pre.example.local"
-    read -r -p "  Hostname [${detected}]: " fqdn
-    fqdn="${fqdn:-$detected}"
   else
-    fqdn="$detected"
-    echo "ℹ Non-interactive run — using auto-detected FQDN: $fqdn"
-    echo "  (override via positional arg or IPSOLIS_FQDN env)"
+    # Tier 3: derive from .env. First host becomes the CN, the rest are
+    # collected as additional SANs.
+    mapfile -t _cors_hosts < <(_read_cors_hosts)
+    if (( ${#_cors_hosts[@]} > 0 )); then
+      fqdn="${_cors_hosts[0]}"
+      cors_extra_sans=("${_cors_hosts[@]:1}")
+      if (( ${#cors_extra_sans[@]} > 0 )); then
+        echo "ℹ Using FQDN from .env CORS_ORIGINS: $fqdn (+${#cors_extra_sans[@]} additional SAN(s))"
+      else
+        echo "ℹ Using FQDN from .env CORS_ORIGINS: $fqdn"
+      fi
+    elif [[ -t 0 ]]; then
+      # Interactive — ask the operator. Enter accepts the auto-detect.
+      echo ""
+      echo "Self-signed TLS cert needed for the nginx reverse proxy."
+      echo "Enter the hostname (DNS alias) users will type to reach this install."
+      echo "Examples: ipsolis.acme.com, ipsolis-pre.example.local"
+      read -r -p "  Hostname [${detected}]: " fqdn
+      fqdn="${fqdn:-$detected}"
+    else
+      fqdn="$detected"
+      echo "ℹ Non-interactive run — using auto-detected FQDN: $fqdn"
+      echo "  (override via positional arg, IPSOLIS_FQDN env, or CORS_ORIGINS in .env)"
+    fi
   fi
 fi
 
@@ -114,6 +147,10 @@ extra_san=""    # add ",DNS:lb.example.com" etc. here if needed
 ips="$(hostname -I 2>/dev/null | tr -s ' ' '\n' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' || true)"
 san="DNS:$fqdn"
 [[ "$short" != "$fqdn" ]] && san+=",DNS:$short"
+# Extra SANs from CORS_ORIGINS (Tier 3). De-duped vs the primary FQDN.
+for h in "${cors_extra_sans[@]}"; do
+  [[ "$h" != "$fqdn" ]] && san+=",DNS:$h"
+done
 san+=",DNS:localhost,IP:127.0.0.1"
 for ip in $ips; do
   san+=",IP:$ip"
