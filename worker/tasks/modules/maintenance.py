@@ -96,6 +96,72 @@ def _enforce_keep_last_n(db: Session) -> None:
     db.commit()
 
 
+def _reconcile_backup_files(db) -> int:
+    """Scan ``BACKUP_DIR`` for ``.sql.gz`` files without a matching
+    ``db_backups`` row and INSERT one for each.
+
+    Used after restores: the dump's ``db_backups`` table replaces the
+    target's, so any rows that existed only on the target instance
+    (typically the just-taken safety backup, plus any uploads not yet
+    restored) lose their database record while their files survive on
+    disk. Reconciling makes those files visible in the UI again and
+    restore-eligible.
+
+    Also useful as a periodic janitor for files dropped in via ``scp`` /
+    manual copy. Idempotent — safe to call repeatedly.
+
+    Returns the number of rows inserted.
+    """
+    inserted = 0
+    for path in sorted(BACKUP_DIR.glob("*.sql.gz")):
+        if not path.is_file():
+            continue
+        filename = path.name
+        existing = db.execute(
+            text("SELECT 1 FROM db_backups WHERE filename = :f LIMIT 1"),
+            {"f": filename},
+        ).first()
+        if existing:
+            continue
+        # Derive trigger from the filename's naming convention. New
+        # uploads + safety backups + manual backups all use distinct
+        # prefixes, so we can recover the right ``trigger`` value
+        # without parsing the dump itself.
+        if "_pre_restore_" in filename:
+            trig = "pre_restore"
+        elif "_uploaded_" in filename:
+            trig = "upload"
+        else:
+            trig = "manual"
+        try:
+            stat = path.stat()
+        except OSError:
+            continue
+        try:
+            res = db.execute(
+                text(
+                    "INSERT INTO db_backups "
+                    "(filename, status, trigger, size_bytes, finished_at, "
+                    " created_at, created_by, note) "
+                    "VALUES (:f, 'success', :t, :s, to_timestamp(:m), "
+                    "        to_timestamp(:m), 'reconcile', "
+                    "        'Reconciled — backup file existed on disk without a db_backups row.') "
+                    "ON CONFLICT (filename) DO NOTHING"
+                ),
+                {"f": filename, "t": trig, "s": stat.st_size, "m": stat.st_mtime},
+            )
+            if (res.rowcount or 0) > 0:
+                inserted += 1
+        except Exception:
+            logger.warning("reconcile: could not INSERT row for %s", filename)
+            db.rollback()
+            continue
+    db.commit()
+    if inserted:
+        logger.info("reconcile: inserted %d db_backups row(s) for orphan files", inserted)
+    return inserted
+
+
 def _run_backup_sync(db, backup_id: int, trigger: str = "manual") -> dict:
     """Plain-function backup runner — the actual pg_dump work.
 
@@ -338,12 +404,24 @@ def run_restore(self, backup_id: int, safety_backup_id: int) -> dict:
             timeout=3600,
         )
 
-        # ── 4. Mark restored / failed ────────────────────────────────
-        # Re-open db session — note that this connects to the freshly-
-        # restored DB, which now contains the row we're updating.
+        # ── 4. Reconcile the restored DB's db_backups with /app/backups ─
+        # Re-open the session against the *freshly-restored* DB. That
+        # DB's ``db_backups`` table came from the source dump and so
+        # doesn't know about either:
+        #   * the safety backup we took at step 1 (its row was inserted
+        #     on the target instance, which we just dropped); or
+        #   * any uploads / pre-existing rows that lived only on the
+        #     target.
+        # Don't try to UPDATE the original target row — it likely
+        # doesn't exist in the restored DB, and even if it does it now
+        # describes a backup from the source perspective. Instead,
+        # ``_reconcile_backup_files`` walks BACKUP_DIR and INSERTs rows
+        # for any ``.sql.gz`` file without a matching ``filename``.
         db = _db()
         if proc.returncode != 0:
             err = (proc.stderr or b"").decode("utf-8", errors="replace")[:4000]
+            # Best-effort UPDATE — the restored DB might be empty / partial,
+            # but if the row IS there the operator sees the failure surfaced.
             try:
                 db.execute(
                     text(
@@ -354,27 +432,23 @@ def run_restore(self, backup_id: int, safety_backup_id: int) -> dict:
                 )
                 db.commit()
             except Exception:
-                # The freshly-restored DB doesn't have the row yet if the
-                # dump was empty; ignore and let the outer return surface
-                # the error.
                 pass
+            # Still reconcile so the safety backup is recoverable from the UI.
+            try:
+                _reconcile_backup_files(db)
+            except Exception:
+                logger.warning("reconcile after restore failure: skipped (DB likely partial)")
             logger.error("Restore %s failed: %s", target_filename, err[:200])
             return {"success": False, "error": "psql restore failed", "stderr": err}
 
+        # Success path: reconcile orphan files (safety backup, uploads, etc.)
+        # so the UI shows a complete list. We deliberately do NOT UPDATE the
+        # original ``backup_id`` row — its content now reflects the source's
+        # state, not what we did on this target.
         try:
-            db.execute(
-                text(
-                    "UPDATE db_backups SET status='restored', "
-                    "error=concat('restored_at=', NOW()::text) WHERE id = :i"
-                ),
-                {"i": backup_id},
-            )
-            db.commit()
+            _reconcile_backup_files(db)
         except Exception:
-            # Backup row may not exist in the restored DB (if the dump
-            # pre-dates this backup's row). That's fine — the operator's
-            # action is recorded in audit_log via the api endpoint.
-            pass
+            logger.exception("post-restore reconcile failed; leaving as-is")
 
         logger.info("Restore %s completed from %s", target_filename, target_path)
         return {
@@ -382,6 +456,11 @@ def run_restore(self, backup_id: int, safety_backup_id: int) -> dict:
             "backup_id": backup_id,
             "safety_backup_id": safety_backup_id,
             "filename": target_filename,
+            "note": (
+                "db_backups now reflects the source dump's state; the safety "
+                "backup and any other on-disk-only files were re-registered "
+                "via reconcile."
+            ),
         }
     except Exception as exc:
         logger.exception("Restore failed for id=%s: %s", backup_id, exc)

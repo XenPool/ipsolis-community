@@ -73,10 +73,19 @@ jobs:
             exit 1
           fi
 
-      - name: Reload nginx (pick up new upstream IPs)
+      - name: Restart nginx (pick up new config + upstream IPs)
+        # ``nginx -s reload`` re-reads the file at the path nginx already
+        # has open, but Docker's file-level bind-mount pins the original
+        # inode — so when ``git reset --hard`` rewrites
+        # ``nginx/nginx.conf`` the container keeps serving the old file
+        # forever (silent until someone hits the changed directive, e.g.
+        # client_max_body_size on a backup upload). A container restart
+        # re-resolves the bind-mount to the current inode. ~10s downtime
+        # per deploy is acceptable for prelive; production can use a
+        # directory bind-mount instead if zero-downtime is required.
         run: |
           cd ${{ secrets.PRELIVE_PATH }}
-          docker compose exec -T nginx nginx -s reload
+          docker compose -f docker-compose.yml -f docker-compose.nginx.yml restart nginx
 
       - name: Health check
         run: |
