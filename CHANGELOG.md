@@ -12,7 +12,13 @@ start, so a `docker compose pull && docker compose up -d` is the only
 operator step. See [`docs/UPGRADING.md`](docs/UPGRADING.md) (TODO) for
 the full upgrade procedure including DB backup recommendations.
 
-## [Unreleased] 
+## [Unreleased]
+
+## [0.4.3] — 2026-04-28
+
+### Added
+
+- add option to create AD groups if missing during grant (`420429d`)
 
 ## [0.4.2] — 2026-04-28
 
