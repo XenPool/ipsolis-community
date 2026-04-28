@@ -293,6 +293,18 @@ async def refresh_app_config_if_stale(force: bool = False) -> None:
                 if "app.logo" not in seen:
                     set_app_logo_config("app.logo", "")
                 set_update_globals(update_rows)
+            # Refresh license globals on the same TTL. ``load_license`` is
+            # cheap when nothing changed (mtime-cached) — re-reads only
+            # when the .lic file actually moves. This is what keeps a
+            # mid-life license upload visible to every uvicorn worker
+            # (each worker has its own ``templates.env.globals``; without
+            # this hook only the worker that handled the upload would
+            # flip ``is_enterprise``).
+            try:
+                from app.utils.license import load_license  # local import — avoid module-load cycle
+                set_license_globals(load_license())
+            except Exception:
+                pass
             _last_config_refresh_ts = now
         except Exception:
             # Swallow: a transient DB hiccup must not break page renders.
