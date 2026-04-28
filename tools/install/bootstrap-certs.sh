@@ -12,9 +12,16 @@
 # no-op unless --force is passed. Safe to invoke from CI on every run.
 #
 # Usage:
-#   tools/install/bootstrap-certs.sh                      # auto-detect FQDN from `hostname -f`
-#   tools/install/bootstrap-certs.sh ipsolis.example.com  # explicit FQDN
-#   tools/install/bootstrap-certs.sh --force ...          # overwrite existing certs
+#   tools/install/bootstrap-certs.sh                       # interactive prompt (or auto-detect on CI)
+#   tools/install/bootstrap-certs.sh ipsolis.example.com   # explicit FQDN, no prompt
+#   IPSOLIS_FQDN=ipsolis.example.com tools/install/...     # same, via env var
+#   tools/install/bootstrap-certs.sh --force ...           # overwrite existing certs
+#
+# FQDN resolution order:
+#   1. positional arg
+#   2. IPSOLIS_FQDN env var
+#   3. interactive prompt (only when stdin is a tty — CI runners skip this)
+#   4. ``hostname -f`` auto-detect (last-resort fallback)
 #
 # Production: replace ./certs/cert.pem + key.pem with files from your
 # real CA / Let's Encrypt afterwards. Same paths, same nginx config —
@@ -55,21 +62,47 @@ done
 
 mkdir -p certs
 
-# ── Idempotency guard (run BEFORE FQDN detection so a no-op deploy
-#    is completely silent) ────────────────────────────────────────────────
+# ── Idempotency guard (run BEFORE FQDN resolution so a no-op deploy
+#    is completely silent and never prompts) ───────────────────────────────
 if [[ -f certs/cert.pem && -f certs/key.pem && "$force" == "false" ]]; then
   echo "✓ TLS certs already present in ./certs — nothing to do."
   echo "  Pass --force to regenerate (e.g. for a different FQDN)."
   exit 0
 fi
 
-# Auto-detect FQDN only if we're actually going to generate. ``hostname -f``
-# returns the fully-qualified name on most distros; falls back to the short
-# name when there's no DNS / search domain configured.
+# ── FQDN resolution: arg > env > interactive prompt > auto-detect ────────
+# Real-world customer deploys typically run ipSolis on a host with its
+# own private hostname (e.g. ``linapp01``) but expose it to users under
+# a service-specific DNS alias (e.g. ``ipsolis.acme.com``). The cert's
+# CN must match the alias, not the host. Tier order:
+#
+#   1. Explicit positional arg          — for scripted / CI calls
+#   2. ``IPSOLIS_FQDN`` env var         — same, without editing the call
+#   3. Interactive prompt (tty stdin)   — for operators on the box
+#   4. ``hostname -f`` auto-detect      — last-resort fallback
+#
+# CI runners (GitHub Actions, etc.) have no tty so step 3 is skipped
+# and they fall through to auto-detect — which is also why workflows
+# should pass ``IPSOLIS_FQDN`` via a secret when the host's FQDN
+# doesn't match the public DNS alias.
+detected="$(hostname -f 2>/dev/null || hostname)"
 if [[ -z "$fqdn" ]]; then
-  fqdn="$(hostname -f 2>/dev/null || hostname)"
-  echo "ℹ Using auto-detected FQDN: $fqdn"
-  echo "  (override by passing it as the first arg, e.g. ipsolis-pre.xenpool.local)"
+  if [[ -n "${IPSOLIS_FQDN:-}" ]]; then
+    fqdn="$IPSOLIS_FQDN"
+    echo "ℹ Using IPSOLIS_FQDN env: $fqdn"
+  elif [[ -t 0 ]]; then
+    # Interactive — ask the operator. Enter accepts the auto-detect.
+    echo ""
+    echo "Self-signed TLS cert needed for the nginx reverse proxy."
+    echo "Enter the hostname (DNS alias) users will type to reach this install."
+    echo "Examples: ipsolis.acme.com, ipsolis-pre.example.local"
+    read -r -p "  Hostname [${detected}]: " fqdn
+    fqdn="${fqdn:-$detected}"
+  else
+    fqdn="$detected"
+    echo "ℹ Non-interactive run — using auto-detected FQDN: $fqdn"
+    echo "  (override via positional arg or IPSOLIS_FQDN env)"
+  fi
 fi
 
 # ── Build SubjectAltName list ────────────────────────────────────────────

@@ -27,6 +27,14 @@ jobs:
         # boots cleanly instead of crash-looping on the missing file.
         # Operators replace certs/cert.pem + key.pem with a real CA cert
         # post-install — same paths, same config.
+        #
+        # ``IPSOLIS_FQDN`` is read from a repo secret so the cert's CN
+        # matches the public DNS alias customers actually type, even when
+        # the box's own ``hostname -f`` is a different internal name
+        # (e.g. host=linapp01, alias=ipsolis.acme.com). When the secret
+        # isn't set, the script falls back to ``hostname -f``.
+        env:
+          IPSOLIS_FQDN: ${{ secrets.PRELIVE_FQDN }}
         run: |
           cd ${{ secrets.PRELIVE_PATH }}
           bash tools/install/bootstrap-certs.sh
