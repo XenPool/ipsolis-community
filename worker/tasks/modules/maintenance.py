@@ -96,52 +96,52 @@ def _enforce_keep_last_n(db: Session) -> None:
     db.commit()
 
 
-@shared_task(name="tasks.modules.maintenance.run_backup", bind=True)
-def run_backup(self, backup_id: int, trigger: str = "manual") -> dict:
-    """Runs pg_dump against DATABASE_URL, stores the file under /app/backups/.
+def _run_backup_sync(db, backup_id: int, trigger: str = "manual") -> dict:
+    """Plain-function backup runner — the actual pg_dump work.
 
-    The db_backups row is expected to exist already (status='pending') —
-    the API endpoint inserts it before enqueuing this task so the UI can
-    show the pending record immediately.
+    Extracted from the Celery task wrapper so other tasks (notably
+    ``run_restore``) can call it directly without the Celery
+    "Never call result.get() within a task" anti-pattern that
+    ``apply()``/``get()`` would trigger. The caller owns the SQLAlchemy
+    session.
     """
-    db = _db()
+    row = db.execute(
+        text("SELECT filename FROM db_backups WHERE id = :i"),
+        {"i": backup_id},
+    ).first()
+    if not row:
+        logger.error("_run_backup_sync: no db_backups row with id=%s", backup_id)
+        return {"success": False, "error": "backup row not found"}
+    filename = row[0]
+    target = BACKUP_DIR / filename
+
+    db.execute(
+        text(
+            "UPDATE db_backups SET status='running', trigger=:t "
+            "WHERE id = :i"
+        ),
+        {"i": backup_id, "t": trigger},
+    )
+    db.commit()
+
+    pg = _parse_pg_url()
+    env = os.environ.copy()
+    if pg["password"]:
+        env["PGPASSWORD"] = pg["password"]
+
+    # pg_dump custom format + gzip for smaller file + atomic write (.part)
+    tmp = target.with_suffix(target.suffix + ".part")
+    cmd = [
+        "pg_dump",
+        "--host",     pg["host"],
+        "--port",     pg["port"],
+        "--username", pg["user"],
+        "--dbname",   pg["dbname"],
+        "--format",   "plain",
+        "--no-owner",
+        "--no-privileges",
+    ]
     try:
-        row = db.execute(
-            text("SELECT filename FROM db_backups WHERE id = :i"),
-            {"i": backup_id},
-        ).first()
-        if not row:
-            logger.error("run_backup: no db_backups row with id=%s", backup_id)
-            return {"success": False, "error": "backup row not found"}
-        filename = row[0]
-        target = BACKUP_DIR / filename
-
-        db.execute(
-            text(
-                "UPDATE db_backups SET status='running', trigger=:t "
-                "WHERE id = :i"
-            ),
-            {"i": backup_id, "t": trigger},
-        )
-        db.commit()
-
-        pg = _parse_pg_url()
-        env = os.environ.copy()
-        if pg["password"]:
-            env["PGPASSWORD"] = pg["password"]
-
-        # pg_dump custom format + gzip for smaller file + atomic write (.part)
-        tmp = target.with_suffix(target.suffix + ".part")
-        cmd = [
-            "pg_dump",
-            "--host",     pg["host"],
-            "--port",     pg["port"],
-            "--username", pg["user"],
-            "--dbname",   pg["dbname"],
-            "--format",   "plain",
-            "--no-owner",
-            "--no-privileges",
-        ]
         with open(tmp, "wb") as out:
             dump = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
             gzip_p = subprocess.Popen(["gzip", "-c"], stdin=dump.stdout, stdout=out)
@@ -175,6 +175,10 @@ def run_backup(self, backup_id: int, trigger: str = "manual") -> dict:
     except Exception as exc:
         logger.exception("Backup failed for id=%s: %s", backup_id, exc)
         try:
+            tmp.unlink(missing_ok=True)
+        except Exception:
+            pass
+        try:
             db.execute(
                 text(
                     "UPDATE db_backups SET status='failed', finished_at=NOW(), "
@@ -186,6 +190,19 @@ def run_backup(self, backup_id: int, trigger: str = "manual") -> dict:
         except Exception:
             pass
         return {"success": False, "error": str(exc)}
+
+
+@shared_task(name="tasks.modules.maintenance.run_backup", bind=True)
+def run_backup(self, backup_id: int, trigger: str = "manual") -> dict:
+    """Celery wrapper around ``_run_backup_sync``.
+
+    The db_backups row is expected to exist already (status='pending') —
+    the API endpoint inserts it before enqueuing this task so the UI can
+    show the pending record immediately.
+    """
+    db = _db()
+    try:
+        return _run_backup_sync(db, backup_id, trigger)
     finally:
         db.close()
 
@@ -234,13 +251,14 @@ def run_restore(self, backup_id: int, safety_backup_id: int) -> dict:
             return {"success": False, "error": "backup file missing"}
 
         # ── 1. Pre-restore safety backup ──────────────────────────────
-        # Re-use ``run_backup`` synchronously so the safety dump is
-        # captured BEFORE we touch the target DB. ``apply()`` runs
-        # the task in this worker process, no broker round-trip.
-        safety_result = run_backup.apply(
-            args=[safety_backup_id],
-            kwargs={"trigger": "pre_restore"},
-        ).get()
+        # Call the plain-function backup runner directly. We must NOT
+        # use ``run_backup.apply().get()`` here — Celery raises
+        # "Never call result.get() within a task" because synchronous
+        # subtasks inside a worker can deadlock the prefork pool when
+        # the called task ends up routed to the same worker.
+        safety_result = _run_backup_sync(
+            db, safety_backup_id, trigger="pre_restore"
+        )
         if not safety_result.get("success"):
             db.execute(
                 text(
