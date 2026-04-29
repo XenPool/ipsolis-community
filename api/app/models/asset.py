@@ -80,6 +80,12 @@ class AssetType(Base):
     is_active: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=True, server_default="true"
     )
+    # Per-type opt-in for the Admin Dashboard donut card. Default false
+    # so installs with many asset types stay scannable; admins toggle
+    # this on the types they want at-a-glance status for.
+    show_on_dashboard: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
     category: Mapped[AssetCategory] = mapped_column(
         Enum(AssetCategory, name="asset_category", values_callable=lambda x: [e.value for e in x]),
         nullable=False,

@@ -599,6 +599,7 @@ async def create_asset_type(
         description=payload.description,
         help_text=payload.help_text,
         is_active=payload.is_active,
+        show_on_dashboard=payload.show_on_dashboard,
         category=payload.category,
         config=payload.config,
         assignment_model=payload.assignment_model,
@@ -753,6 +754,8 @@ async def update_asset_type(
         asset_type.eligible_requestors_dn = payload.eligible_requestors_dn or None
     if payload.logo is not None:
         asset_type.logo = payload.logo or None
+    if payload.show_on_dashboard is not None:
+        asset_type.show_on_dashboard = payload.show_on_dashboard
     await aaudit(db, "asset_type", asset_type.id, "updated", old=old_snap, new=_type_snap(asset_type),
                  by=actor_by(request, "update_asset_type"),
                  classification=classify_asset_type(asset_type))

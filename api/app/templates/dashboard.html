@@ -1,7 +1,33 @@
 {% extends "base.html" %}
+{% from "_partials/donut.html" import donut %}
 {% set active_page = "dashboard" %}
 
 {% block title %}Dashboard – {{ app_title }}{% endblock %}
+
+{# Per-status donut palette. Drawn from existing _ASSET_STATUS_COLORS but
+   resolved to literal hex so the SVG ``stroke=`` attribute paints reliably
+   in both light and dark themes (the Tailwind classes on the asset_pool
+   page can't be inlined into stroke=""). #}
+{% set _STATUS_PALETTE = {
+    'Free':         '#16a34a',
+    'reserved':     '#eab308',
+    'busy':         '#2563eb',
+    'maintenance':  '#94a3b8',
+    'Reinstall':    '#f97316',
+    'Reinstalling': '#0ea5e9',
+    'Failed':       '#dc2626',
+} %}
+{# Keep the slice order stable so legends and donuts read consistently. #}
+{% set _STATUS_ORDER = ['Free', 'busy', 'reserved', 'Reinstall', 'Reinstalling', 'maintenance', 'Failed'] %}
+{% set _STATUS_LABELS = {
+    'Free':         'Free',
+    'reserved':     'Reserved',
+    'busy':         'Assigned',
+    'maintenance':  'Maintenance',
+    'Reinstall':    'Reinstall',
+    'Reinstalling': 'Reinstalling',
+    'Failed':       'Failed',
+} %}
 
 {% block content %}
 
@@ -27,6 +53,11 @@
 </div>
 {% endif %}
 
+{# Superadmin-only: the underlying ``/admin/setup/state`` endpoint is gated
+   to ``superadmin`` (admin_setup.py), so for any lower role the checklist
+   would just sit on "Loading…" after a silent 403. Hide it server-side
+   instead — same intent, less noise. #}
+{% if admin_role_at_least(request, 'superadmin') %}
 <!-- Setup checklist — auto-hides once everything is done. Persistently
      dismissible per-browser via the Hide button (localStorage). -->
 <div id="setup-checklist" class="mb-6 hidden">
@@ -165,6 +196,7 @@
   });
 })();
 </script>
+{% endif %}
 
 <!-- Pool Summary -->
 <div class="mb-8">
@@ -185,68 +217,165 @@
   </div>
 </div>
 
-<!-- Recent Orders -->
+<!-- Per-Asset-Type Status Donuts -->
 <div>
   <div class="flex items-center justify-between mb-3">
-    <h2 class="text-lg font-semibold text-heading">Recent Orders</h2>
-    <a href="/ui/orders" class="text-sm text-blue-600 dark:text-blue-400 hover:underline">Show all →</a>
+    <h2 class="text-lg font-semibold text-heading">Asset Type Status</h2>
+    <a href="/ui/orders" class="text-sm text-blue-600 dark:text-blue-400 hover:underline">View all orders →</a>
   </div>
 
-  <div class="bg-surface rounded-xl border border-token-border shadow-sm shadow-slate-900/5 dark:shadow-black/20 overflow-hidden">
-    <table class="min-w-full divide-y divide-token-border text-sm">
-      <thead class="bg-surface-raised">
-        <tr>
-          <th class="px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wide">ID</th>
-          <th class="px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wide">User</th>
-          <th class="px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wide">Asset</th>
-          <th class="px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wide">Action</th>
-          <th class="px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wide">Status</th>
-          <th class="px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wide">Created</th>
-          <th class="px-4 py-3"></th>
-        </tr>
-      </thead>
-      <tbody class="divide-y divide-token-border">
-        {% for order in recent_orders %}
-        <tr class="hover:bg-surface-raised transition-colors">
-          <td class="px-4 py-3 font-mono text-muted">#{{ order.id }}</td>
-          <td class="px-4 py-3">
-            <div class="font-medium text-heading">{{ order.user_name }}</div>
-            <div class="text-xs text-muted">{{ order.user_email }}</div>
-          </td>
-          <td class="px-4 py-3 text-body">
-            {% if order.assigned_asset_id %}
-              {{ asset_names.get(order.assigned_asset_id, "–") }}
-            {% elif asset_type_models.get(order.asset_type_id) == "dedicated_shared" %}
-              <span class="text-xs text-muted">Shared</span>
-            {% elif asset_type_models.get(order.asset_type_id) == "capacity_pooled" %}
-              <span class="text-xs text-muted">Pooled</span>
-            {% else %}–{% endif %}
-          </td>
-          <td class="px-4 py-3">
-            <span class="inline-block px-2 py-0.5 rounded-md text-xs font-medium bg-surface-raised text-body border border-token-border">
-              {{ order.action.value }}
-            </span>
-          </td>
-          <td class="px-4 py-3">
-            <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold {{ status_colors.get(order.status.value, 'bg-slate-100 dark:bg-slate-700 text-body') }}">
-              <span class="w-1.5 h-1.5 rounded-full bg-current opacity-70"></span>
-              {{ order.status.value }}
-            </span>
-          </td>
-          <td class="px-4 py-3 text-muted text-xs whitespace-nowrap">
-            {{ order.created_at.strftime("%d.%m.%Y %H:%M") }}
-          </td>
-          <td class="px-4 py-3 text-right">
-            <a href="/ui/orders/{{ order.id }}" class="text-blue-600 dark:text-blue-400 hover:underline text-xs">Detail</a>
-          </td>
-        </tr>
+  {% if not dashboard_types %}
+    <div class="bg-surface rounded-xl border border-dashed border-token-border px-6 py-10 text-center">
+      <p class="text-sm text-muted">
+        No asset types are flagged for the dashboard yet.
+      </p>
+      <p class="text-xs text-muted/70 mt-2 max-w-md mx-auto leading-snug">
+        On any Asset Definition, toggle <strong>Show status on Dashboard</strong> to see a per-status
+        donut here. Off by default — only the types you explicitly want at a glance show up.
+      </p>
+      <a href="/ui/asset-types" class="inline-block mt-3 text-xs text-blue-600 dark:text-blue-400 hover:underline">
+        Asset Definitions →
+      </a>
+    </div>
+  {% else %}
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+      {% for t in dashboard_types %}
+        {# Two donut shapes per assignment_model:
+           - capacity_pooled  → 2-slice donut: In Use vs Free Capacity
+                                (when pool_capacity is set; otherwise just
+                                "in use" with a grey full ring)
+           - personal/shared  → AssetStatus enum breakdown via asset_pool counts
+        #}
+        {% if t.assignment_model == 'capacity_pooled' %}
+          {% set in_use = pooled_in_use.get(t.id, 0) %}
+          {% set capacity = t.pool_capacity or 0 %}
+          {% set free = (capacity - in_use) if capacity > 0 else 0 %}
+          {% if free < 0 %}{% set free = 0 %}{% endif %}
+          {% set total_for_donut = capacity if capacity > 0 else in_use %}
+          {# capacity_pooled has no per-row asset_pool table to drill into,
+             so slices stay non-clickable; the unfiltered drilldown via the
+             card title still works. #}
+          {% set slices = [
+              {'label': 'In Use',         'value': in_use, 'color': '#2563eb'},
+              {'label': 'Free Capacity',  'value': free,   'color': '#16a34a'},
+          ] %}
+          {% set total_label = (in_use|string) + ' / ' + (capacity|string if capacity > 0 else '∞') %}
+          {% set drilldown_url = '/ui/orders?asset_type_id=' ~ t.id %}
         {% else %}
-        <tr>
-          <td colspan="7" class="px-4 py-8 text-center text-muted text-sm">No orders found.</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
+          {% set counts = pool_status_counts.get(t.id, {}) %}
+          {% set _t_total = namespace(n=0) %}
+          {% for k, v in counts.items() %}{% set _t_total.n = _t_total.n + v %}{% endfor %}
+          {% set total_for_donut = _t_total.n %}
+          {% set slices = [] %}
+          {% for k in _STATUS_ORDER %}
+            {# Per-status drilldown — the asset_pool page reads ?status=
+               from the URL and pre-selects its filter (asset_pool.html). #}
+            {% set _ = slices.append({
+                'label': _STATUS_LABELS.get(k, k),
+                'value': counts.get(k, 0),
+                'color': _STATUS_PALETTE.get(k, '#94a3b8'),
+                'href':  '/ui/asset-pool?asset_type_id=' ~ t.id ~ '&status=' ~ k,
+                'status_key': k,
+            }) %}
+          {% endfor %}
+          {% set total_label = total_for_donut|string %}
+          {% set drilldown_url = '/ui/asset-pool?asset_type_id=' ~ t.id %}
+        {% endif %}
+
+        {# Capacity pressure styling — same thresholds as the dashboard warning
+           band (≥95% critical / ≥80% warning). Pulled from _pool_summary so
+           there's one source of truth for "this pool is hot". #}
+        {% set _cap = type_capacity.get(t.id) %}
+        {% if _cap and _cap.severity == 'critical' %}
+          {% set _card_classes = 'border-red-300 dark:border-red-500/40 bg-red-50 dark:bg-red-500/10 ring-1 ring-red-300/50 dark:ring-red-500/30' %}
+          {% set _model_badge_classes = 'text-red-700 dark:text-red-300' %}
+        {% elif _cap and _cap.severity == 'warning' %}
+          {% set _card_classes = 'border-amber-300 dark:border-amber-500/40 bg-amber-50 dark:bg-amber-500/10' %}
+          {% set _model_badge_classes = 'text-amber-700 dark:text-amber-300' %}
+        {% else %}
+          {% set _card_classes = 'bg-surface border-token-border' %}
+          {% set _model_badge_classes = 'text-muted/60' %}
+        {% endif %}
+
+        <div class="rounded-xl border {{ _card_classes }} shadow-sm shadow-slate-900/5 dark:shadow-black/20 p-5 flex flex-col">
+          <div class="flex items-start justify-between mb-3 gap-2">
+            <a href="{{ drilldown_url }}"
+               class="text-sm font-semibold text-heading hover:text-blue-600 dark:hover:text-blue-400 hover:underline truncate"
+               title="{{ t.name }} — click to drill down">
+              {{ t.name }}
+            </a>
+            {% if _cap %}
+              <span class="inline-flex items-center gap-1 shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold tabular-nums
+                  {% if _cap.severity == 'critical' %}bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-200
+                  {% else %}bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-200{% endif %}"
+                  title="{{ _cap.used }} of {{ _cap.total }} in use ({{ _cap.fill_pct }}%) — {{ 'critical' if _cap.severity == 'critical' else 'approaching capacity' }}">
+                {% if _cap.severity == 'critical' %}
+                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                          d="M12 9v2m0 4h.01M5.07 19h13.86a2 2 0 001.74-3l-6.93-12a2 2 0 00-3.48 0L3.34 16a2 2 0 001.73 3z"/>
+                  </svg>
+                {% endif %}
+                {{ _cap.fill_pct }}%
+              </span>
+            {% endif %}
+            <span class="text-[10px] uppercase tracking-wider {{ _model_badge_classes }} ml-1 shrink-0">
+              {% if t.assignment_model == 'capacity_pooled' %}Pooled
+              {% elif t.assignment_model == 'dedicated_shared' %}Shared
+              {% else %}Personal
+              {% endif %}
+            </span>
+          </div>
+
+          <div class="flex items-center gap-4">
+            {# Wrapper is a <div>, not <a>, so each SVG slice can carry its
+               own per-status link without nesting <a> elements. The center
+               label is pointer-events:none so clicks fall through to the
+               slice underneath. #}
+            <div class="relative shrink-0">
+              {{ donut(slices, total_for_donut, size=120, stroke=14) }}
+              <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                <span class="text-xl font-semibold text-heading leading-none">{{ total_label }}</span>
+                <span class="text-[10px] text-muted/70 mt-1">
+                  {% if t.assignment_model == 'capacity_pooled' %}quota{% else %}assets{% endif %}
+                </span>
+              </div>
+            </div>
+            <div class="text-xs flex-1 min-w-0 space-y-1">
+              {% for s in slices %}
+                {% if s.value and s.value > 0 %}
+                {% if s.href %}
+                <a href="{{ s.href }}"
+                   class="flex items-center justify-between gap-2 -mx-1 px-1 py-0.5 rounded hover:bg-surface-raised transition-colors"
+                   title="Show only {{ s.label }} assets of {{ t.name }}">
+                  <span class="flex items-center gap-1.5 min-w-0">
+                    <span class="w-2 h-2 rounded-full shrink-0" style="background-color: {{ s.color }}"></span>
+                    <span class="text-body truncate">{{ s.label }}</span>
+                  </span>
+                  <span class="text-heading font-medium tabular-nums">{{ s.value }}</span>
+                </a>
+                {% else %}
+                <div class="flex items-center justify-between gap-2 -mx-1 px-1 py-0.5">
+                  <span class="flex items-center gap-1.5 min-w-0">
+                    <span class="w-2 h-2 rounded-full shrink-0" style="background-color: {{ s.color }}"></span>
+                    <span class="text-body truncate">{{ s.label }}</span>
+                  </span>
+                  <span class="text-heading font-medium tabular-nums">{{ s.value }}</span>
+                </div>
+                {% endif %}
+                {% endif %}
+              {% endfor %}
+              {% if total_for_donut == 0 %}
+                <div class="text-muted/60 italic">No assets yet</div>
+              {% endif %}
+              <a href="{{ drilldown_url }}"
+                 class="block pt-1 text-[11px] text-blue-600 dark:text-blue-400 hover:underline">
+                View all →
+              </a>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
 </div>
 {% endblock %}

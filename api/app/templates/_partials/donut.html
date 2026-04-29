@@ -1,0 +1,76 @@
+{# Reusable donut chart macro for the Admin Dashboard.
+
+Pure SVG, no JS chart library. The caller passes:
+
+  - ``size``     : pixel width/height of the SVG (e.g. 140)
+  - ``slices``   : list of {label, value, color, href?} dicts. Slices
+                   with value 0 are skipped automatically. ``href`` is
+                   optional — when present, the slice is wrapped in an
+                   ``<a>`` element and behaves as a navigation link
+                   (per-status drilldown). Colours can be any CSS
+                   colour the surrounding context resolves (hex,
+                   css var, …).
+  - ``total``    : the total to display in the centre. Caller passes
+                   it so an empty pool still renders sensibly (a
+                   single grey ring + ``0`` in the centre).
+  - ``stroke``   : ring thickness in px (default 16)
+
+Implementation: every slice is a circle whose stroke-dasharray
+represents (slice_length, gap_remainder) and whose stroke-dashoffset
+positions the slice along the ring. Browsers render this consistently
+without needing path-arc math.
+
+Renders empty state (single full-circle dim ring) when total <= 0 so
+operators see "this type has no assets yet" rather than a broken /
+missing donut.
+
+Clickable slices use the SVG ``<a>`` element. Because SVG <a> is in
+the SVG namespace, it can sit inside an HTML <svg> without violating
+the "no nested <a>" HTML rule — but the caller still must NOT wrap
+the whole <svg> in another <a>, or the browser will collapse focus
+behaviour to the outer link.
+#}
+
+{% macro donut(slices, total, size=140, stroke=16) -%}
+  {% set radius = (size / 2) - (stroke / 2) %}
+  {% set circumference = 2 * 3.14159265358979 * radius %}
+  {% set effective_total = total if total > 0 else 1 %}
+  <svg width="{{ size }}" height="{{ size }}" viewBox="0 0 {{ size }} {{ size }}"
+       class="block" style="transform: rotate(-90deg);">
+    {# Background track — always full circle, dim, so the donut still
+       reads as "a chart" when only one slice is non-zero. #}
+    <circle cx="{{ size / 2 }}" cy="{{ size / 2 }}" r="{{ radius }}"
+            fill="none" stroke="rgba(148, 163, 184, 0.18)" stroke-width="{{ stroke }}"/>
+
+    {% if total > 0 %}
+      {% set ns = namespace(offset=0) %}
+      {% for s in slices %}
+        {% if s.value and s.value > 0 %}
+          {% set frac = s.value / effective_total %}
+          {% set length = circumference * frac %}
+          {% set tip = s.label ~ ' — ' ~ s.value %}
+          {% if s.href %}
+          <a href="{{ s.href }}" class="donut-slice" aria-label="{{ tip }} — click to filter">
+            <title>{{ tip }} — click to filter</title>
+            <circle cx="{{ size / 2 }}" cy="{{ size / 2 }}" r="{{ radius }}"
+                    fill="none" stroke="{{ s.color }}" stroke-width="{{ stroke }}"
+                    stroke-dasharray="{{ length }} {{ circumference - length }}"
+                    stroke-dashoffset="{{ -ns.offset }}"
+                    stroke-linecap="butt"
+                    style="cursor: pointer; transition: stroke-width 120ms ease;"/>
+          </a>
+          {% else %}
+          <circle cx="{{ size / 2 }}" cy="{{ size / 2 }}" r="{{ radius }}"
+                  fill="none" stroke="{{ s.color }}" stroke-width="{{ stroke }}"
+                  stroke-dasharray="{{ length }} {{ circumference - length }}"
+                  stroke-dashoffset="{{ -ns.offset }}"
+                  stroke-linecap="butt">
+            <title>{{ tip }}</title>
+          </circle>
+          {% endif %}
+          {% set ns.offset = ns.offset + length %}
+        {% endif %}
+      {% endfor %}
+    {% endif %}
+  </svg>
+{%- endmacro %}

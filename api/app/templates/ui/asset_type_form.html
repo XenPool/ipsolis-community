@@ -69,6 +69,20 @@
           </span>
         </label>
       </div>
+      <div>
+        <label class="flex items-start gap-2 text-sm cursor-pointer">
+          <input type="checkbox" name="show_on_dashboard" value="true" id="at-show-on-dashboard"
+                 {% if asset_type and asset_type.show_on_dashboard %}checked{% endif %}
+                 class="mt-0.5 rounded border-token-border text-blue-600 focus:ring-blue-400">
+          <span>
+            <span class="font-medium text-body">Show status on Dashboard</span>
+            <span class="block text-xs text-muted/70 mt-0.5">
+              Adds a per-status donut chart for this asset type to the Admin Dashboard. Off by default —
+              only the types you explicitly want at a glance show up there. System-wide setting.
+            </span>
+          </span>
+        </label>
+      </div>
     </div>
 
     <!-- Logo + live tile preview -->
@@ -1627,6 +1641,7 @@ async function submitForm() {
     description: form.querySelector('[name="description"]').value.trim() || null,
     help_text: form.querySelector('[name="help_text"]').value.trim() || null,
     is_active: form.querySelector('[name="is_active"]').checked,
+    show_on_dashboard: form.querySelector('[name="show_on_dashboard"]').checked,
     category: form.querySelector('[name="category"]:checked').value,
     assignment_model: assignmentModel,
     pool_capacity: form.querySelector('[name="pool_capacity"]').value

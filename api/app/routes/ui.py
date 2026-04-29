@@ -187,40 +187,67 @@ async def dashboard(
 ) -> HTMLResponse:
     summary = await _pool_summary(db)
 
-    # Last 20 orders
-    result = await db.execute(
-        select(Order)
-        .options(selectinload(Order.steps))
-        .order_by(Order.created_at.desc())
-        .limit(20)
+    # ── Per-type donut data — only types with show_on_dashboard=True ─────
+    # The flag is admin-curated on the asset-type form. Three queries
+    # total: dashboard types, asset_pool counts (for personal/shared),
+    # active-order counts (for capacity_pooled). No N+1.
+    dashboard_types_res = await db.execute(
+        select(AssetType)
+        .where(AssetType.show_on_dashboard.is_(True))
+        .order_by(AssetType.name)
     )
-    recent_orders = result.scalars().all()
+    dashboard_types = dashboard_types_res.scalars().all()
 
-    # Asset name lookup for assigned assets
-    asset_ids = [o.assigned_asset_id for o in recent_orders if o.assigned_asset_id]
-    asset_names: dict[int, str] = {}
-    if asset_ids:
-        asset_rows = await db.execute(
-            select(AssetPool.id, AssetPool.name).where(AssetPool.id.in_(asset_ids))
+    pool_status_counts: dict[int, dict[str, int]] = {}
+    pooled_in_use: dict[int, int] = {}
+    if dashboard_types:
+        # Per-(type, status) row counts from asset_pool — the breakdown
+        # source for ``assigned_personal`` / ``dedicated_shared`` types.
+        pool_rows = await db.execute(
+            text(
+                "SELECT asset_type_id, status, COUNT(*) "
+                "FROM asset_pool "
+                "WHERE asset_type_id = ANY(:ids) "
+                "GROUP BY asset_type_id, status"
+            ),
+            {"ids": [t.id for t in dashboard_types]},
         )
-        asset_names = {row.id: row.name for row in asset_rows}
+        for at_id, status_val, cnt in pool_rows:
+            pool_status_counts.setdefault(at_id, {})[str(status_val)] = int(cnt)
 
-    # Assignment model lookup for shared/pooled assets
-    type_ids = list({o.asset_type_id for o in recent_orders if o.asset_type_id})
-    asset_type_models: dict[int, str] = {}
-    if type_ids:
-        type_rows = await db.execute(
-            select(AssetType.id, AssetType.assignment_model).where(AssetType.id.in_(type_ids))
+        # Active-order counts for ``capacity_pooled`` types — these have
+        # no asset_pool rows; their "in use" is the count of orders in
+        # an active state against the type's pool_capacity quota.
+        from app.utils.capacity import _ACTIVE_STATUSES  # local — avoids cycle
+        pooled_rows = await db.execute(
+            select(Order.asset_type_id, func.count())
+            .where(
+                Order.asset_type_id.in_([t.id for t in dashboard_types]),
+                Order.status.in_(_ACTIVE_STATUSES),
+            )
+            .group_by(Order.asset_type_id)
         )
-        asset_type_models = {row.id: row.assignment_model for row in type_rows}
+        pooled_in_use = {row[0]: int(row[1]) for row in pooled_rows}
+
+    # Reuse the warnings already computed by _pool_summary (same 80%/95%
+    # thresholds as the dashboard warning band) so a single source of truth
+    # decides "this pool is hot" — keyed by asset_type_id for O(1) lookup
+    # in the per-card loop.
+    dashboard_type_ids = {t.id for t in dashboard_types}
+    type_capacity: dict[int, dict] = {
+        w["asset_type_id"]: w
+        for w in summary.get("warnings", [])
+        if w["asset_type_id"] in dashboard_type_ids
+    }
 
     return templates.TemplateResponse(
         request, "dashboard.html",
         {
             "summary": summary,
-            "recent_orders": recent_orders,
-            "asset_names": asset_names,
-            "asset_type_models": asset_type_models,
+            "dashboard_types": dashboard_types,
+            "pool_status_counts": pool_status_counts,
+            "pooled_in_use": pooled_in_use,
+            "type_capacity": type_capacity,
             "status_colors": _STATUS_COLORS,
             "asset_status_colors": _ASSET_STATUS_COLORS,
             "now": datetime.now(timezone.utc),
