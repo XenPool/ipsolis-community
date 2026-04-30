@@ -403,14 +403,49 @@ pull one when there's a procurement need or a quiet week.
       decide directly via the existing token URL.
 
 ### Per-classification approval routing
-- [ ] Approval routing: orders containing PII/PHI/PCI fields automatically
-      include an extra approval step (e.g. compliance officer). The
-      conditional-approval-rules engine already covers this with
-      `has_pii / has_phi / has_pci` fields — slice is more about defaults
-      and discoverability than mechanism.
-- [ ] Settings: per-classification policy switches ("PII fields always
-      trigger manager approval", "PHI requires owner-of-record
-      acknowledgement").
+- [x] **Per-classification approval routing — defaults path**
+      *(2026-04-30)*. Three new config keys
+      (`approval.classification_policy.{pii,phi,pci}`, default `none`)
+      plus an `approval.compliance_officer_email` /
+      `_name` pair seeded by migration `0091`. New helper
+      `app.utils.classification_routing.compliance_officer_approver()`
+      inspects an asset type's attribute classifications and the
+      loaded policy, returning the compliance-officer approver dict
+      (or `None`) for the order-creation site to inject. Activation
+      precedence is strictest-first (PCI > PHI > PII): an order
+      touching multiple classes still gets one compliance step,
+      attributed (via the audit row's existing `classification`
+      column) to the strictest matching class. Plugged into
+      `portal.py` order creation right after the conditional-rules
+      evaluation, with explicit de-dup against the manager / app-owner
+      / rule approver emails so a manager who's also the compliance
+      officer doesn't get two approval requests. Status flips to
+      `pending_approval` correctly when the auto-step is the only
+      approval-needing trigger (existing static toggles off,
+      no rules configured). New `compliance_officer` value for
+      the `approver_type` column (`String(30)` so 18 chars fits).
+      Settings UI adds a "Per-classification approval routing"
+      card in the Compliance tab with three policy dropdowns +
+      compliance-officer email/name inputs; client-side guard
+      blocks save when any class is enabled but the email is
+      empty (server side also skips silently — defense in depth,
+      but the Settings-time guard is the operator-facing signal).
+      Smoke-tested live with a real asset type stamped with
+      various classifications: default policy → no auto-step;
+      PII-only on with no email → no auto-step (skipped by the
+      email guard); PII on with email set → returns the approver
+      with `trigger_class='pii'`; PII+PHI both on → `'phi'` wins
+      (strictest-first); PCI+PHI+PII all on → `'pci'` wins. Runs
+      alongside the existing `has_pii / has_phi / has_pci`
+      conditional-rules engine — operators can keep using rules
+      for fine-grained logic ("PII *and* monthly_cost > €1000")
+      while the defaults path covers the simple "any PII →
+      compliance step" case in one click.
+- [ ] PHI-specific *owner-of-record acknowledgement* — separate from
+      the global compliance officer; auto-routes the auto-step to
+      the asset's listed business owner instead of the centralised
+      officer. Useful when HIPAA controls require the data steward
+      (not just a generic compliance team) to sign off.
 
 ---
 

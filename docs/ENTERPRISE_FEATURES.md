@@ -1287,6 +1287,71 @@ Admin UI → *Asset Definitions* → edit a definition → in each
 attribute row, pick a value from the **Classification** dropdown.
 Unset = `internal` (the default).
 
+### Per-classification approval routing
+
+Operators in regulated industries can flip a *one-click* switch:
+"any order whose asset type carries PII / PHI / PCI fields auto-adds
+a compliance-officer approval step." The conditional approval rules
+engine has supported this for a while via the
+`has_pii / has_phi / has_pci` context fields, but only when an
+admin writes the rules explicitly. The classification-driven
+defaults path bypasses that — operators just pick a policy per
+class.
+
+Admin UI → *Settings → Compliance → Per-classification approval
+routing*:
+
+| Setting | Options |
+|---|---|
+| **PII policy** | `None — existing flow` / `Add compliance officer step` |
+| **PHI policy** | same |
+| **PCI policy** | same |
+| **Compliance officer email** | the email the auto-step targets |
+| **Display name** | shown in approval emails / portal pending page |
+
+**Activation precedence** is *strictest-first* (PCI > PHI > PII).
+An order touching multiple classes still gets *one* compliance
+step, attributed (via the audit row's `classification`) to the
+strictest matching class. The rule evaluator's de-dup-by-email
+contract still applies — a compliance officer named in a
+conditional rule plus configured globally still gets just one
+approval row per order.
+
+**Interaction with other approval sources**:
+
+* The compliance officer is **de-duped** against the manager,
+  application owners, and rule-driven approvers. A manager who
+  *is* the compliance officer doesn't receive two approval
+  requests.
+* The compliance officer step is added even when the static
+  manager / app-owner toggles are off — a PII-tagged asset type
+  with no manager approval needed still triggers the
+  compliance-officer step. Order status flips to
+  `pending_approval` correctly.
+* The classification-routing path runs **on top of** the
+  conditional approval rules engine — an admin can keep using
+  rules for fine-grained logic (e.g. "PII only requires
+  compliance approval when monthly_cost > €1000") and the
+  defaults path for the simple "any PII → compliance step" case.
+
+**No-email guard**: setting any class to `Add compliance officer
+step` without filling in the email surfaces a Settings-time error
+("Set the compliance officer email when any classification is set
+to..."). The order-creation path also skips the auto-step silently
+when the email is empty — defense in depth, but the Settings-time
+guard is the primary signal so operators can't accidentally ship
+a half-configured policy.
+
+**Stored config keys**:
+
+| Key | Default | Notes |
+|---|---|---|
+| `approval.classification_policy.pii` | `none` | Per-class policy (PII) |
+| `approval.classification_policy.phi` | `none` | Per-class policy (PHI) |
+| `approval.classification_policy.pci` | `none` | Per-class policy (PCI) |
+| `approval.compliance_officer_email`  | (empty) | Single email or DL address |
+| `approval.compliance_officer_name`   | `Compliance Officer` | Display name in emails / portal |
+
 ---
 
 ## Per-order cost projection on the portal

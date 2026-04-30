@@ -578,7 +578,18 @@ async def portal_create_order(
         build_context(order, asset_type),
     )
 
-    if needs_any_approval or rule_approvers:
+    # Per-classification approval routing — defaults-driven path that
+    # injects a compliance-officer step when the asset type's attribute
+    # classification (PII / PHI / PCI) matches a configured policy. Runs
+    # alongside the rules engine, de-duped against existing approvers.
+    from app.utils.classification_routing import (
+        compliance_officer_approver,
+        load_classification_policy,
+    )
+    classification_policy = await load_classification_policy(db)
+    compliance_approver = compliance_officer_approver(asset_type, classification_policy)
+
+    if needs_any_approval or rule_approvers or compliance_approver:
         # Create approval records, applying delegation re-routing if active
         from app.models.approval import OrderApproval
         from app.utils.approval_delegation import resolve_active_delegate
@@ -650,12 +661,28 @@ async def portal_create_order(
             ))
             seen_emails.add(ra["email"].lower())
 
+        # Per-classification compliance-officer step. Skips silently when
+        # already covered by manager / owner / rule approvers — common
+        # case is "the manager and the compliance officer are the same
+        # person on a small team" and we don't want to double-charge.
+        if compliance_approver and compliance_approver["email"].lower() not in seen_emails:
+            db.add(await _make_approval(
+                "compliance_officer",
+                compliance_approver["email"],
+                compliance_approver["name"],
+            ))
+            seen_emails.add(compliance_approver["email"].lower())
+            logger.info(
+                "Portal: order %s adds compliance-officer step (trigger=%s, officer=%s)",
+                order.id, compliance_approver["trigger_class"], compliance_approver["email"],
+            )
+
         await db.flush()
 
-        # Make sure the order ends up in pending_approval if rules added
-        # approvers even though the static toggles were off (i.e.
-        # `needs_any_approval` was False but `rule_approvers` triggered).
-        if not needs_any_approval and rule_approvers:
+        # Make sure the order ends up in pending_approval if rules or
+        # the classification-routing path added approvers even though
+        # the static toggles were off.
+        if not needs_any_approval and (rule_approvers or compliance_approver):
             order.status = OrderStatus.PENDING_APPROVAL
 
         # Send approval request emails via Celery
