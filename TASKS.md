@@ -396,8 +396,46 @@ pull one when there's a procurement need or a quiet week.
 ### Conditional approval rules slice 3
 - [ ] Visual editor for deeply-nested compounds (today's UI flattens to
       1 level + warning).
-- [ ] Per-bucket reminder optimisation: stop nagging approvers in a bucket
-      whose quorum is already met but whose siblings are still pending.
+- [x] **Per-bucket supersession (was: per-bucket reminder optimisation)**
+      *(2026-04-30)*. Today (slice 2) when a single quorum bucket meets
+      its threshold but other buckets are still pending, the surplus
+      pending rows in the now-closed bucket stay `pending` and continue
+      attracting reminders / escalations — operators in 2-of-5 rule
+      groups got nagged after the first two votes had already closed
+      their bucket, training them to ignore reminder emails. Slice 3
+      auto-closes those rows the moment their bucket meets quorum,
+      decision-time rather than Beat-tick-time. Refactored
+      `apply_approval_decision()` in `api/app/utils/approval_decision.py`:
+      extracted the inline bucket math into a `_compute_bucket_state()`
+      helper returning a `_BucketState` with `bucket_of` (approval_id →
+      bucket key), `members`, `thresholds`, `approved_counts`, `met`,
+      and `all_met` aggregates. Both the existing whole-order
+      supersession path and the new per-bucket path use the same state.
+      New "deciding approval closes its own bucket" branch fires when
+      `state.met[deciding_bucket]` is true but `state.all_met` is false:
+      iterates the bucket's members, flips remaining pending rows to
+      `superseded` with `decided_at` stamped, and writes one
+      `order_approval / superseded_bucket_quorum_met` audit row per
+      supersession capturing the bucket name, `approved/threshold`
+      progress, and the deciding approver's email — distinguishable
+      from the existing whole-order sweep (which writes a single
+      `order / approved_and_dispatched` audit instead of per-row rows
+      since the gate-clearance row already names who voted to release).
+      Reminder Beat task needs no changes — its query already filters
+      `WHERE status = 'pending'`, so superseded rows naturally drop out.
+      Smoke-tested live with a 2-bucket order (1 manager in `global`,
+      3 sec reviewers in `rule:HighRisk` with threshold 2): first sec
+      vote → bucket 1/2, no supersession, all 3 sec rows still pending;
+      second sec vote → bucket 2/2 met, `rule:HighRisk` member 23
+      auto-flipped to `superseded` with the audit trail capturing
+      `bucket=rule:HighRisk progress=2/2 decided_by=sec2@xenpool.de`,
+      manager row stayed `pending` (different bucket, not yet met);
+      manager vote → all_met → order dispatched (`status=processing`),
+      "Approval recorded — order is being dispatched" rendered. The
+      audit-trail picture: bucket-mate's "I'm closed early" event is
+      attributable to the *deciding* approver, not the superseded
+      approver — consistent with how the existing whole-order path
+      attributes via the `approved_and_dispatched` row.
 - [x] **Escalation v2 — assignment mode** *(2026-04-30)*. Today's
       slice-1 escalation flow notifies `approval.escalation_email`
       contacts via an email pointing at `/ui/orders` — the contact

@@ -45,6 +45,126 @@ class DecisionResult:
         self.all_granted = all_granted    # True iff this decision unblocked the order
 
 
+class _BucketState:
+    """Snapshot of the per-bucket approval situation for a single order.
+
+    See ``_compute_bucket_state`` for how buckets are formed. The state
+    drives both the per-bucket supersession path (close surplus rows in a
+    bucket whose quorum is met while siblings are still pending) and
+    the all-buckets-met path (mark every remaining pending row as
+    superseded and dispatch the order).
+    """
+
+    __slots__ = (
+        "bucket_of",        # approval_id -> bucket key
+        "members",          # bucket key -> list[OrderApproval]
+        "thresholds",       # bucket key -> int (after clamping / coercion)
+        "approved_counts",  # bucket key -> int
+        "met",              # bucket key -> bool
+        "global_mode",      # human-readable global mode string ("all" / "N-of-M")
+        "all_met",          # all(met.values())
+    )
+
+    def __init__(
+        self,
+        bucket_of: dict[int, str],
+        members: dict[str, list],
+        thresholds: dict[str, int],
+        approved_counts: dict[str, int],
+        met: dict[str, bool],
+        global_mode: str,
+    ) -> None:
+        self.bucket_of = bucket_of
+        self.members = members
+        self.thresholds = thresholds
+        self.approved_counts = approved_counts
+        self.met = met
+        self.global_mode = global_mode
+        self.all_met = all(met.values())
+
+    def progress_summary(self) -> str:
+        """Comma-separated 'bucket=approved/threshold' string used in audit / log lines."""
+        parts: list[str] = []
+        for key in sorted(self.members):
+            if not self.members[key]:
+                continue
+            parts.append(f"{key}={self.approved_counts.get(key, 0)}/{self.thresholds.get(key, 0)}")
+        return ", ".join(parts) or self.global_mode
+
+
+def _compute_bucket_state(all_approvals: list, asset_type) -> _BucketState:
+    """Group an order's approvals into quorum buckets and tally each.
+
+    Bucket model (slice 2 of conditional rules introduced this):
+
+    * ``global``                  — manager / app-owner / rule-driven
+                                    approvers without a per-rule
+                                    ``rule_threshold``. One per order.
+                                    Threshold = ``asset_type.min_approvals_required``
+                                    coerced to "all" when 0/NULL or
+                                    >= bucket size.
+    * ``rule:<rule_name>`` (×N)   — each rule with its own
+                                    ``min_approvals_required`` forms an
+                                    independent quorum group. Threshold
+                                    is clamped to bucket size.
+
+    The order is "all-buckets-met" only when every populated bucket has
+    hit its threshold. A bucket can meet its threshold while siblings
+    remain pending — that's the case the per-bucket supersession path
+    handles (slice 3): mark the surplus pending rows in the closed
+    bucket as ``superseded`` so they stop attracting reminders.
+    """
+    global_threshold_cfg = (asset_type.min_approvals_required if asset_type else None) or 0
+
+    bucket_of: dict[int, str] = {}
+    members: dict[str, list] = {"global": []}
+    thresholds: dict[str, int] = {}
+    for a in all_approvals:
+        if a.rule_threshold and a.rule_name:
+            key = f"rule:{a.rule_name}"
+            members.setdefault(key, []).append(a)
+            # All approvals from the same rule carry the same threshold;
+            # take the first non-null we see and ignore drift.
+            thresholds.setdefault(key, int(a.rule_threshold))
+        else:
+            key = "global"
+            members["global"].append(a)
+        bucket_of[a.id] = key
+
+    # Apply legacy "0/NULL/>=total → all required" coercion to global.
+    global_total = len(members["global"])
+    if global_threshold_cfg <= 0 or global_threshold_cfg >= global_total:
+        thresholds["global"] = global_total
+        global_mode = "all"
+    else:
+        thresholds["global"] = global_threshold_cfg
+        global_mode = f"{global_threshold_cfg}-of-{global_total}"
+
+    # Per-rule buckets: clamp to the bucket size so a rule that asks
+    # for more approvers than it has doesn't create an unfulfillable
+    # quorum (== "all of this rule's approvers").
+    for key, m in members.items():
+        if key == "global":
+            continue
+        thresholds[key] = min(thresholds[key], len(m))
+
+    approved_counts: dict[str, int] = {}
+    met: dict[str, bool] = {}
+    for key, m in members.items():
+        if not m:
+            met[key] = True   # an empty bucket is vacuously met
+            approved_counts[key] = 0
+            continue
+        approved = sum(1 for a in m if a.status == "approved")
+        approved_counts[key] = approved
+        met[key] = approved >= thresholds[key]
+
+    return _BucketState(
+        bucket_of=bucket_of, members=members, thresholds=thresholds,
+        approved_counts=approved_counts, met=met, global_mode=global_mode,
+    )
+
+
 async def apply_approval_decision(
     db: AsyncSession,
     approval: OrderApproval,
@@ -188,58 +308,53 @@ async def apply_approval_decision(
         select(OrderApproval).where(OrderApproval.order_id == order.id)
     )
     all_approvals = list(rows.scalars().all())
+    state = _compute_bucket_state(all_approvals, asset_type)
 
-    global_threshold_cfg = (asset_type.min_approvals_required if asset_type else None) or 0
-
-    # Bucket approvals: "global" plus one bucket per rule_name with a
-    # rule_threshold. Approvals from the same rule but without a
-    # threshold continue to live in "global".
-    buckets: dict[str, list[OrderApproval]] = {"global": []}
-    bucket_thresholds: dict[str, int] = {}
-    for a in all_approvals:
-        if a.rule_threshold and a.rule_name:
-            key = f"rule:{a.rule_name}"
-            buckets.setdefault(key, []).append(a)
-            # All approvals from the same rule carry the same threshold;
-            # take the first non-null we see and ignore drift.
-            bucket_thresholds.setdefault(key, int(a.rule_threshold))
-        else:
-            buckets["global"].append(a)
-
-    # Apply legacy "0/NULL/>=total → all required" coercion to global.
-    global_total = len(buckets["global"])
-    if global_threshold_cfg <= 0 or global_threshold_cfg >= global_total:
-        bucket_thresholds["global"] = global_total
-        global_mode = "all"
-    else:
-        bucket_thresholds["global"] = global_threshold_cfg
-        global_mode = f"{global_threshold_cfg}-of-{global_total}"
-
-    # Per-rule buckets: clamp to the bucket size so a rule that asks
-    # for more approvers than it has doesn't create an unfulfillable
-    # quorum (== "all of this rule's approvers").
-    for key, members in buckets.items():
-        if key == "global":
-            continue
-        bucket_thresholds[key] = min(bucket_thresholds[key], len(members))
-
-    bucket_met: dict[str, bool] = {}
-    bucket_progress: dict[str, str] = {}
-    for key, members in buckets.items():
-        if not members:
-            bucket_met[key] = True
-            continue
-        approved = sum(1 for a in members if a.status == "approved")
-        bucket_met[key] = approved >= bucket_thresholds[key]
-        bucket_progress[key] = f"{approved}/{bucket_thresholds[key]}"
-
-    threshold_met = all(bucket_met.values())
+    threshold_met = state.all_met
     approved_count = sum(1 for a in all_approvals if a.status == "approved")
-    mode = ", ".join(
-        f"{key}={bucket_progress[key]}"
-        for key in sorted(buckets)
-        if buckets[key]
-    ) or global_mode
+    mode = state.progress_summary()
+
+    # Slice 3 — per-bucket reminder optimisation. When the deciding
+    # approval closes its *own* bucket but other buckets are still
+    # waiting, mark surplus pending rows in the now-closed bucket as
+    # ``superseded`` so they stop attracting reminders / escalations.
+    # Bucket-mates can still see the order's history but they no
+    # longer carry an actionable pending row. Skipped when the whole
+    # order is met (the next block handles that with one sweep).
+    if not threshold_met:
+        deciding_bucket = state.bucket_of.get(approval.id)
+        if deciding_bucket and state.met.get(deciding_bucket):
+            now = datetime.now(timezone.utc)
+            bucket_superseded = 0
+            for a in state.members.get(deciding_bucket, []):
+                if a.status == "pending":
+                    a.status = "superseded"
+                    a.decided_at = now
+                    bucket_superseded += 1
+                    await aaudit(
+                        db, "order_approval", a.id, "superseded_bucket_quorum_met",
+                        old={"status": "pending", "approver_email": a.approver_email},
+                        new={
+                            "status": "superseded",
+                            "approver_email": a.approver_email,
+                            "bucket": deciding_bucket,
+                            "bucket_progress": (
+                                f"{state.approved_counts.get(deciding_bucket, 0)}/"
+                                f"{state.thresholds.get(deciding_bucket, 0)}"
+                            ),
+                            "decided_by": approval.approver_email,
+                        },
+                        by=actor, classification=classification,
+                    )
+            if bucket_superseded:
+                logger.info(
+                    "Order %s bucket %s closed (%d/%d) — %d surplus rows superseded; "
+                    "other buckets still pending (%s)",
+                    order.id, deciding_bucket,
+                    state.approved_counts.get(deciding_bucket, 0),
+                    state.thresholds.get(deciding_bucket, 0),
+                    bucket_superseded, mode,
+                )
 
     if threshold_met:
         # Mark remaining pending approvals as "superseded" so they

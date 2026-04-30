@@ -1538,6 +1538,23 @@ condition matches the order. Rules:
   group; manager / owner / no-quorum-rule approvers fold into the
   asset-type-level group. The order is unblocked only when *every*
   group meets its threshold.
+- **Per-bucket supersession** (slice 3): when a single bucket meets
+  its quorum but other buckets are still waiting, surplus pending
+  rows in the closed bucket flip to `superseded` immediately
+  (decision-time, not Beat-tick-time). They stop attracting
+  reminders and escalations the moment their bucket is covered —
+  approvers in a 2-of-5 group don't keep getting nagged after the
+  first two say yes. Each supersession writes an
+  `order_approval / superseded_bucket_quorum_met` audit row
+  capturing the bucket name, the `approved/threshold` progress at
+  the time of close, and the deciding approver's email — so a
+  forensic query can reconstruct who closed which bucket without
+  cross-referencing per-decision audit rows. The whole-order
+  supersession path (when *every* bucket meets and the order
+  dispatches) is unchanged: it sweeps remaining pending rows in
+  one go without per-row audit, since the
+  `approved_and_dispatched` order audit already names who voted to
+  release the gate.
 - **Malformed rules** (typo in `op`, unknown `field`) are logged at
   WARNING and skipped — a hand-edited JSON typo can never block
   order creation.
