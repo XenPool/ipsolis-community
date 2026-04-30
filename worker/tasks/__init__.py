@@ -20,6 +20,7 @@ app = Celery(
         "tasks.workflows.license_check",
         "tasks.workflows.siem_streamer",
         "tasks.workflows.approval_reminders",
+        "tasks.workflows.approval_auto_decline",
         "tasks.workflows.audit_retention",
         "tasks.workflows.update_checker",
         "tasks.modules.maintenance",
@@ -74,6 +75,7 @@ app.conf.update(
         "tasks.workflows.audit_retention.*": {"queue": "default"},
         "tasks.workflows.update_checker.*": {"queue": "default"},
         "tasks.workflows.approval_reminders.*": {"queue": "notifications"},
+        "tasks.workflows.approval_auto_decline.*": {"queue": "notifications"},
         "tasks.modules.notifications.*": {"queue": "notifications"},
         "tasks.modules.maintenance.*": {"queue": "default"},
     },
@@ -130,6 +132,14 @@ app.conf.update(
         "approval-reminder-scan": {
             "task": "tasks.workflows.approval_reminders.scan_and_remind",
             "schedule": crontab(minute=15),  # Hourly at :15 to spread Beat load
+            "options": {"queue": "notifications"},
+        },
+        # Decline pending approvals past the configured inactivity window
+        # (opt-in via approval.auto_decline_enabled — no-op when disabled).
+        # Daily cadence is plenty since the threshold is in days.
+        "approval-auto-decline-scan": {
+            "task": "tasks.workflows.approval_auto_decline.scan_and_auto_decline",
+            "schedule": crontab(hour=3, minute=30),  # Daily at 03:30 Europe/Berlin
             "options": {"queue": "notifications"},
         },
         # Daily check for newer ipSolis releases — opt-in via the

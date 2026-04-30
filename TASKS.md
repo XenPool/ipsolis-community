@@ -1086,7 +1086,59 @@ delegation, N-of-M, conditional rules) remain.
   validator confirms 167 keys per locale.
 - Verified: routes return 302 (portal-login redirect) without a
   session; 167 i18n keys present in every locale.
-- [ ] Auto-decline policy after extended inactivity (opt-in)
+
+**Done — auto-decline on extended inactivity (2026-04-30):**
+- Migration `0078_seed_auto_decline_config.py` seeds three keys
+  (`approval.auto_decline_enabled` = false,
+  `approval.auto_decline_after_days` = 0,
+  `approval.auto_decline_message` = friendly resubmit hint).
+  Off by default so existing installs see no behaviour change
+  until a superadmin opts in.
+- New Beat task `worker/tasks/workflows/approval_auto_decline.py:
+  scan_and_auto_decline` runs daily at 03:30 Europe/Berlin.
+  Picks at most one stale pending approval per order
+  (`DISTINCT ON (order_id)` ordered by `created_at ASC`) so a
+  single decline propagates the existing veto-on-decline
+  semantics without writing N redundant audit rows on a
+  multi-approver order.
+- Mirrors the decline path in
+  `app.utils.approval_decision.apply_approval_decision`:
+  approval row → `status='declined'` + `decided_at` + the
+  configured comment; order → `status='rejected'` +
+  populated `error_message`; two `waudit` rows
+  (`order_approval` + `order`) attributed to
+  `system:auto_decline`; rejection email queued via the
+  existing `tasks.workflows.dynamic_runner.send_approval_result_email`
+  task so the requester gets the same message a human-driven
+  decline produces. Deliberate duplication of the API-side
+  decline logic — keeps the worker free of api package imports
+  (same boundary `audit_helper.py` already observes).
+- Wired into `worker/tasks/__init__.py` `include` list, queue
+  routing (`notifications`), and `beat_schedule`.
+- Settings UI: new "Auto-decline (opt-in)" sub-card inside the
+  existing Approval Reminders section with status dropdown,
+  days-input (0 disables), and decline-reason textarea. Single
+  Save button persists the whole reminders+escalation+auto-decline
+  block via the existing `saveApprovalReminderConfig` PUT loop.
+- Verified end-to-end:
+  * Synthetic stale approval (30 days old) on a synthetic
+    pending_approval order against a real asset_type. With
+    `enabled=true, after_days=14`: task returned
+    `{declined: 1, after_days: 14}`, approval row flipped to
+    `declined` with the configured comment, order flipped to
+    `rejected` with the prefixed message, audit log gained two
+    rows attributed to `system:auto_decline`.
+  * Re-running the same task immediately returned
+    `{declined: 0}` — already-rejected order is correctly
+    skipped (the `o.status NOT IN ('rejected', 'cancelled')`
+    guard in the SELECT).
+  * Setting `enabled=false` and re-running returned
+    `{skipped: True, reason: 'auto_decline_enabled is false'}`
+    — disabled toggle short-circuits before any DB scan.
+  * Synthetic test data + audit rows cleaned up via the
+    documented `SET LOCAL ipsolis.allow_audit_mutation`
+    bypass; tamper-evident triggers from migration 0062
+    correctly blocked the initial DELETE before the bypass.
 
 ### [open] HR feed + SCIM — Prio 1
 Auto-deprovision on `LeaverEvent` from Workday/SAP HR; SCIM in/out so Okta /
