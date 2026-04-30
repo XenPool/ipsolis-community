@@ -32,11 +32,12 @@ Enterprise IT automation shouldn't require a 6-month implementation project and 
 - **Approval escalation** — once an approval has burned through all its reminders without a decision, a single notification fires to the configured escalation contact(s) so an operator can intervene; each row escalates at most once
 - **N-of-M approvals** — set `min_approvals_required` per asset definition so any N of M configured approvers can satisfy the order; remaining pending rows transition to `superseded` once the threshold is met. Per-rule N-of-M lets each conditional rule carry its own quorum; rule-driven approvers form an isolated group with that quorum, while manager / owner / no-quorum-rule approvers fold into the asset-type-level group. Decline still vetoes regardless of N.
 - **Conditional approval rules** — JSONB rule list per asset definition adds extra approvers when a condition matches the order. Conditions can be a leaf `{field, op, value}` or a compound `{op: "and"|"or"|"not", clauses: [...]}` — nested up to 8 levels deep. Built-in fields (`duration_days`, `monthly_cost`, `has_pii/phi/pci`, `requester_department`) plus any `attr.<key>` from the asset type's user-supplied attributes. Malformed rules are logged and skipped, never blocking order creation.
+- **Auto-decline on extended inactivity** — opt-in policy that system-declines pending approvals past a configurable age (e.g. 14 days) so stale requests don't pile up forever. Daily Beat task picks at most one stale approval per order, propagates the existing veto-on-decline semantics (order → rejected, requester emailed, audit row attributed to `system:auto_decline`). Off by default; configure under *Settings → E-Mail → Approval Reminders → Auto-decline (opt-in)*.
 
 ### Dynamic Runbook Engine
 - Visual runbook builder in the Admin UI
 - Three automation strategies: Group Access (AD/Entra groups), Runbook (PowerShell scripts), or Composite (both)
-- PowerShell module management (install from Gallery or upload custom `.zip`)
+- PowerShell module management (install from Gallery or upload custom `.zip`) with a per-module **Linux compatibility flag** (`Linux ✓` / `Windows only ✕` / `Unverified ?`) — the worker runs PowerShell 7 on Linux, and modules tagged `PSEdition_Desktop` only won't load. Operators declare compatibility when adding a module and can flip the badge inline by clicking it in the modules table
 - In-app PowerShell script editor with parameter introspection
 - Step-by-step execution tracking with structured JSON logs
 
@@ -89,7 +90,8 @@ Enterprise IT automation shouldn't require a 6-month implementation project and 
 
 ### Finance & Chargeback
 - **Cost / chargeback per asset definition** — set `monthly_cost`, `currency`, and `cost_center` on each definition; the Cost Report page aggregates active orders into projected monthly spend per cost center with CSV export
-- **AD-driven consumer breakdown** — at order creation we snapshot the requester's AD attributes (`department`, `cost_center`, `company`, `employeeID`, `title`; attribute names configurable in Settings) onto each order, so the Cost Report can also slice spend by consuming team / department, and the per-order CSV carries every requester's full HR identity for spreadsheet pivots
+- **AD-driven consumer breakdown** — at order creation we snapshot the requester's AD attributes (`department`, `cost_center`, `company`, `employeeID`, `title`; attribute names configurable in Settings) onto each order, so the Cost Report can also slice spend by consuming team / department, and the per-order CSV carries every requester's full HR identity for spreadsheet pivots. Snapshot runs on every creation path — portal, public `POST /orders/`, and the ServiceNow webhook — so externally-driven orders feed the same consumer-side rows
+- **Per-order cost projection** — the portal's order detail page renders the projected total (`monthly_cost × months_requested`) in the Access & Duration card whenever the asset definition is priced; users see what their request will cost before / after approval
 
 ### Admin UI
 - Dashboard with live pool status tiles (auto-refreshing HTMX fragments)
@@ -194,7 +196,7 @@ The overlay is purely additive — same database, same migrations, same image ta
 
 See the full deployment guide: **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)**
 
-For per-feature setup (Teams approval cards, Prometheus metrics, per-user quotas, catalog help text, …) see **[docs/ENTERPRISE_FEATURES.md](docs/ENTERPRISE_FEATURES.md)**.
+For per-feature setup walkthroughs (Admin RBAC, external secret management, SIEM streaming, Teams approval cards, OpenTelemetry tracing, HA Beat, conditional approval rules, auto-decline, cost / chargeback, …) see **[docs/ENTERPRISE_FEATURES.md](docs/ENTERPRISE_FEATURES.md)**. Grafana dashboard + Prometheus alerts in **[docs/grafana/](docs/grafana/)**; ops runbooks in **[docs/runbooks/](docs/runbooks/)**.
 
 Summary:
 1. Provision a Linux server with Docker
@@ -212,33 +214,52 @@ api/
     models/         SQLAlchemy ORM models
     routes/         FastAPI routers (admin, admin_auth, admin_modules,
                     admin_runbooks, admin_standalone_runbooks,
-                    admin_maintenance, portal, auth, orders, webhook, ui)
+                    admin_maintenance, admin_users, admin_self,
+                    admin_api_tokens, admin_license, admin_setup,
+                    admin_seed_export, admin_cost_report,
+                    admin_approval_delegations, approvals_external,
+                    portal, portal_delegations, auth, orders, webhook,
+                    metrics, ui)
     schemas/        Pydantic request/response schemas
     templates/      Jinja2 templates (Admin UI + Portal + admin login)
     static/         Static JS/CSS assets served by FastAPI
-    utils/          AD (msldap), capacity, MSAL, admin auth, PS param parser
+    utils/          AD (msldap), capacity, MSAL, admin auth, PS param parser,
+                    RBAC, password (PBKDF2), api_tokens, secrets resolver
+                    (Vault / CCP), approval token signer + decision helper,
+                    SoD detection, classification, metrics, tracing, audit
   alembic/
-    versions/       Database migrations (0001 ... 0044+)
+    versions/       Database migrations (0001 ... 0078, head bumps with each
+                    feature slice — see `docker compose exec api alembic
+                    history` for the full chain)
 worker/
   tasks/
     modules/        Atomic workflow modules (pool_manager, vsphere, sccm,
                     active_directory, notifications, target_executor,
-                    maintenance, config_reader)
+                    teams_notify, maintenance, config_reader, secrets,
+                    siem_export, audit_helper, step_helper, registry)
     workflows/      Orchestration (dynamic_runner, standalone_runner,
-                    ps_module_installer, sccm_probe)
-    utils/          DB query helpers for worker-side code
+                    ps_module_installer, sccm_probe, license_check,
+                    siem_streamer, audit_retention, approval_reminders,
+                    approval_auto_decline, update_checker)
+    tracing.py      OpenTelemetry setup for the worker side
 scripts/
-  ad/               Active Directory PowerShell scripts
-  sccm/             SCCM task sequence scripts
-  sql/              SQL helpers (legacy migration queries)
-  test/             Sandbox / smoke-test scripts
-  vmware/           VMware vSphere PowerShell scripts
-  xenserver/        XCP-ng / XenServer PowerShell scripts
-locales/            Portal i18n (de/en/es/fr/it JSON + validator)
+  modules/          Per-category PowerShell script modules synced from the DB
+                    (ad / sccm / sql / test / vmware / xenserver) — seed
+                    material only, runtime reads from the DB
+  runbooks/         Standalone runbook JSON snapshots (seed material)
+tools/
+  license/          Ed25519 keypair generator + license signer for
+                    Enterprise .lic files
+  validate_locales.py  Portal i18n JSON key-tree validator
+locales/            Portal i18n (de/en/es/fr/it JSON)
 nginx/              Reverse-proxy + TLS config (production overlay)
 backups/            Persisted DB dumps (bind-mounted into api + worker)
+licenses/           Signed `.lic` Enterprise license file (read-write)
 docs/
-  DEPLOYMENT.md     Production deployment guide
+  DEPLOYMENT.md             Production deployment guide
+  ENTERPRISE_FEATURES.md    Per-feature setup walkthroughs
+  grafana/                  Ready-to-import dashboard + Prometheus alerts
+  runbooks/                 Operational runbooks (e.g. compose project rename)
 ```
 
 ## Data Privacy
@@ -258,14 +279,18 @@ This software is designed for on-premises deployment. All data stays within your
 ### Built-in safeguards
 
 - No data leaves your network (zero telemetry, no cloud dependencies)
-- Append-only audit log for accountability
-- Role-based access (admin vs. portal user)
-- Entra ID SSO (no password storage)
+- Tamper-evident audit log (BEFORE-statement triggers block DELETE / UPDATE / TRUNCATE outside a documented bypass)
+- Per-classification audit retention windows (PII / PHI / PCI configurable independently of the global window)
+- Five-tier admin RBAC with per-asset-type ACL grants and separation-of-duties enforcement
+- Entra ID SSO for the portal (no password storage on the portal side)
+- Admin password storage uses PBKDF2-SHA256 (600k iterations, OWASP-2023)
+- External secret management (HashiCorp Vault / CyberArk CCP) replaces plaintext credentials in `app_config`
 - All traffic encrypted via HTTPS (nginx TLS termination)
+- Field-level data classification badges so requesters know which fields are sensitive before submitting
 
 ### Planned enhancements
 
-- Data retention policies with automatic cleanup of old orders
+- Order-history retention with automatic cleanup
 - User data export (data portability)
 - User data anonymization/deletion
 - Configurable session cookie hardening (production defaults)
@@ -279,18 +304,32 @@ Operators are responsible for maintaining their own records of processing activi
 
 ## Roadmap
 
-- [x] Multi-language support (i18n) -- portal available in DE / EN / ES / FR / IT
-- [x] Dashboard with live pool status tiles
+**Shipped**
+
+- [x] Multi-language support (i18n) — portal available in DE / EN / ES / FR / IT
+- [x] Dashboard with live pool status tiles, setup checklist, pool capacity warnings
 - [x] Maintenance UI (backups, health probes, queue inspection)
-- [x] PowerShell module management (Gallery + manual upload)
+- [x] PowerShell module management (Gallery + manual upload, with Linux compatibility flag)
 - [x] Standalone runbooks (ad-hoc + cron-scheduled)
+- [x] Per-classification audit-log retention with tamper-evident triggers
+- [x] Role-based admin access — five-tier ladder with per-asset-type ACL grants and SoD enforcement
+- [x] API token management for external integrations (per-token scopes + role binding)
+- [x] Audit log viewer + SIEM streaming (Splunk HEC / Microsoft Sentinel / generic webhook)
+- [x] OpenTelemetry tracing (api + Celery worker) + Prometheus metrics + Grafana dashboard
+- [x] External secret management (HashiCorp Vault + CyberArk CCP/AIM)
+- [x] HA Beat scheduler (celery-redbeat with Redis-backed distributed lock)
+- [x] Cost / chargeback per asset definition with provider + consumer (AD-driven) views
+- [x] Approval reminders, escalation, delegation (admin + portal self-service), and auto-decline
+
+**Open**
+
+- [ ] Access certification campaigns (quarterly manager re-confirmation workflow)
+- [ ] HR feed + SCIM 2.0 (Workday/SAP leaver events, Okta / Ping / SailPoint integration)
+- [ ] Cost report: threshold alerting, historical view, FX conversion
 - [ ] Data retention and automatic cleanup (order history)
-- [ ] User data export and deletion
-- [ ] Sentry integration (optional error tracking)
-- [ ] Usage analytics dashboard
-- [ ] Role-based admin access (multiple admin roles)
-- [ ] API token management for external integrations
-- [ ] Terraform provider for asset type configuration
+- [ ] User data export and deletion (GDPR-style data portability)
+- [ ] Optional Sentry integration for error tracking
+- [ ] Terraform provider for asset definition configuration
 
 ## License
 

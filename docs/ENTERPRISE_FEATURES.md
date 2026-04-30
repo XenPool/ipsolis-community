@@ -4,15 +4,48 @@ This page covers the per-feature setup for capabilities that go beyond the
 default install. Everything below is community-licensed unless an
 explicit *Enterprise license* note appears.
 
+**Catalog & portal**
+
 - [Per-user quota (`max_per_user`)](#per-user-quota-max_per_user)
 - [Active / inactive flag on asset definitions](#active--inactive-flag-on-asset-definitions)
 - [Long-form help text per asset definition (markdown)](#long-form-help-text-per-asset-definition-markdown)
 - [Catalog search and category filter](#catalog-search-and-category-filter)
+- [Field-level data classification](#field-level-data-classification)
+- [Per-order cost projection on the portal](#per-order-cost-projection-on-the-portal)
+
+**Approvals**
+
 - [Microsoft Teams approval cards](#microsoft-teams-approval-cards)
 - [Approval reminders](#approval-reminders)
+- [Approval escalation](#approval-escalation)
+- [Approval delegation (admin + portal self-service)](#approval-delegation-admin--portal-self-service)
+- [N-of-M approvals + conditional rules](#n-of-m-approvals--conditional-rules)
+- [Auto-decline on extended inactivity](#auto-decline-on-extended-inactivity)
+
+**Observability**
+
 - [Prometheus `/metrics` endpoint](#prometheus-metrics-endpoint)
+- [OpenTelemetry tracing (api + worker)](#opentelemetry-tracing-api--worker)
+
+**Compliance & audit**
+
 - [SIEM audit-log streaming (Splunk HEC + Microsoft Sentinel + Generic Webhook)](#siem-audit-log-streaming-splunk-hec--microsoft-sentinel--generic-webhook)
+- [Tamper-evident audit log + retention](#tamper-evident-audit-log--retention)
+
+**Authentication & access control**
+
 - [Per-integration API tokens](#per-integration-api-tokens)
+- [Admin RBAC (roles, ACL grants, SoD, password policy)](#admin-rbac-roles-acl-grants-sod-password-policy)
+- [External secret management (HashiCorp Vault + CyberArk CCP/AIM)](#external-secret-management-hashicorp-vault--cyberark-ccpaim)
+
+**Operations**
+
+- [PowerShell modules — Linux compatibility](#powershell-modules--linux-compatibility)
+- [HA Beat scheduler (multi-replica with celery-redbeat)](#ha-beat-scheduler-multi-replica-with-celery-redbeat)
+- [Setup checklist + pool capacity warnings on the dashboard](#setup-checklist--pool-capacity-warnings-on-the-dashboard)
+
+**Finance**
+
 - [Cost report / chargeback](#cost-report--chargeback)
 
 ---
@@ -757,3 +790,814 @@ by `Asset type`, by `Provider cost center`, or any combination.
 - Attribute names are read from `app_config` on every request, so
   rotating from `department` to a custom attribute lands on the next
   order without restart.
+- The same snapshot helper (`app.utils.ad_lookup.snapshot_requester_attrs`)
+  runs on **all three creation paths** — self-service portal, public
+  `POST /orders/`, and the ServiceNow webhook — so externally-driven
+  orders feed the same consumer-side rows the portal does.
+
+---
+
+## Field-level data classification
+
+Tag each user-supplied attribute on an asset definition as
+`internal`, `pii`, `phi`, or `pci`. The portal renders matching
+warning badges (amber for PII, red for PHI / PCI, neutral for
+`internal`) next to the field on the order form, and the
+classification flows into every audit row touching that asset type.
+
+### What it changes
+
+- **Portal**: requesters see at a glance which fields are sensitive
+  before they fill them in.
+- **Audit log**: each row's `classification` column is set at
+  *write time* from the strictest class declared on the touched
+  asset type's attributes (PCI > PHI > PII > internal). Writing-time
+  classification freezes the regulatory category against subsequent
+  attribute edits — the row's class is determined by the type's
+  state at the moment of the audited change, not at prune time.
+- **Per-class retention** (see [Tamper-evident audit log + retention](#tamper-evident-audit-log--retention))
+  uses the column to keep PII / PHI / PCI rows for a longer window
+  than routine config changes.
+
+### Where to set it
+
+Admin UI → *Asset Definitions* → edit a definition → in each
+attribute row, pick a value from the **Classification** dropdown.
+Unset = `internal` (the default).
+
+---
+
+## Per-order cost projection on the portal
+
+When the asset definition is priced (see
+[Cost report / chargeback](#cost-report--chargeback)), the portal's
+order detail page renders the projected total for the request:
+
+```
+Monthly cost      12.50 EUR
+Projected total   37.04 EUR    ← (hover for "90 days · 2.96 months")
+```
+
+Hidden when the asset type has no `monthly_cost` set, or when the
+order has no `requested_from`/`requested_until` window. Months use
+the calendar average (30.4375 days per month) so the figure
+matches the per-order CSV that finance pivots.
+
+No configuration — appears automatically once `monthly_cost` is
+populated.
+
+---
+
+## Approval escalation
+
+When an approval has burned through all its reminders without a
+decision, ip·Solis fires **one** notification to the configured
+escalation contact(s) so an operator can intervene. Each approval
+escalates *at most once*; subsequent ticks ignore already-escalated
+rows.
+
+### Where to configure
+
+Admin UI → *Settings* → *E-Mail* tab → *Approval Reminders* →
+**Escalation contact(s)** field. Comma-separated email addresses;
+leave blank to disable escalation entirely.
+
+### Stored config keys
+
+| Key | Purpose |
+|---|---|
+| `approval.escalation_email` | Comma-separated escalation contacts (blank disables) |
+
+### Operational notes
+
+- Triggered when `reminder_count >= max_reminders` AND
+  `escalated_at IS NULL`. The same Beat task that nudges
+  reminders also handles escalations in a single tick.
+- Approval URL in the escalation email points the contact at the
+  admin UI's `/ui/orders` page, not a signed-token approve page —
+  the escalation contact intervenes operationally rather than
+  deciding on the approver's behalf.
+- The seeded `approval_escalated` email template carries the full
+  variable set (original approver name+email, requester, asset,
+  reminder count, etc.) — customise it via *Settings → E-Mail
+  Templates* (Enterprise license).
+
+---
+
+## Approval delegation (admin + portal self-service)
+
+Re-route approval requests to a deputy while the assigned approver
+is out. Two surfaces, identical mechanics:
+
+| Surface | Who manages it | Use when |
+|---|---|---|
+| Admin UI → `/ui/approval-delegations` | Admins / helpdesk | Setting up delegations on behalf of users |
+| Portal → `/portal/delegations` | The approver themselves | Self-service "I'm on vacation" |
+
+### Where to configure
+
+- **Admin**: *Approval Delegations* in the left nav. New
+  delegation modal asks for approver email + delegate email +
+  from/until window + optional reason.
+- **Portal**: the user clicks *Delegations* under *My Approvals*
+  (visible only to users who have ever had at least one
+  approval). The form is pre-filled with their identity and
+  cannot be tampered with — server-side coercion enforces that
+  every portal-driven write addresses the SSO-authenticated user.
+
+### Behaviour
+
+- Applied at order-creation time. New approvals during the
+  window are addressed to the delegate; existing in-flight
+  approvals are not retroactively re-routed.
+- The most-recent matching active delegation wins. Revoked or
+  out-of-window delegations are ignored.
+- Audit trail: every create/revoke records who set up the
+  delegation. Portal-driven rows show
+  `portal:user:<email>`; admin-driven rows show
+  `admin:session:<user>:<role>`.
+- Cross-user portal revoke attempts return 404 (not 403) so
+  the existence of someone else's delegation isn't leaked.
+
+### Stored config keys
+
+None — delegation rows live in the `approval_delegations` table.
+
+---
+
+## N-of-M approvals + conditional rules
+
+Two complementary controls that together cover most real-world
+approval policies without code.
+
+### N-of-M
+
+Set `min_approvals_required` per asset definition so any N of M
+configured approvers can satisfy the order:
+
+| `min_approvals_required` | Behaviour |
+|---|---|
+| `NULL`, `0`, or ≥ total approvers | "All required" (legacy default) |
+| Positive integer < total | "Any N of M" — first N approves wins |
+
+Once the threshold is met, the remaining pending approvals
+transition to status `superseded` so they disappear from pending
+lists, no longer attract reminders / escalations / auto-decline,
+and can't be acted on retroactively. **Decline still vetoes
+regardless of N** — a single rejection always rejects the order.
+
+### Conditional rules
+
+JSONB rule list per asset definition adds extra approvers when a
+condition matches the order. Rules:
+
+```json
+{
+  "name": "EU cost center: compliance must approve long-running",
+  "condition": {
+    "op": "and",
+    "clauses": [
+      {"field": "duration_days",       "op": ">",       "value": 30},
+      {"field": "attr.cost_center",    "op": "contains","value": "EU"}
+    ]
+  },
+  "approvers": [
+    {"email": "compliance@example.com", "name": "Compliance"}
+  ],
+  "min_approvals_required": 1
+}
+```
+
+- **Condition shape**: leaf `{field, op, value}` or compound
+  `{op: "and"|"or"|"not", clauses: [...]}` nested up to 8 levels.
+- **Built-in fields**: `duration_days`, `monthly_cost`,
+  `has_pii`, `has_phi`, `has_pci`, `requester_department`.
+- **Custom-attribute fields**: `attr.<key>` for any user-supplied
+  attribute on the asset type's `config`. Auto-suggestions in the
+  rule builder come from the asset type's own attribute list.
+- **Operators**: `>`, `>=`, `<`, `<=`, `==`, `contains`.
+- **Per-rule N-of-M**: optional `min_approvals_required` on the
+  rule itself. Rule-driven approvers form an isolated quorum
+  group; manager / owner / no-quorum-rule approvers fold into the
+  asset-type-level group. The order is unblocked only when *every*
+  group meets its threshold.
+- **Malformed rules** (typo in `op`, unknown `field`) are logged at
+  WARNING and skipped — a hand-edited JSON typo can never block
+  order creation.
+
+### Where to configure
+
+Admin UI → *Asset Definitions* → edit a definition → **Approval**
+section → rule builder card. The rule editor shows a free-text
+field input with an autocomplete datalist of built-in fields plus
+all `attr.*` keys from the asset type. Deeply-nested compounds (3+
+levels) round-trip correctly but the simple card editor only edits
+top-level clauses; an "edit JSON" mode is on the roadmap.
+
+---
+
+## Auto-decline on extended inactivity
+
+Opt-in policy: pending approvals past a configurable age are
+declined by the system on the requester's behalf, marking the
+order as `rejected` and emailing the requester with the configured
+message. Closes the third lever in the staleness story alongside
+reminders and escalation.
+
+### Behaviour
+
+- **Cadence**: daily Beat task at 03:30 Europe/Berlin
+  (`tasks.workflows.approval_auto_decline.scan_and_auto_decline`).
+- **Selection**: pending approvals where
+  `created_at < NOW() - auto_decline_after_days days` AND the
+  parent order isn't already `rejected` / `cancelled`. At most one
+  stale approval per order is declined per tick (`DISTINCT ON
+  (order_id)`); the existing veto-on-decline semantics propagate
+  the rejection to the order, so handling siblings in the same
+  tick would just write redundant audit rows.
+- **Effects**: approval row → `status='declined'` + `decided_at` +
+  the configured comment; order → `status='rejected'` +
+  populated `error_message`; two audit rows (`order_approval` +
+  `order`) attributed to `system:auto_decline`; rejection email
+  queued via the existing `send_approval_result_email` task so the
+  requester gets the same message a human-driven decline produces.
+- **Off by default** — leave `auto_decline_enabled = false` or
+  `auto_decline_after_days = 0` to skip the scan entirely.
+
+### Where to configure
+
+Admin UI → *Settings* → *E-Mail* tab → *Approval Reminders* →
+**Auto-decline (opt-in)** sub-card:
+
+| Field | Default | Notes |
+|---|---|---|
+| Status | Disabled | Master switch — `Enabled` activates the Beat task |
+| Decline after (days) | 0 | Counted from the approval row's `created_at`. 0 also disables |
+| Decline reason | "Auto-declined: no decision recorded …" | Recorded on the approval + included in the rejection email |
+
+### Stored config keys
+
+| Key | Purpose |
+|---|---|
+| `approval.auto_decline_enabled` | `true`/`false` master switch |
+| `approval.auto_decline_after_days` | Days a pending approval may sit before system-decline |
+| `approval.auto_decline_message` | Decline reason text (operator-customisable) |
+
+### Sensible cadences
+
+A typical end-to-end staleness flow on a 14-day window:
+
+```
+Day 0 — Approval created, initial email + Teams card sent.
+Day 1 — Reminder (1) — same channel mix.
+Day 2 — Reminder (2).
+Day 3 — Reminder (3) — cap reached, no further nudges.
+Day 4 — Escalation email fires once to escalation contact.
+Day 4 → 14 — Silent (operator handles via escalation).
+Day 14 — Auto-decline fires; order → rejected; requester emailed.
+```
+
+Tune `reminder_after_hours`, `max_reminders`,
+`escalation_email`, and `auto_decline_after_days` to match your
+internal SLA policy.
+
+---
+
+## OpenTelemetry tracing (api + worker)
+
+Auto-instrumented FastAPI requests, SQLAlchemy queries, and Celery
+tasks flow through an OTLP HTTP exporter to any standard collector
+(Jaeger, Tempo, SigNoz, Honeycomb). A request that dispatches a
+runbook produces a single distributed trace spanning api + worker
+when both sides point at the same collector.
+
+### What gets traced
+
+- **API** (`service.name = ipsolis-api`): every HTTP request,
+  every SQLAlchemy statement.
+- **Worker** (`service.name = ipsolis-worker`): every Celery task
+  invocation, every SQLAlchemy statement.
+- **Distributed trace context** is propagated across the Celery
+  message boundary, so an http-dispatched runbook stitches into
+  one trace.
+
+### Where to configure
+
+Admin UI → *Settings* → *Compliance* tab → **OpenTelemetry
+Tracing** card:
+
+| Field | Purpose |
+|---|---|
+| Status | Master switch (off by default) |
+| Service name | Defaults to `ipsolis-api` (worker auto-suffixes `-worker`) |
+| OTLP endpoint | Your collector's `/v1/traces` URL |
+| Headers | JSON object — additional OTLP headers (vendor API key etc.) |
+| Console exporter | Diagnostic only — emits spans to api/worker stdout |
+
+### Operational notes
+
+- Wires up at api/worker startup, so changes here require a
+  restart (`docker compose restart api worker`).
+- Console-exporter mode is for local verification — never enable
+  it in production, span volume on stdout will eat your log
+  pipeline.
+- Pinned to OTel 1.29.0 / 0.50b0 for HTTP transport (avoids the
+  grpcio compile dependency).
+
+### Stored config keys
+
+| Key | Purpose | Stored as |
+|---|---|---|
+| `otel.enabled` | `true`/`false` master switch | plain |
+| `otel.service_name` | API service name (worker uses `<name>-worker`) | plain |
+| `otel.endpoint` | OTLP HTTP traces endpoint | plain |
+| `otel.headers` | JSON object of additional OTLP headers | secret |
+| `otel.console_exporter` | Diagnostic-only stdout span dump | plain |
+
+---
+
+## Tamper-evident audit log + retention
+
+Two layers, defense in depth:
+
+1. **Tamper-evident triggers** (migration `0062`) — three
+   BEFORE-statement triggers on `audit_log` (DELETE / UPDATE /
+   TRUNCATE) raise an exception unless the transaction sets
+   `ipsolis.allow_audit_mutation = 'true'` via `SET LOCAL`. Even
+   an operator with full DB credentials can't quietly mutate the
+   table; errors are loud and self-documenting.
+
+2. **Retention pruning** — daily Beat task at 03:00 Europe/Berlin
+   uses the documented bypass to delete rows past the configured
+   window. Per-classification windows let PII / PHI / PCI rows
+   keep a longer retention than routine config changes.
+
+### Per-classification retention
+
+Each audit row carries a `classification` column set at
+write-time from the strictest class declared on the touched asset
+type's attributes (`pci > phi > pii > internal`). The prune Beat
+task iterates buckets:
+
+| Window | Applies to | Default |
+|---|---|---|
+| `retention.audit_log_days` | `internal` + NULL rows | 0 (disabled) |
+| `retention.pii_days` | rows classified `pii` | 0 (disabled) |
+| `retention.phi_days` | rows classified `phi` | 0 (disabled) |
+| `retention.pci_days` | rows classified `pci` | 0 (disabled) |
+
+Each bucket runs in its own transaction with the bypass GUC, so
+a single huge bucket can't starve the others.
+**Per-class windows do not fall back to the global default** when
+set to 0 — explicit opt-in to retention so PII / PHI / PCI rows
+are never accidentally dropped under the catch-all.
+
+### Status surface
+
+`retention.last_run_at`, `retention.last_pruned`, and
+`retention.last_pruned_by_class` (JSON breakdown) are kept in
+`app_config` for ops visibility — Admin UI → *Settings* →
+*Compliance* → *Audit Log Retention* card.
+
+### Manual maintenance pattern
+
+```sql
+BEGIN;
+SET LOCAL ipsolis.allow_audit_mutation = 'true';
+DELETE FROM audit_log WHERE timestamp < NOW() - INTERVAL '7 years';
+COMMIT;
+```
+
+The `SET LOCAL` is transaction-scoped; the next BEGIN reverts to
+default-deny.
+
+### Combined with SIEM streaming
+
+If you also stream to a SIEM (see
+[SIEM audit-log streaming](#siem-audit-log-streaming-splunk-hec--microsoft-sentinel--generic-webhook)),
+the local row is hard to mutate quietly, and even if it were
+mutated the SIEM has the original copy outside the app's blast
+radius. Tamper-evidence + external streaming + tight retention
+windows is a defensible compliance posture for ISO 27001 / SOX /
+PCI audits.
+
+---
+
+## Admin RBAC (roles, ACL grants, SoD, password policy)
+
+Five-tier role ladder backed by per-user accounts in `admin_users`
+(PBKDF2-SHA256 / 600 k iterations, stdlib-only, no bcrypt /
+passlib build dependency). Replaces the single shared
+`ADMIN_API_KEY` for everyone except a back-compat fallback path.
+
+### Role ladder
+
+```
+superadmin > admin > approver > auditor > helpdesk
+```
+
+- **superadmin** — admin user CRUD, license upload, seed export,
+  initial setup, API token issuance, all admin role privileges.
+- **admin** — operational config (modules, runbooks, asset types,
+  maintenance, approval delegations), approval delegation create.
+- **approver** — decide on pending approvals.
+- **auditor** — read-only access to audit log + cost report +
+  maintenance read paths (backups list, retention status, queue
+  depth) — granted in slice 4.
+- **helpdesk** — placeholder for future minimal-permission
+  troubleshooting paths.
+
+`role_at_least(actual, required)` in `app.utils.rbac` is the
+single source of truth; every other role check delegates to it.
+
+### First-run setup
+
+When `admin_users` is empty, the login page renders a "Create
+first administrator" form instead of the sign-in form. Submitting
+it creates the first superadmin and auto-logs them in. Idempotent
+against races (re-checks the count on the setup POST).
+
+### Legacy back-compat
+
+`ADMIN_API_KEY` from `.env` continues to work as a virtual
+superadmin — set `username` blank and `password = ADMIN_API_KEY`
+on the login page. Audit attribution is `admin:legacy_key` so
+auditors can spot when the fallback path was used. Existing
+scripts and bookmarked admin sessions don't break on upgrade.
+
+### Per-asset-type ACL grants
+
+Scope individual `admin` users to a subset of asset types. Granting
+an admin even one type flips them into "see only granted types"
+mode:
+
+- The admin UI list filters automatically.
+- Out-of-scope `PUT/DELETE/clone` returns **404** (same shape as
+  a missing id) so the existence of unrelated teams' types isn't
+  leaked.
+- Auto-grant on create — when a scoped admin creates a new asset
+  type, the grant is added inside the same transaction so they
+  don't lose visibility on their own creation.
+- Zero grants = back-compat "see all" so single-team installs
+  aren't surprised by the new feature.
+
+`superadmin` / `approver` / `auditor` / `helpdesk` always bypass
+scoping — their role-level read or no-asset-type concerns make
+type-level fencing pointless.
+
+### Separation of duties (SoD)
+
+A user who configured an asset type cannot also approve their own
+access requests against it. Detection walks the audit log for
+matching `created` / `updated` / `cloned` rows attributed to the
+approver (matched on email, local-part, or admin username).
+
+- Fires on **approve only** — declines stay open since rejecting
+  your own work is always allowed.
+- Blocked approver gets HTTP 409 with the original config-time
+  audit attribution quoted back; the approval row stays `pending`
+  so a different approver can decide.
+- Per-rule opt-out: `approval_rules` JSON entries accept
+  `sod_exempt: true` for compliance-officer style "this approver
+  is also an admin and that's OK" scenarios. Captured in the
+  `order_approvals.sod_exempt` column at order-creation time so
+  subsequent rule edits don't shift past orders' SoD logic.
+- SoD *enforcement* is itself an Enterprise feature; community
+  installs get the audit-trail breadcrumb (warning log) but the
+  decision is allowed to proceed.
+
+### Bearer-token role binding
+
+API tokens may be issued with a specific role on top of their
+scopes. Role-gated routes consult the token's role too:
+
+| Token role | Effect |
+|---|---|
+| `NULL` (default) | Pre-slice-3 scope-only authz (back-compat) |
+| `superadmin` / `admin` / etc. | Standard role-ladder check via `role_at_least` |
+
+**Mint guard**: a creator can only issue tokens at or below their
+own role. A non-superadmin attempting to mint a superadmin token
+gets HTTP 403 with a descriptive message; no privilege escalation
+via token issuance.
+
+### Self-service password change
+
+Admin UI → *My Account* (`/ui/my-account`). Requires the current
+password as a liveness check; new password must differ from the
+current and be ≥12 chars. Legacy `ADMIN_API_KEY` actors get a
+clear HTTP 409 directing them to rotate via `.env`. Audit row is
+`password_changed_self` with no value content (no plaintext leak).
+
+### Password policy + lockout
+
+| Config key | Default | Purpose |
+|---|---|---|
+| `rbac.password_rotation_days` | 0 (off) | Force rotation after N days since `password_set_at` |
+| `rbac.lockout_threshold` | 0 (off) | Lock the account after N failed login attempts |
+| `rbac.lockout_duration_minutes` | 0 (off) | Auto-unlock after this many minutes since `locked_at` |
+
+All three default to off so existing installs are unchanged.
+Settings UI section in the *Compliance* tab; values writable on
+community but **enforcement gated on the `password_policy`
+Enterprise feature key**.
+
+Lockout responses use HTTP 423 with an "unlock at <UTC>" hint.
+Auto-unlock fires on the next attempt past the duration window so
+brief flurries clear themselves. Superadmin password reset =
+unlock + clock reset.
+
+### Audit attribution
+
+`triggered_by` carries both *who* and *with what authority*:
+
+| Caller | Audit attribution |
+|---|---|
+| Admin session | `admin:session:alice:superadmin` |
+| Per-integration bearer token | `token:<name>` |
+| Legacy `ADMIN_API_KEY` | `admin:legacy_key` |
+| Webhook bearer | `webhook:token:<name>` |
+| Webhook HMAC fallback | `webhook:hmac` |
+| Portal user | `portal:user:<email>` |
+| Anonymous portal | `portal:anonymous` |
+| Signed approval token | `api:approval_token (approver:<email>)` |
+| System (auto-decline, retention prune, SIEM streamer) | `system:auto_decline`, etc. |
+
+Filter on the `triggered_by` column in the audit log viewer to
+isolate one credential's activity.
+
+---
+
+## External secret management (HashiCorp Vault + CyberArk CCP/AIM)
+
+Replace plaintext credentials in `app_config` with references to
+your secret store. Any secret-typed config row whose value is
+`vault://<path>[#<field>]` or `ccp://[<safe>/]<object>` is
+resolved at read time via the configured backend. Plain string
+values keep working unchanged so partial migrations are safe.
+
+### Reference grammar
+
+```
+vault://ipsolis/ad/password               # KV v2, default field "value"
+vault://ipsolis/ad/password#bind_dn       # KV v2, custom field "bind_dn"
+ccp://OperationsSafe/sccm-svc             # CyberArk CCP with explicit Safe
+ccp://vsphere-svc                         # CCP with default Safe from config
+```
+
+### Where it kicks in
+
+| Credential | Location | Resolved by |
+|---|---|---|
+| AD bind password | `ad.password` | API |
+| Entra ID client secret | `entra.client_secret` | API |
+| SMTP password | `smtp.password` | API |
+| vSphere admin password | `vsphere.password` | API + worker |
+| XenServer admin password | `xenserver.password` | API + worker |
+
+The worker mirror at `worker/tasks/modules/secrets.py` is sync-only
+(same boundary as `audit_helper.py`) so the worker stays free of
+api package imports.
+
+### Process-local TTL cache
+
+Default 60 s, configurable via `secret.cache_ttl_seconds`. Keyed
+by `(backend, reference)`. Avoids hammering the secret store on
+every config read.
+
+### Vault setup
+
+| Config key | Purpose |
+|---|---|
+| `secret.backend` | `vault` |
+| `secret.vault.url` | e.g. `https://vault.example.com:8200` |
+| `secret.vault.token` | Static token (slice 1) — AppRole/JWT in slice 2 |
+| `secret.vault.kv_mount` | KV mount path, default `secret` |
+| `secret.vault.namespace` | Optional Vault Enterprise namespace |
+
+KV v2 envelope is unwrapped automatically (`data.data.<field>`).
+
+### CyberArk CCP setup
+
+| Config key | Purpose |
+|---|---|
+| `secret.backend` | `ccp` |
+| `secret.ccp.url` | e.g. `https://aim.example.com` |
+| `secret.ccp.app_id` | AppID configured in PVWA |
+| `secret.ccp.default_safe` | Default Safe for `ccp://<object>` references |
+| `secret.ccp.client_cert_pem` | Optional mTLS PEM (cert + key, materialised to a 0600 temp file just for the request duration) |
+| `secret.ccp.verify_tls` | Verify endpoint TLS cert |
+
+Authentication is AppID + IP allow-list (the standard CCP install)
+or optional mTLS via the configured client cert.
+
+### Test connection
+
+`POST /admin/config/secret-backend/test` clears the process cache,
+hits the right probe (`/v1/sys/health` for Vault, `/api/Verify`
+for CCP), and stamps `secret.last_test_at` on success or
+`secret.last_test_error` on failure. Visible inline in the
+*Settings → Compliance → External Secret Backend* card.
+
+### Failure semantics
+
+Backend failures (network / auth / missing path) log at WARNING and
+**return empty string** — fail-closed-quiet so a Vault outage
+doesn't crash unrelated requests. The calling integration's own
+auth-failure error is the user-visible signal.
+
+### Masking exception
+
+`GET /admin/config/<key>` masks secrets as `***` by default, **but**
+reference-shaped values (`vault://…`, `ccp://…`) stay in clear so
+admins can see *which* store entry each row points to. Knowing the
+path doesn't grant access. Genuine secrets
+(`secret.vault.token`, `secret.ccp.client_cert_pem`) are still
+masked.
+
+### Slice 2 (queued)
+
+CyberArk Conjur, AWS Secrets Manager, Azure Key Vault adapters;
+Vault AppRole / Kubernetes-JWT auth methods; CCP mTLS bootstrap UX;
+one-shot migration tool that walks every `is_secret=true` row and
+writes the value into the chosen backend. Track in *Deferred
+Enterprise Backlog* (top of `TASKS.md`).
+
+---
+
+## PowerShell modules — Linux compatibility
+
+The worker runs **PowerShell 7 on Linux** in the worker container,
+but many PSGallery modules ship with `PSEdition_Desktop` (Windows
+PowerShell 5.1) only and won't load. Operators declare each
+module's compatibility when adding it; the modules table shows the
+flag and lets admins click any badge to cycle the value.
+
+### Compatibility states
+
+| Badge | Value | Meaning |
+|---|---|---|
+| `Linux ✓` | `core` | Operator-marked Linux-compatible (PowerShell 7 / Core) |
+| `Windows only ✕` | `desktop_only` | Windows PowerShell 5.1 only — will not load on the Linux worker |
+| `Unverified ?` | `unknown` | Operator hasn't declared yet (default for back-compat rows) |
+
+### Where to set it
+
+Admin UI → *PS Modules* → **Add module** form has a *Linux
+compatibility* dropdown (visible for both Gallery and Upload
+sources). On the modules table, click any compatibility badge to
+cycle through the three states.
+
+### Why no PSGallery search / probe
+
+We deliberately don't query PSGallery for tag-derived
+auto-detection. Two reasons:
+
+1. **Most ip·Solis installs are air-gapped** — no outbound
+   internet from the api / worker containers. A search-driven
+   feature would be useless in those environments.
+2. **Cloud PSGallery's `Search()` endpoint times out on popular
+   modules** (e.g. `VMware.PowerCLI` with `$top=20` exceeds a 12 s
+   budget) and `IsLatestVersion` filters return zero results when
+   combined with `searchTerm`. Manual operator declaration is
+   faster, deterministic, and works everywhere.
+
+### Stored fields
+
+`ps_modules.compatibility` (added by migration `0077`).
+Default `unknown` for back-compat with existing rows; the next
+add or inline cycle populates it.
+
+---
+
+## HA Beat scheduler (multi-replica with celery-redbeat)
+
+Drop-in `celery-redbeat` swap moves the Celery Beat schedule into
+Redis with a Lua-script distributed lock. Run multiple Beat
+replicas side-by-side; only the lock-holder dispatches.
+
+### Why this matters
+
+Single-Beat is a single point of failure for every Celery
+periodic task — health probes, SIEM streamer, retention prune,
+license expiry check, approval reminders + auto-decline, scheduled
+order dispatcher, backup scheduler, update notifier. A crash
+silently stops everything until someone notices.
+
+### How to run multiple replicas
+
+```bash
+docker compose up -d --scale beat=2
+```
+
+Both replicas race for the Redis lock; the loser polls until it
+can take over.
+
+### Failover timing
+
+| Setting | Value | Purpose |
+|---|---|---|
+| `redbeat_lock_timeout` | 30 s | How long a dead lock survives in Redis before another replica can claim it |
+| `beat_max_loop_interval` | 30 s | Caps the non-leader poll cadence so failover happens within ~lock-TTL |
+
+Verified: SIGKILL on the leader → other replica acquired the lock
+in **13 seconds** with the tuned timings. Default RedBeat polls
+only every 5 min, which yields ~5-min failover and isn't really HA.
+
+### What survives a restart
+
+The schedule lives in Redis (`ipsolis:redbeat:` key prefix) so
+stop/start of all Beat replicas doesn't lose schedule state. The
+static `app.conf.beat_schedule` dict in `worker/tasks/__init__.py`
+is re-ingested by RedBeat on first start and re-synced on every
+restart, so schedule edits ship via container rebuild as before.
+
+### Idempotence
+
+Existing Beat tasks audited for "at-most-once-but-rarely-twice"
+semantics during the lock-handover window:
+
+- SIEM streamer's cursor-advance is idempotent (cursor only moves
+  on 2xx).
+- Retention prune is deterministic on the time cutoff.
+- License-expiry mailer dedupes via the `license.last_warning_*`
+  cursors.
+- Approval reminders / auto-decline guard via `last_reminded_at` /
+  status-already-changed checks.
+- `check_backup_schedule` dedupes per-minute via a `db_backups`
+  row query.
+
+Handover window is sub-second on clean restart and ≤30 s on hard
+kill, so duplicate-dispatch risk is limited to the very narrow
+lock-handover window.
+
+### Multi-tenancy on a shared Redis
+
+`redbeat_key_prefix="ipsolis:redbeat:"` namespaces the schedule
+keys so multiple ip·Solis tenants on a shared Redis don't collide.
+Override via `redbeat_key_prefix` in `worker/tasks/__init__.py` if
+you run more than one tenant on the same Redis.
+
+---
+
+## Setup checklist + pool capacity warnings on the dashboard
+
+Two opt-in dashboard widgets that surface operational problems
+before they bite.
+
+### Setup checklist
+
+`GET /admin/setup/state` returns 9 checklist items (6 essential,
+3 recommended), each with `done` / `label` / `hint` / `link` /
+`tier`. The dashboard renders them as a card with a circular
+progress ring and percent badge.
+
+| Tier | Items |
+|---|---|
+| Essential | App branding, SMTP, AD, Entra ID, asset definitions exist, asset pool has assets |
+| Recommended | Teams card delivery, SIEM streaming, per-integration API token issued |
+
+State is auto-derived from the current DB — *not* a one-time
+"setup wizard", so deleting the only asset definition flips the
+relevant item back to ☐. Each pending row is a direct link to the
+relevant settings tab anchor.
+
+**"Hide until next setup change"** persists a signature of the
+current done-state in `localStorage`. If the state later changes
+(regression or new config), the signature mismatch re-shows the
+card.
+
+### Pool capacity warnings
+
+Surfaces capacity pressure before users hit a 409 from per-pool
+quota enforcement. Renders inside the existing
+`fragments/pool_summary.html` so it participates in the dashboard
+auto-refresh path.
+
+| Severity | Threshold | Color |
+|---|---|---|
+| `warning` | ≥80% fill | amber |
+| `critical` | ≥95% fill | red |
+
+Per-pool fill is computed in two batched queries (no N+1 regardless
+of catalog size):
+
+- `assigned_personal` / `dedicated_shared` — anything not in `Free`
+  status counts as a consuming slot (busy, reserved, maintenance,
+  Failed, Reinstall).
+- `capacity_pooled` — count active orders against `pool_capacity`
+  using the same status set as quota enforcement.
+
+Each warning row is a clickable link — `pooled` types link to the
+asset-definition edit page (where capacity is configured);
+`personal` / `shared` types link to the asset-pool list filtered
+to that type.
+
+Inactive asset definitions are excluded — they can't accept new
+orders so flagging them as "full" is noise.
+
+### No configuration
+
+Both widgets are auto-rendered from current DB state. The
+checklist hides itself when everything is done; the capacity band
+hides itself when no pool is at ≥80%.

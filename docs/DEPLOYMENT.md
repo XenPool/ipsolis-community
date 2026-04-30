@@ -241,9 +241,9 @@ services:
       - ps_user_modules:/root/.local/share/powershell/Modules
       - ./scripts:/app/scripts:ro
 
-  beat:
-    volumes:
-      - beat_schedule:/app/beat_schedule
+  # Beat schedule lives in Redis (celery-redbeat); no on-disk schedule
+  # volume needed. See ENTERPRISE_FEATURES.md → "HA Beat scheduler" for
+  # multi-replica scaling: `docker compose up -d --scale beat=2`.
 
   nginx:
     image: nginx:alpine
@@ -284,14 +284,17 @@ docker compose ps
 Expected output -- all services should show `Up (healthy)`:
 
 ```
-NAME          STATUS
-xp_postgres   Up (healthy)
-xp_redis      Up (healthy)
-xp_api        Up (healthy)
-xp_worker     Up (healthy)
-xp_beat       Up
-xp_nginx      Up
+NAME             STATUS
+xp_postgres      Up (healthy)
+xp_redis         Up (healthy)
+xp_api           Up (healthy)
+xp_worker        Up (healthy)
+ipsolis-beat-1   Up
+xp_nginx         Up
 ```
+
+The beat container has no fixed `container_name` so it can be scaled
+for HA — see [ENTERPRISE_FEATURES.md → HA Beat scheduler](ENTERPRISE_FEATURES.md#ha-beat-scheduler-multi-replica-with-celery-redbeat).
 
 Verify the application:
 
@@ -307,12 +310,54 @@ curl -fsk https://selfservice.yourcompany.com/health
 
 ## 7. Initial Admin Setup
 
-### Access the Admin UI
+### First-run admin account (RBAC)
 
-Open **https://selfservice.yourcompany.com/ui/** in your browser.
+Open **https://selfservice.yourcompany.com/ui/** in your browser. On
+the very first visit (when `admin_users` is empty), the login page
+renders a **"Create first administrator"** form instead of the
+normal sign-in form. Fill in:
 
-The Admin UI is protected by the `ADMIN_API_KEY` you set in `.env`. When
-prompted, enter the key in the `X-Admin-Key` header field.
+| Field | Notes |
+|---|---|
+| Username | 3–128 chars, allowed: `[a-zA-Z0-9._@-]+`. Lower-cased at write time. |
+| Password | ≥ 12 chars. PBKDF2-SHA256 / 600k iterations (OWASP-2023). |
+| Confirm password | Must match. |
+
+Submitting creates the first **superadmin** and auto-logs you in.
+This is idempotent against races — if two operators hit the form at
+the same time, only one wins; the other gets a "use the sign-in
+form" message.
+
+After the first superadmin exists, the form switches to the regular
+username + password sign-in.
+
+### Add additional admin users
+
+Once signed in, navigate to **Admin Users** in the left nav
+(superadmin-only). Create per-user accounts in the role appropriate
+to each operator:
+
+```
+superadmin > admin > approver > auditor > helpdesk
+```
+
+See **[ENTERPRISE_FEATURES.md → Admin RBAC](ENTERPRISE_FEATURES.md#admin-rbac-roles-acl-grants-sod-password-policy)**
+for the full role ladder, per-asset-type ACL grants, separation-of-duties
+enforcement, and password-policy options.
+
+### Legacy `ADMIN_API_KEY` fallback
+
+The `ADMIN_API_KEY` from `.env` continues to authenticate as a
+**virtual superadmin** even after first-run setup, so existing
+scripts / `X-Admin-Key` headers don't break on upgrade. To use it
+on the login page: leave **Username** blank, paste the key into
+**Password**. Audit attribution shows up as `admin:legacy_key` so
+auditors can tell when the fallback path was used.
+
+For new integrations prefer **Per-integration API tokens** (Admin UI
+→ *API Tokens*) — named, expiring, revocable bearer tokens with
+optional role binding and scoped permissions. The legacy single
+shared key is kept for back-compat only.
 
 ### Configuration Checklist
 
@@ -385,7 +430,7 @@ The self-service portal supports Microsoft Entra ID (Azure AD) for single sign-o
 
 1. Go to the [Azure Portal](https://portal.azure.com) > **App registrations** > **New registration**
 2. Name: `ip·Solis`
-3. Redirect URI: `https://selfservice.yourcompany.com/auth/callback` (Web)
+3. Redirect URI: `https://selfservice.yourcompany.com/portal/auth/callback` (Web)
 4. Note down the **Application (client) ID** and **Directory (tenant) ID**
 5. Under **Certificates & secrets**, create a new client secret
 
@@ -399,7 +444,7 @@ Navigate to **Admin > Settings** and set:
 | `entra.client_id` | Application (client) ID |
 | `entra.client_secret` | Client secret value *(marked as secret)* |
 | `entra.tenant_id` | Directory (tenant) ID |
-| `entra.redirect_uri` | `https://selfservice.yourcompany.com/auth/callback` |
+| `entra.redirect_uri` | `https://selfservice.yourcompany.com/portal/auth/callback` |
 | `entra.allowed_domains` | Comma-separated list of allowed email domains, e.g. `yourcompany.com` |
 
 Use the **Test Entra Connection** button to verify the configuration.
@@ -418,10 +463,15 @@ Run through this checklist to confirm everything works:
 
 - [ ] **HTTPS**: `https://selfservice.yourcompany.com` loads with a valid certificate
 - [ ] **Admin UI**: `https://selfservice.yourcompany.com/ui/` is accessible
+- [ ] **First-run setup**: visiting the admin login renders the "Create first administrator" form (or, if already done, the regular sign-in form with no error)
+- [ ] **Setup checklist**: the dashboard shows the in-app setup checklist; tick off Essential items as you configure them
 - [ ] **Portal login**: Users can sign in via Entra ID SSO
 - [ ] **AD lookup**: On the order form, user validation (deputy, RDP, admin fields) resolves names
 - [ ] **Email**: Submit a test order and confirm notification email arrives
 - [ ] **Health check**: `curl -fsk https://selfservice.yourcompany.com/health` returns `{"status": "ok"}`
+- [ ] *(optional)* **API tokens**: issue a per-integration token for any automation that previously used `X-Admin-Key`
+- [ ] *(optional)* **SIEM streaming**: configure under *Settings → Compliance* if you have Splunk / Sentinel / a generic webhook receiver
+- [ ] *(optional)* **Prometheus**: scrape `/metrics` from your monitoring; the dashboard ships in [docs/grafana/](grafana/)
 
 ---
 
@@ -484,7 +534,28 @@ curl -fsk https://selfservice.yourcompany.com/health
 ```
 
 > Migrations are safe to run multiple times -- Alembic tracks which have
-> already been applied and skips them.
+> already been applied and skips them. Each feature slice typically
+> ships its own migration; review `api/alembic/versions/` between
+> upgrades for the changeset, and `docker compose exec api alembic
+> history` to see the chain.
+
+### Backing up before upgrade
+
+Always snapshot the database first — `pg_dump` from the Postgres
+container, or use the in-app **Maintenance → Backups** page (Admin UI)
+which writes a timestamped SQL dump to the bind-mounted `./backups/`
+directory. Configure a daily backup schedule in the same UI so the
+snapshot is fresh when an unexpected regression appears.
+
+### Beat HA failover during the restart
+
+If you run multiple Beat replicas (`--scale beat=N`), `docker compose
+up --build -d` rolls the containers one at a time and the leader lock
+hands over to the surviving replica within ~13 s (see
+[ENTERPRISE_FEATURES.md → HA Beat scheduler](ENTERPRISE_FEATURES.md#ha-beat-scheduler-multi-replica-with-celery-redbeat)).
+For single-Beat installs there's a brief gap during the restart
+where periodic tasks aren't running — usually invisible since cadences
+are minutes / hours.
 
 ---
 
