@@ -420,6 +420,67 @@ def send_approval_escalated(
     return _send_html_email_multi(db, addrs, bcc, mail_from, subject, html)
 
 
+def send_approval_escalation_assigned(
+    db: "Session",
+    *,
+    recipient_email: str,
+    recipient_name: str,
+    approver_email: str,
+    approver_name: str,
+    requester_name: str,
+    requester_email: str,
+    asset_type_name: str,
+    from_date: str,
+    until_date: str,
+    approval_url: str,
+) -> dict:
+    """Notify a single escalation contact that an approval has been
+    reassigned to them.
+
+    Unlike ``send_approval_escalated`` (notify-only, points at the
+    admin UI), this email carries a tokenized one-click decide link
+    bound to the contact's *new* OrderApproval row — created upstream
+    in the escalation flow when ``approval.escalation_assign=true``.
+    The recipient can approve / reject directly from the email.
+
+    One row per recipient (caller iterates over the configured
+    ``approval.escalation_email`` list); the escalation tokens are
+    independent so the recipients can each respond on their own.
+    """
+    from tasks.modules.config_reader import get_config
+
+    if not recipient_email or not recipient_email.strip():
+        return {"success": True, "skipped": True, "reason": "empty recipient"}
+
+    company_name = get_config(db, "company.name", "XenPool")
+    app_title = get_config(db, "app.title", "ip·Solis")
+    mail_from = get_config(db, "email.from", MAIL_FROM)
+    bcc = get_config(db, "email.bcc")
+
+    variables = {
+        "company_name": company_name,
+        "app_title": app_title,
+        # ``approver_*`` here means the *original* approver who let the
+        # request lapse — same naming as the notify-only template so
+        # admins can reuse copy with `s/approval_escalated/approval_escalation_assigned/`.
+        "approver_name": approver_name,
+        "approver_email": approver_email,
+        "requester_name": requester_name,
+        "requester_email": requester_email,
+        "asset_type_name": asset_type_name,
+        "from_date": from_date,
+        "until_date": until_date,
+        "approval_url": approval_url,
+    }
+
+    subject, body = _render_template(db, "approval_escalation_assigned", variables)
+    if subject is None:
+        return {"success": True, "skipped": True, "reason": "template inactive"}
+
+    html = _build_branded_html(body, app_title, subject)
+    return _send_html_email_multi(db, [recipient_email.strip()], bcc, mail_from, subject, html)
+
+
 def send_cost_threshold_breach(
     db: "Session",
     *,

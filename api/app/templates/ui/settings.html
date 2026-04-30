@@ -775,9 +775,25 @@
                placeholder="ops@example.com, oncall@example.com"
                class="w-full rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono">
         <p class="text-[11px] text-muted/60 mt-1 leading-snug">
-          Comma-separated. Notified once per stuck approval after the reminder cap is reached.
-          Each approval is escalated <em>at most once</em>; subsequent ticks ignore already-escalated rows.
+          Comma-separated. Each approval is escalated <em>at most once</em>; subsequent ticks ignore already-escalated rows.
           Leave blank to disable escalation entirely.
+        </p>
+      </div>
+
+      <div>
+        <label class="block text-xs font-medium text-muted mb-1">Escalation behaviour</label>
+        {% set _ea = (approval_config.get('approval.escalation_assign', 'false') or 'false').lower() %}
+        <select id="approval-escalation-assign"
+                class="w-full rounded border border-token-border bg-surface text-body text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500">
+          <option value="false" {% if _ea != 'true' %}selected{% endif %}>Notify only — contact intervenes via the admin UI</option>
+          <option value="true"  {% if _ea == 'true' %}selected{% endif %}>Reassign — create a new approval row for the contact (one-click decide)</option>
+        </select>
+        <p class="text-[11px] text-muted/60 mt-1 leading-snug">
+          <strong>Notify only</strong> (default) sends a heads-up email to the escalation contact and lets them
+          chase or cancel manually. <strong>Reassign</strong> creates a new <code class="font-mono">OrderApproval</code> row
+          per contact (<code class="font-mono">approver_type=escalation</code>) and emails them a tokenized
+          <code class="font-mono">/approve/&lt;token&gt;</code> URL — they can decide directly from their inbox without an admin login.
+          Mode change applies to subsequent escalations only; already-escalated rows stay as they were.
         </p>
       </div>
 
@@ -3007,6 +3023,7 @@ async function saveApprovalReminderConfig() {
     'approval.reminder_after_hours':   document.getElementById('approval-reminder-hours').value.trim() || '24',
     'approval.max_reminders':          document.getElementById('approval-max-reminders').value.trim() || '3',
     'approval.escalation_email':       document.getElementById('approval-escalation-email').value.trim(),
+    'approval.escalation_assign':      document.getElementById('approval-escalation-assign').value,
     'approval.auto_decline_enabled':   document.getElementById('approval-auto-decline-enabled').value,
     'approval.auto_decline_after_days': document.getElementById('approval-auto-decline-days').value.trim() || '0',
     'approval.auto_decline_message':   document.getElementById('approval-auto-decline-message').value.trim(),

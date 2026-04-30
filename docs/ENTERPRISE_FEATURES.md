@@ -1378,35 +1378,65 @@ populated.
 ## Approval escalation
 
 When an approval has burned through all its reminders without a
-decision, ip·Solis fires **one** notification to the configured
-escalation contact(s) so an operator can intervene. Each approval
-escalates *at most once*; subsequent ticks ignore already-escalated
-rows.
+decision, ip·Solis triggers an escalation event. Two behaviours
+are supported:
+
+| Mode | What happens |
+|---|---|
+| **Notify only** (default) | One email to each escalation contact pointing at `/ui/orders`. Contact intervenes via the admin UI — chases the approver, reassigns, or cancels. Does *not* decide on the approver's behalf. |
+| **Reassign** | One **new `OrderApproval` row per contact** (`approver_type=escalation`) is created on the order. Each contact receives a tokenized `/approve/<token>` URL — they decide directly from their inbox, same one-click flow the original approver had. |
+
+Each original approval escalates *at most once*; subsequent ticks
+ignore already-escalated rows. In reassign mode, the new escalation
+rows are independent — different recipients can decide on their own
+schedule, and the order's existing quorum / N-of-M / SoD logic
+applies to them just like any other approval.
 
 ### Where to configure
 
-Admin UI → *Settings* → *E-Mail* tab → *Approval Reminders* →
-**Escalation contact(s)** field. Comma-separated email addresses;
-leave blank to disable escalation entirely.
+Admin UI → *Settings* → *E-Mail* tab → *Approval Reminders*:
+
+* **Escalation contact(s)** — comma-separated email addresses (blank
+  disables escalation entirely).
+* **Escalation behaviour** — `Notify only` or `Reassign`. Mode
+  changes apply to *subsequent* escalations only; already-escalated
+  rows aren't retroactively converted.
 
 ### Stored config keys
 
 | Key | Purpose |
 |---|---|
 | `approval.escalation_email` | Comma-separated escalation contacts (blank disables) |
+| `approval.escalation_assign` | `false` = notify only (default), `true` = reassign |
 
 ### Operational notes
 
 - Triggered when `reminder_count >= max_reminders` AND
   `escalated_at IS NULL`. The same Beat task that nudges
   reminders also handles escalations in a single tick.
-- Approval URL in the escalation email points the contact at the
-  admin UI's `/ui/orders` page, not a signed-token approve page —
-  the escalation contact intervenes operationally rather than
-  deciding on the approver's behalf.
-- The seeded `approval_escalated` email template carries the full
-  variable set (original approver name+email, requester, asset,
-  reminder count, etc.) — customise it via *Settings → E-Mail
+- The original approval row stays `pending` (it's still in the
+  audit trail) but its `escalated_at` is stamped so further
+  reminders / re-escalations are suppressed.
+- **Reassign mode**: each new escalation row is independent. If
+  five contacts are configured, five new rows are created and
+  five tokenized emails go out. The order's existing approval
+  rules decide what counts as "all approvers granted" — typically
+  that's "any one of the new escalation rows decides", so the
+  first contact to act dispatches the order.
+- **De-dup guard**: if an escalation contact is *already* an
+  approver on the order (e.g. they were named in a conditional
+  rule), the reassign branch skips creating a duplicate row.
+  They keep their original row and their original token URL.
+- **Audit trail**: the new rows carry `approver_type=escalation`
+  so audit-log filters can distinguish escalation-driven
+  decisions from manager / app-owner / rule-driven ones. The
+  decision itself is attributed as
+  `api:approval_token (approver:<email>)` like any other
+  signed-link decision.
+- The seeded `approval_escalated` template (notify-only) and
+  `approval_escalation_assigned` template (reassign) both carry
+  the full variable set (original approver name+email, requester,
+  asset, dates, approval URL) — customise via *Settings → E-Mail
   Templates* (Enterprise license).
 
 ---

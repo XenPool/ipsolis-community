@@ -61,6 +61,11 @@ def scan_and_remind() -> dict:
         app_title = get_config(db, "app.title", "ip·Solis") or "ip·Solis"
         escalation_emails_raw = (get_config(db, "approval.escalation_email") or "").strip()
         escalation_emails = [a.strip() for a in escalation_emails_raw.split(",") if a.strip()]
+        # Slice 3: optionally CREATE new approval rows for the
+        # escalation contact(s) instead of sending them a notify-only
+        # email. When enabled, the contact gets a tokenized one-click
+        # decide URL — same as the original approver had.
+        escalation_assign = _truthy(get_config(db, "approval.escalation_assign", "false"))
 
         # ── Reminders: row not yet at cap, last touch older than cutoff ─────
         rows = db.execute(
@@ -152,9 +157,88 @@ def scan_and_remind() -> dict:
                 from_date = r.requested_from.strftime("%d.%m.%Y") if r.requested_from else ""
                 until_date = r.requested_until.strftime("%d.%m.%Y") if r.requested_until else ""
 
-                # Approval URL points the escalation contact at the order in
-                # the admin UI, not a signed-token page (they don't decide,
-                # they intervene operationally).
+                if escalation_assign:
+                    # Slice 3: assignment mode. Create a new OrderApproval
+                    # row for each escalation contact (skipping any that
+                    # already exist on this order — re-running the scan
+                    # mustn't pile up duplicates), generate a token, and
+                    # send a one-click decide email. The original row is
+                    # marked escalated_at after the loop, the same as
+                    # notify-only mode, so reminders / dupe-escalation
+                    # are suppressed. The new rows participate in the
+                    # regular approval flow — they can be approved /
+                    # rejected via /approve/<token> or via the portal.
+                    from tasks.modules.teams_notify import make_approval_token
+                    assigned_to_emails: list[str] = []
+                    for contact in escalation_emails:
+                        existing = db.execute(
+                            text("""
+                                SELECT id FROM order_approvals
+                                WHERE order_id = (SELECT order_id FROM order_approvals WHERE id = :aid)
+                                  AND lower(approver_email) = lower(:email)
+                            """),
+                            {"aid": r.approval_id, "email": contact},
+                        ).fetchone()
+                        if existing:
+                            logger.info(
+                                "Escalation: skipping %s on approval %s (already an approver)",
+                                contact, r.approval_id,
+                            )
+                            continue
+                        new_row = db.execute(
+                            text("""
+                                INSERT INTO order_approvals (
+                                    order_id, approver_type, approver_email,
+                                    approver_name, status, created_at
+                                )
+                                SELECT order_id, 'escalation', :email, :name, 'pending', NOW()
+                                FROM order_approvals WHERE id = :aid
+                                RETURNING id
+                            """),
+                            {"aid": r.approval_id, "email": contact, "name": contact},
+                        ).fetchone()
+                        if not new_row:
+                            continue
+                        token = make_approval_token(int(new_row.id))
+                        approve_url = f"{portal_base.rstrip('/')}/approve/{token}"
+                        try:
+                            notif.send_approval_escalation_assigned(
+                                db,
+                                recipient_email=contact,
+                                recipient_name=contact,
+                                approver_email=r.approver_email,
+                                approver_name=r.approver_name,
+                                requester_name=r.user_name or "",
+                                requester_email=r.user_email or "",
+                                asset_type_name=r.asset_type_name or "",
+                                from_date=from_date, until_date=until_date,
+                                approval_url=approve_url,
+                            )
+                            assigned_to_emails.append(contact)
+                        except Exception as exc:  # noqa: BLE001
+                            logger.warning(
+                                "Escalation-assign email failed for approval %s contact %s: %s",
+                                r.approval_id, contact, exc,
+                            )
+                    if not assigned_to_emails:
+                        # No new rows created (every contact already covered
+                        # or every send failed). Don't mark the original
+                        # escalated_at — let the next scan retry instead of
+                        # silently dropping the escalation.
+                        continue
+                    db.execute(
+                        text("UPDATE order_approvals SET escalated_at = NOW() WHERE id = :id"),
+                        {"id": r.approval_id},
+                    )
+                    escalated += 1
+                    logger.info(
+                        "Approval %s escalated-assigned (original approver=%s) to %s",
+                        r.approval_id, r.approver_email, ", ".join(assigned_to_emails),
+                    )
+                    continue
+
+                # Slice 1: notify-only. Approval URL points at the admin UI;
+                # the contact intervenes operationally rather than deciding.
                 approval_url = f"{portal_base.rstrip('/')}/ui/orders"
 
                 try:

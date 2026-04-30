@@ -398,9 +398,52 @@ pull one when there's a procurement need or a quiet week.
       1 level + warning).
 - [ ] Per-bucket reminder optimisation: stop nagging approvers in a bucket
       whose quorum is already met but whose siblings are still pending.
-- [ ] Escalation v2: optionally **assign** the escalated approval to the
-      contact (creating a new approval row with their email) so they can
-      decide directly via the existing token URL.
+- [x] **Escalation v2 — assignment mode** *(2026-04-30)*. Today's
+      slice-1 escalation flow notifies `approval.escalation_email`
+      contacts via an email pointing at `/ui/orders` — the contact
+      intervenes operationally but doesn't decide. The new
+      `approval.escalation_assign` boolean (default `false` —
+      back-compat) flips the worker into assignment mode: when true,
+      the escalation Beat tick creates one new `OrderApproval` row
+      per contact (`approver_type='escalation'`, `status='pending'`)
+      and emails each one a tokenized `/approve/<token>` URL via the
+      new `approval_escalation_assigned` email template. The contact
+      can decide directly from their inbox without an admin login —
+      same one-click flow the original approver had. Migration `0092`
+      seeds the boolean + template. Worker-side wiring in
+      `worker/tasks/workflows/approval_reminders.py` adds an
+      `if escalation_assign` branch that uses the existing
+      `tasks.modules.teams_notify.make_approval_token` helper to
+      mint per-row tokens, with explicit de-dup against existing
+      approver emails on the same order (an escalation contact who's
+      already a rule-driven approver keeps their original row and
+      doesn't get a duplicate). The original approval's
+      `escalated_at` is stamped only after at least one new row is
+      created — if every contact is already an approver or every
+      send fails, `escalated_at` stays NULL so the next scan retries.
+      Each escalation row is independent — five contacts → five
+      rows → five token URLs. The order's existing approval rules
+      determine "all granted" semantics (typically "any one
+      escalation contact decides" dispatches the order). New
+      `send_approval_escalation_assigned()` helper in
+      `worker/tasks/modules/notifications.py` mirrors the existing
+      `send_approval_escalated` shape but uses the new template and
+      sends one email per recipient (with the per-row tokenized URL
+      built into the body). Settings UI gets an *Escalation
+      behaviour* dropdown (`Notify only` / `Reassign`) right under
+      the existing *Escalation contact(s)* field. Smoke-tested live:
+      seeded a synthetic at-cap pending approval, ran the Beat task
+      in-process, observed two new `escalation` rows created with
+      ids 18/19 (one per contact email), original manager row id 17
+      stamped with `escalated_at`, GET `/approve/<token>` returned
+      the standard confirmation page scoped to the test order, POST
+      with `decision=approve` flipped row 18 to `approved` with the
+      decision's `comment` recorded — full end-to-end. The other
+      escalation row (19) stayed pending, confirming each
+      escalation row's decision is independent. Decision audit
+      attribution is the regular `api:approval_token (approver:<email>)`
+      shape, distinguishable from manager/owner decisions via the
+      `approver_type='escalation'` column.
 
 ### Per-classification approval routing
 - [x] **Per-classification approval routing — defaults path**
