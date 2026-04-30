@@ -104,7 +104,7 @@ Enum types (e.g. `order_action`, `asset_status`) already exist in the DB — use
 `op.execute(raw SQL)` instead of `op.create_table()` with `sa.Enum` to avoid
 `DuplicateObject` errors.
 
-Current head: `0046_seed_example_scripts_and_runbooks.py`.
+Current head: `0093_seed_api_token_purge.py`.
 
 ### Template changes require image rebuild
 `api/app/templates/` and `api/app/routes/` are baked into the `xp_api` image, not

@@ -483,90 +483,13 @@
             approvers into the asset-type-level quorum. Examples: <em>"extension &gt; 90 days AND has_pii"</em>,
             <em>"attr.cost_center contains 'EU' OR monthly_cost &gt; €500"</em>.
           </p>
-          <div id="approval-rule-rows" class="space-y-3">
-            {% if asset_type and asset_type.approval_rules %}
-              {% for rule in asset_type.approval_rules %}
-                {# Normalise the saved condition shape so the template renders it as a list of leaves. #}
-                {% set _cond = rule.condition or {} %}
-                {% if _cond.op in ['and', 'or'] %}
-                  {% set _combinator = _cond.op %}
-                  {% set _leaves = _cond.clauses or [] %}
-                {% elif _cond.field %}
-                  {% set _combinator = 'and' %}
-                  {% set _leaves = [_cond] %}
-                {% else %}
-                  {% set _combinator = 'and' %}
-                  {% set _leaves = [{}] %}
-                {% endif %}
-                {# Detect deep / unsupported shapes — UI keeps the rule but warns the admin. #}
-                {% set _ns = namespace(complex=false) %}
-                {% for leaf in _leaves %}
-                  {% if leaf.op in ['and','or','not'] %}{% set _ns.complex = true %}{% endif %}
-                {% endfor %}
-                {% set _approvers = rule.approvers or [] %}
-                {% set _emails = _approvers | map(attribute='email') | join(', ') %}
-                <div class="approval-rule-card rounded-lg border border-token-border bg-surface-raised/30 p-3">
-                  <div class="grid grid-cols-12 gap-2 items-center mb-2">
-                    <input type="text" data-field="rule_name" value="{{ rule.name or '' }}" placeholder="Rule name"
-                           class="col-span-5 rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500">
-                    <div class="col-span-3 flex items-center gap-1 text-xs text-muted">
-                      <span class="text-muted/60">Match</span>
-                      <select data-field="rule_combinator"
-                              class="rounded border border-token-border bg-surface text-body text-xs px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono">
-                        <option value="and" {% if _combinator == 'and' %}selected{% endif %}>ALL (AND)</option>
-                        <option value="or"  {% if _combinator == 'or'  %}selected{% endif %}>ANY (OR)</option>
-                      </select>
-                    </div>
-                    <div class="col-span-3 flex items-center gap-1 text-xs text-muted">
-                      <span class="text-muted/60">Quorum</span>
-                      <input type="number" min="1" data-field="rule_threshold"
-                             value="{{ rule.min_approvals_required or '' }}" placeholder="all"
-                             class="w-14 rounded border border-token-border bg-surface text-body text-xs px-2 py-1 font-mono focus:outline-none focus:ring-1 focus:ring-blue-500">
-                      <span class="text-muted/50">of approvers</span>
-                    </div>
-                    <button type="button" onclick="this.closest('.approval-rule-card').remove()"
-                            class="col-span-1 text-red-400 hover:text-red-600 text-lg leading-none text-center justify-self-end">×</button>
-                  </div>
-                  {% if _ns.complex %}
-                  <p class="text-[11px] text-amber-600 dark:text-amber-400 mb-2 leading-snug">
-                    ⚠ This rule has a deeply nested condition. The form below shows only the top-level clauses;
-                    saving will overwrite the nested structure. Edit via API to preserve it.
-                  </p>
-                  {% endif %}
-                  <div class="approval-rule-conds space-y-1.5">
-                    {% for leaf in _leaves %}
-                    <div class="approval-rule-cond grid grid-cols-12 gap-2 items-center">
-                      <input type="text" data-field="cond_field" value="{{ leaf.field or '' }}"
-                             list="approval-rule-fields" placeholder="field"
-                             class="col-span-4 rounded border border-token-border bg-surface text-body text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono">
-                      <select data-field="cond_op"
-                              class="col-span-2 rounded border border-token-border bg-surface text-body text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono">
-                        {% for o in ['>','>=','<','<=','==','contains'] %}
-                        <option value="{{ o }}" {% if leaf.op == o %}selected{% endif %}>{{ o }}</option>
-                        {% endfor %}
-                      </select>
-                      <input type="text" data-field="cond_value" value="{{ leaf.value if leaf.value is not none else '' }}"
-                             placeholder="value"
-                             class="col-span-5 rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono">
-                      <button type="button" onclick="removeRuleCondition(this)"
-                              class="col-span-1 text-red-400 hover:text-red-600 text-lg leading-none text-center">×</button>
-                    </div>
-                    {% endfor %}
-                  </div>
-                  <div class="flex items-center gap-3 mt-2">
-                    <button type="button" onclick="addRuleCondition(this)"
-                            class="text-[11px] text-blue-600 hover:underline">+ Add condition</button>
-                  </div>
-                  <div class="mt-2">
-                    <input type="text" data-field="rule_approvers" value="{{ _emails }}"
-                           placeholder="approver1@x.de, approver2@x.de"
-                           class="w-full rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono">
-                    <p class="text-[10px] text-muted/50 mt-0.5">Comma-separated approver emails for this rule.</p>
-                  </div>
-                </div>
-              {% endfor %}
-            {% endif %}
-          </div>
+          <!-- Rule cards are hydrated from the JSON blob below by approval-rules-editor JS.
+               Server-side renders nothing here so the deeply-nested editor doesn't have to
+               race a half-rendered template; the JSON shape is the single source of truth. -->
+          <div id="approval-rule-rows" class="space-y-3"></div>
+          <script type="application/json" id="approval-rules-data">
+            {{ asset_type.approval_rules | tojson if asset_type and asset_type.approval_rules else '[]' }}
+          </script>
           <datalist id="approval-rule-fields">
             <option value="duration_days"></option>
             <option value="monthly_cost"></option>
@@ -1465,55 +1388,340 @@ function addAttrRow() {
   document.getElementById('attr-rows').appendChild(row);
 }
 
-var _APPROVAL_OPS = ['>','>=','<','<=','==','contains'];
+// ── Approval rules: recursive AND/OR/NOT editor ───────────────────────────
+//
+// Slice-3 of the conditional rules editor. The engine has supported
+// arbitrary AND/OR/NOT nesting up to depth 8 since slice-1; the
+// previous editor flattened to a single level + a warning. This
+// version is a recursive renderer — each compound (group) renders
+// its op selector + child clauses + per-group "Add condition" /
+// "Add group" buttons; each leaf renders the field/op/value triple
+// + a "wrap in group" affordance.
+//
+// Save shape stays canonical:
+//   leaf:     { field, op, value }
+//   compound: { op: 'and'|'or'|'not', clauses: [...] }
+// The save handler (submitForm) calls _readApprovalCondition() on the
+// rule's root element to walk the DOM back into JSON; mutations
+// (add/remove/wrap) read → mutate → re-render so listener bookkeeping
+// stays trivial.
 
-function _approvalCondHtml() {
+var _APPROVAL_OPS = ['>','>=','<','<=','==','contains'];
+var _APPROVAL_MAX_DEPTH = 8;  // mirror app.utils.approval_rules._MAX_DEPTH
+
+function _isLeaf(node) {
+  return node && typeof node === 'object'
+      && typeof node.field === 'string'
+      && _APPROVAL_OPS.indexOf(node.op) !== -1;
+}
+
+function _isCompound(node) {
+  return node && typeof node === 'object'
+      && (node.op === 'and' || node.op === 'or' || node.op === 'not')
+      && Array.isArray(node.clauses);
+}
+
+function _emptyLeaf()        { return { field: '', op: '==', value: '' }; }
+function _emptyCompound(op)  { return { op: op || 'and', clauses: [_emptyLeaf()] }; }
+
+// Rebuild ``rootEl``'s contents from the JSON representation. Reads
+// current state via _readApprovalCondition so an in-flight edit doesn't
+// get clobbered on mutation, applies ``mutate(rootJson)`` (a mutator
+// that operates on the JSON tree by reference), and re-renders.
+function _rerenderApprovalCondition(rootEl, mutate) {
+  var current = _readApprovalCondition(rootEl) || _emptyLeaf();
+  if (typeof mutate === 'function') {
+    var maybeNew = mutate(current);
+    if (maybeNew !== undefined) current = maybeNew;
+  }
+  var newEl = renderApprovalCondition(current, 0);
+  rootEl.replaceWith(newEl);
+}
+
+// Returns the path string (for data attributes) so nested mutators
+// can find their target node in the read-back JSON. Not strictly
+// needed since we read → mutate → render, but useful for buttons
+// that need to know "which sibling am I" without scanning the DOM.
+function _approvalDepthBorder(depth) {
+  // Cycle through Tailwind colour palette so nested groups visually
+  // distinguish at a glance. Caps at depth 5 — past that the colours
+  // repeat; the editor itself enforces the 8-level depth limit.
+  var palette = [
+    'border-blue-300/40 dark:border-blue-500/30',
+    'border-amber-300/40 dark:border-amber-500/30',
+    'border-emerald-300/40 dark:border-emerald-500/30',
+    'border-purple-300/40 dark:border-purple-500/30',
+    'border-rose-300/40 dark:border-rose-500/30',
+  ];
+  return palette[Math.min(depth, palette.length - 1)];
+}
+
+function renderApprovalCondition(cond, depth) {
+  // depth is 0 for the root inside a rule card, 1+ for nested groups.
   var inputCls = 'rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500';
-  return '<input type="text" data-field="cond_field" list="approval-rule-fields" placeholder="field" class="col-span-4 ' + inputCls + ' font-mono">'
-    + '<select data-field="cond_op" class="col-span-2 ' + inputCls + ' font-mono">'
-    +   _APPROVAL_OPS.map(function(o) { return '<option value="' + o + '">' + o + '</option>'; }).join('')
+
+  // Normalise unknown shapes to an empty leaf so a malformed save
+  // doesn't crash the editor — the operator can re-fill the row.
+  if (!_isLeaf(cond) && !_isCompound(cond)) {
+    cond = _emptyLeaf();
+  }
+
+  if (_isLeaf(cond)) {
+    var leafEl = document.createElement('div');
+    leafEl.className = 'approval-rule-cond approval-cond-leaf grid grid-cols-12 gap-2 items-center';
+    leafEl.dataset.nodeKind = 'leaf';
+    leafEl.innerHTML =
+        '<input type="text" data-field="cond_field" list="approval-rule-fields" placeholder="field" '
+      +   'class="col-span-4 ' + inputCls + ' font-mono">'
+      + '<select data-field="cond_op" class="col-span-2 ' + inputCls + ' font-mono">'
+      +   _APPROVAL_OPS.map(function(o) {
+            return '<option value="' + o + '"' + (o === cond.op ? ' selected' : '') + '>' + o + '</option>';
+          }).join('')
+      + '</select>'
+      + '<input type="text" data-field="cond_value" placeholder="value" '
+      +   'class="col-span-4 ' + inputCls + ' font-mono">'
+      + '<div class="col-span-2 flex items-center justify-end gap-1">'
+      +   '<button type="button" title="Wrap in group" '
+      +     'class="cond-wrap-btn text-[11px] px-1.5 py-0.5 rounded border border-token-border text-muted hover:text-body hover:bg-surface-raised">⊕</button>'
+      +   '<button type="button" title="Remove this condition" '
+      +     'class="cond-remove-btn text-red-400 hover:text-red-600 text-lg leading-none px-1">×</button>'
+      + '</div>';
+    leafEl.querySelector('[data-field="cond_field"]').value = cond.field || '';
+    leafEl.querySelector('[data-field="cond_value"]').value =
+        cond.value === undefined || cond.value === null ? '' : String(cond.value);
+
+    leafEl.querySelector('.cond-wrap-btn').addEventListener('click', function() {
+      // Wrap: leaf → {op:'and', clauses:[leaf]}. Operator can flip
+      // to OR / NOT once the wrapper exists.
+      _rerenderApprovalCondition(leafEl, function(self) {
+        return { op: 'and', clauses: [self] };
+      });
+    });
+    leafEl.querySelector('.cond-remove-btn').addEventListener('click', function() {
+      // Removal at root level is meaningful only when the leaf has a
+      // parent compound; the parent's onChild-removed handler will
+      // re-render. At the root inside a rule card, we keep the leaf
+      // and just blank its inputs (matches the slice-2 behaviour —
+      // emptying the rule is done by deleting the whole card).
+      var parentCompound = leafEl.closest('.approval-cond-compound');
+      if (!parentCompound) {
+        leafEl.querySelectorAll('input').forEach(function(i) { i.value = ''; });
+        leafEl.querySelector('[data-field="cond_op"]').value = '==';
+        return;
+      }
+      var compoundIndex = parseInt(leafEl.dataset.compoundIndex || '0', 10);
+      _rerenderApprovalCondition(parentCompound, function(comp) {
+        comp.clauses.splice(compoundIndex, 1);
+        // NOT must always have exactly one child; if removal empties
+        // a NOT, replace it with a leaf at the parent level. We can't
+        // do that here without going up another level — so for NOT
+        // we just refuse to remove the only child.
+        if (comp.op === 'not' && comp.clauses.length === 0) {
+          comp.clauses = [_emptyLeaf()];
+        }
+        // If a regular AND/OR group is now empty, dissolve to an empty
+        // leaf — matches the "rules need at least one clause" contract.
+        if (comp.clauses.length === 0) {
+          return _emptyLeaf();
+        }
+        // If an AND/OR group is now down to one child, keep the group
+        // wrapper — operators can re-add siblings without re-wrapping.
+        // (NOT exception above keeps the wrapper either way.)
+      });
+    });
+    return leafEl;
+  }
+
+  // Compound: render header + child clauses + add buttons.
+  var compEl = document.createElement('div');
+  compEl.className = 'approval-cond-compound rounded-md border-l-4 ' + _approvalDepthBorder(depth) + ' bg-surface-raised/20 pl-3 pr-2 py-2 space-y-1.5';
+  compEl.dataset.nodeKind = 'compound';
+  compEl.dataset.depth = String(depth);
+
+  // Header row: op selector + remove button (if depth > 0).
+  var header = document.createElement('div');
+  header.className = 'flex items-center gap-2 mb-1';
+  var atDepthLimit = depth >= _APPROVAL_MAX_DEPTH - 1;
+  header.innerHTML =
+      '<select data-field="compound_op" class="rounded border border-token-border bg-surface text-body text-[11px] px-2 py-0.5 font-mono">'
+    +   '<option value="and"' + (cond.op === 'and' ? ' selected' : '') + '>ALL (AND)</option>'
+    +   '<option value="or"'  + (cond.op === 'or'  ? ' selected' : '') + '>ANY (OR)</option>'
+    +   '<option value="not"' + (cond.op === 'not' ? ' selected' : '') + '>NOT</option>'
     + '</select>'
-    + '<input type="text" data-field="cond_value" placeholder="value" class="col-span-5 ' + inputCls + ' font-mono">'
-    + '<button type="button" onclick="removeRuleCondition(this)" '
-    +   'class="col-span-1 text-red-400 hover:text-red-600 text-lg leading-none text-center">\xd7</button>';
+    + '<span class="text-[10px] text-muted/50 font-mono">depth ' + depth + '</span>'
+    + (depth > 0
+        ? '<button type="button" class="compound-remove-btn ml-auto text-[11px] px-1.5 py-0.5 rounded border border-token-border text-muted hover:text-red-600 hover:border-red-400">Remove group</button>'
+        : '<span class="ml-auto"></span>'
+      );
+  compEl.appendChild(header);
+
+  // Op selector: re-render on change so NOT collapses to one child if
+  // we're flipping from AND/OR with multiple children.
+  header.querySelector('[data-field="compound_op"]').addEventListener('change', function(e) {
+    var newOp = e.target.value;
+    _rerenderApprovalCondition(compEl, function(self) {
+      self.op = newOp;
+      if (newOp === 'not' && self.clauses.length > 1) {
+        // Keep only the first child; warn via console but don't block —
+        // the operator picked NOT, the trailing clauses are forfeit.
+        self.clauses = self.clauses.slice(0, 1);
+      }
+    });
+  });
+  if (depth > 0) {
+    header.querySelector('.compound-remove-btn').addEventListener('click', function() {
+      // Removing a group keeps the operator's single child as the
+      // replacement — that's typically what they want when they
+      // realise they over-grouped. AND/OR with >1 child: replace with
+      // first child + warn (rare).
+      var parent = compEl.closest('.approval-cond-compound:not([data-depth="' + depth + '"])');
+      // Actually we can't reliably find "parent compound" via closest
+      // since both have the same class. Use the data attribute walk:
+      parent = compEl.parentElement && compEl.parentElement.closest('.approval-cond-compound');
+      if (!parent) {
+        // At root — replace the whole rule's condition with the first child.
+        _rerenderApprovalCondition(compEl, function(self) {
+          return self.clauses[0] || _emptyLeaf();
+        });
+        return;
+      }
+      var idxRaw = compEl.dataset.compoundIndex;
+      var compoundIndex = idxRaw === undefined ? 0 : parseInt(idxRaw, 10);
+      _rerenderApprovalCondition(parent, function(parentJson) {
+        var firstChild = (parentJson.clauses[compoundIndex] && parentJson.clauses[compoundIndex].clauses
+                          && parentJson.clauses[compoundIndex].clauses[0])
+                         || _emptyLeaf();
+        parentJson.clauses[compoundIndex] = firstChild;
+      });
+    });
+  }
+
+  // Children.
+  var clausesEl = document.createElement('div');
+  clausesEl.className = 'space-y-1.5';
+  (cond.clauses || []).forEach(function(child, i) {
+    var childEl = renderApprovalCondition(child, depth + 1);
+    childEl.dataset.compoundIndex = String(i);
+    clausesEl.appendChild(childEl);
+  });
+  compEl.appendChild(clausesEl);
+
+  // Add-condition + add-group buttons (skip for NOT — already capped at 1 child).
+  if (cond.op !== 'not') {
+    var actions = document.createElement('div');
+    actions.className = 'flex items-center gap-3 pt-1';
+    actions.innerHTML =
+        '<button type="button" class="cond-add-leaf text-[11px] text-blue-600 hover:underline">+ Add condition</button>'
+      + (atDepthLimit
+          ? '<span class="text-[10px] text-amber-600 dark:text-amber-400">Max depth reached</span>'
+          : '<button type="button" class="cond-add-group text-[11px] text-blue-600 hover:underline">+ Add group</button>'
+        );
+    compEl.appendChild(actions);
+    actions.querySelector('.cond-add-leaf').addEventListener('click', function() {
+      _rerenderApprovalCondition(compEl, function(self) {
+        self.clauses.push(_emptyLeaf());
+      });
+    });
+    if (!atDepthLimit) {
+      actions.querySelector('.cond-add-group').addEventListener('click', function() {
+        _rerenderApprovalCondition(compEl, function(self) {
+          self.clauses.push(_emptyCompound('and'));
+        });
+      });
+    }
+  } else {
+    // NOT: show a hint that it accepts exactly one child.
+    var hint = document.createElement('div');
+    hint.className = 'text-[10px] text-muted/60 pt-0.5';
+    hint.textContent = 'NOT applies to exactly one condition. Use AND/OR groups for multi-clause negations.';
+    compEl.appendChild(hint);
+  }
+
+  return compEl;
+}
+
+function _readApprovalCondition(el) {
+  if (!el) return null;
+  var kind = el.dataset.nodeKind;
+  if (kind === 'leaf') {
+    var field = el.querySelector('[data-field="cond_field"]').value.trim();
+    var op    = el.querySelector('[data-field="cond_op"]').value;
+    var value = el.querySelector('[data-field="cond_value"]').value.trim();
+    if (!field) return null;  // skip half-edited rows on save
+    return { field: field, op: op, value: value };
+  }
+  if (kind === 'compound') {
+    var op2 = el.querySelector(':scope > div > [data-field="compound_op"]').value;
+    var children = [];
+    // Direct children only — nested compounds have their own
+    // .approval-cond-compound class; walk them recursively.
+    var clausesContainer = el.children[1];  // [header, clausesEl, actions]
+    Array.from(clausesContainer.children).forEach(function(child) {
+      var c = _readApprovalCondition(child);
+      if (c) children.push(c);
+    });
+    if (op2 === 'not') {
+      return { op: 'not', clauses: children.slice(0, 1) };
+    }
+    if (children.length === 0) return null;
+    if (children.length === 1) return children[0];  // collapse single-child AND/OR
+    return { op: op2, clauses: children };
+  }
+  return null;
 }
 
 function addRuleCondition(btn) {
+  // Legacy entrypoint: still callable from external code, but now
+  // routes through the recursive editor — adds a leaf to the rule's
+  // root condition.
   var card = btn.closest('.approval-rule-card');
   var conds = card.querySelector('.approval-rule-conds');
-  var row = document.createElement('div');
-  row.className = 'approval-rule-cond grid grid-cols-12 gap-2 items-center';
-  row.innerHTML = _approvalCondHtml();
-  conds.appendChild(row);
+  var rootEl = conds.firstElementChild;
+  if (!rootEl) {
+    // Empty card — drop in a fresh leaf.
+    rootEl = renderApprovalCondition(_emptyLeaf(), 0);
+    conds.appendChild(rootEl);
+    return;
+  }
+  // If the root is a compound, add a leaf inside it. Else wrap into
+  // an AND group with two leaves.
+  if (rootEl.dataset.nodeKind === 'compound') {
+    _rerenderApprovalCondition(rootEl, function(self) {
+      self.clauses.push(_emptyLeaf());
+    });
+  } else {
+    _rerenderApprovalCondition(rootEl, function(self) {
+      return { op: 'and', clauses: [self, _emptyLeaf()] };
+    });
+  }
 }
 
 function removeRuleCondition(btn) {
-  var card = btn.closest('.approval-rule-card');
-  var rows = card.querySelectorAll('.approval-rule-cond');
-  // Always leave at least one condition row — emptying a rule is done by removing the whole card.
-  if (rows.length <= 1) {
-    var row = btn.closest('.approval-rule-cond');
-    row.querySelectorAll('input').forEach(function(i) { i.value = ''; });
-    return;
-  }
-  btn.closest('.approval-rule-cond').remove();
+  // Kept for legacy template references — the recursive editor wires
+  // its own remove handlers per leaf, so this is a thin shim that
+  // dispatches to the leaf's own button.
+  var leaf = btn.closest('.approval-cond-leaf') || btn.closest('.approval-rule-cond');
+  if (!leaf) return;
+  var inner = leaf.querySelector('.cond-remove-btn');
+  if (inner && inner !== btn) inner.click();
 }
 
-function addApprovalRuleRow() {
+function _renderApprovalRuleCard(rule) {
+  // ``rule`` shape:
+  //   { name, condition, approvers: [{email, name}], min_approvals_required }
   var card = document.createElement('div');
   card.className = 'approval-rule-card rounded-lg border border-token-border bg-surface-raised/30 p-3';
   var inputCls = 'rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500';
+
+  var emails = ((rule && rule.approvers) || [])
+      .map(function(a) { return (a && a.email) || ''; })
+      .filter(function(e) { return e; })
+      .join(', ');
+
   card.innerHTML =
-    '<div class="grid grid-cols-12 gap-2 items-center mb-2">'
-    +   '<input type="text" data-field="rule_name" placeholder="Rule name" class="col-span-5 ' + inputCls + '">'
-    +   '<div class="col-span-3 flex items-center gap-1 text-xs text-muted">'
-    +     '<span class="text-muted/60">Match</span>'
-    +     '<select data-field="rule_combinator" class="rounded border border-token-border bg-surface text-body text-xs px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono">'
-    +       '<option value="and">ALL (AND)</option>'
-    +       '<option value="or">ANY (OR)</option>'
-    +     '</select>'
-    +   '</div>'
-    +   '<div class="col-span-3 flex items-center gap-1 text-xs text-muted">'
+      '<div class="grid grid-cols-12 gap-2 items-center mb-2">'
+    +   '<input type="text" data-field="rule_name" placeholder="Rule name" class="col-span-7 ' + inputCls + '">'
+    +   '<div class="col-span-4 flex items-center gap-1 text-xs text-muted">'
     +     '<span class="text-muted/60">Quorum</span>'
     +     '<input type="number" min="1" data-field="rule_threshold" placeholder="all" '
     +       'class="w-14 rounded border border-token-border bg-surface text-body text-xs px-2 py-1 font-mono focus:outline-none focus:ring-1 focus:ring-blue-500">'
@@ -1522,20 +1730,45 @@ function addApprovalRuleRow() {
     +   '<button type="button" onclick="this.closest(\'.approval-rule-card\').remove()" '
     +     'class="col-span-1 text-red-400 hover:text-red-600 text-lg leading-none text-center justify-self-end">\xd7</button>'
     + '</div>'
-    + '<div class="approval-rule-conds space-y-1.5">'
-    +   '<div class="approval-rule-cond grid grid-cols-12 gap-2 items-center">' + _approvalCondHtml() + '</div>'
-    + '</div>'
-    + '<div class="flex items-center gap-3 mt-2">'
-    +   '<button type="button" onclick="addRuleCondition(this)" '
-    +     'class="text-[11px] text-blue-600 hover:underline">+ Add condition</button>'
-    + '</div>'
+    + '<div class="approval-rule-conds space-y-1.5"></div>'
     + '<div class="mt-2">'
     +   '<input type="text" data-field="rule_approvers" placeholder="approver1@x.de, approver2@x.de" '
     +     'class="w-full ' + inputCls + ' font-mono">'
     +   '<p class="text-[10px] text-muted/50 mt-0.5">Comma-separated approver emails for this rule.</p>'
     + '</div>';
+
+  card.querySelector('[data-field="rule_name"]').value = (rule && rule.name) || '';
+  card.querySelector('[data-field="rule_threshold"]').value =
+      (rule && rule.min_approvals_required) ? String(rule.min_approvals_required) : '';
+  card.querySelector('[data-field="rule_approvers"]').value = emails;
+
+  var rootCondJson = (rule && rule.condition) || _emptyLeaf();
+  card.querySelector('.approval-rule-conds')
+      .appendChild(renderApprovalCondition(rootCondJson, 0));
+  return card;
+}
+
+function addApprovalRuleRow() {
+  var card = _renderApprovalRuleCard({
+    name: '', condition: _emptyLeaf(), approvers: [], min_approvals_required: null,
+  });
   document.getElementById('approval-rule-rows').appendChild(card);
 }
+
+// Hydrate on load: walk the JSON blob and render each rule card.
+document.addEventListener('DOMContentLoaded', function() {
+  var blob = document.getElementById('approval-rules-data');
+  if (!blob) return;
+  var rules;
+  try {
+    rules = JSON.parse(blob.textContent || '[]');
+  } catch (e) {
+    rules = [];
+  }
+  var rows = document.getElementById('approval-rule-rows');
+  if (!rows || !Array.isArray(rules)) return;
+  rules.forEach(function(rule) { rows.appendChild(_renderApprovalRuleCard(rule)); });
+});
 
 async function submitForm() {
   var form = document.getElementById('at-form');
@@ -1684,38 +1917,41 @@ async function submitForm() {
       return v ? parseInt(v) : null;
     })(),
     approval_rules: (function() {
+      // Slice-3 save: walks each card's recursive condition tree via
+      // _readApprovalCondition (which preserves AND/OR/NOT nesting up
+      // to depth 8 — the engine's limit). The single-leaf collapse at
+      // the root falls out of _readApprovalCondition naturally.
       var rules = [];
       Array.from(document.querySelectorAll('.approval-rule-card')).forEach(function(card) {
         var name = card.querySelector('[data-field="rule_name"]').value.trim();
-        var combinator = card.querySelector('[data-field="rule_combinator"]').value || 'and';
         var thresholdRaw = card.querySelector('[data-field="rule_threshold"]').value.trim();
         var emailsRaw = card.querySelector('[data-field="rule_approvers"]').value.trim();
         if (!emailsRaw) return;  // a rule with no approvers is meaningless
 
-        // Collect leaves; drop incomplete rows so a half-edited card doesn't fail the rule.
-        var leaves = [];
-        Array.from(card.querySelectorAll('.approval-rule-cond')).forEach(function(row) {
-          var field = row.querySelector('[data-field="cond_field"]').value.trim();
-          var op = row.querySelector('[data-field="cond_op"]').value;
-          var value = row.querySelector('[data-field="cond_value"]').value.trim();
-          if (!field || !op || !value) return;
-          leaves.push({ field: field, op: op, value: value });
-        });
-        if (!leaves.length) return;
+        var rootEl = card.querySelector('.approval-rule-conds').firstElementChild;
+        var condition = _readApprovalCondition(rootEl);
+        if (!condition) return;  // empty / malformed condition → drop the rule
 
         var approvers = emailsRaw.split(',').map(function(e) { return e.trim(); })
           .filter(function(e) { return e.length > 0; })
           .map(function(e) { return { email: e, name: e }; });
         if (!approvers.length) return;
 
-        // Single-leaf → flat shape (back-compat with slice-1 evaluator + simpler JSON).
-        // Multi-leaf → compound {op: combinator, clauses: [...]}.
-        var condition = leaves.length === 1
-          ? leaves[0]
-          : { op: combinator, clauses: leaves };
+        // Auto-name from the first leaf if the operator left it blank —
+        // matches slice-2 behaviour. Walk the condition tree to find
+        // the leftmost leaf (works for nested compounds too).
+        function _firstLeaf(c) {
+          if (_isLeaf(c)) return c;
+          if (_isCompound(c) && c.clauses.length) return _firstLeaf(c.clauses[0]);
+          return null;
+        }
+        var firstLeaf = _firstLeaf(condition);
+        var defaultName = firstLeaf
+            ? (firstLeaf.field + ' ' + firstLeaf.op + ' ' + firstLeaf.value)
+            : 'unnamed rule';
 
         var rule = {
-          name: name || (leaves[0].field + ' ' + leaves[0].op + ' ' + leaves[0].value),
+          name: name || defaultName,
           condition: condition,
           approvers: approvers,
         };

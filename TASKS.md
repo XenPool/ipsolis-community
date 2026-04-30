@@ -6,14 +6,31 @@ and historical "done" entries at the bottom.
 
 ---
 
-## Status — 2026-04-26
+## Status — 2026-04-30
 
-The Prio-0 enterprise-procurement push paused after this round. Headline features
-across RBAC, external secret management, audit + SIEM, conditional approval rules,
-per-classification retention, and HA Beat are all **shipped and verified**; the
-remaining slice-N+1 enrichments are consolidated in *Deferred Enterprise Backlog*
-below for whenever the focus comes back here. Each backlog item points at the
-originating section so the build-log context is one click away.
+Prio-0 enterprise-procurement push **complete**. The 2026-04-26 round shipped
+the headline features (RBAC, external secret management, audit + SIEM,
+conditional approval rules, per-classification retention, HA Beat); the
+2026-04-30 follow-on round closed every queued slice-2 / slice-3 enrichment:
+
+* External secret management: Conjur + Azure KV + AWS SM backends, residual
+  `is_secret` key resolver coverage, one-shot bulk-migration tool, Vault
+  AppRole / Kubernetes-JWT auth, AWS native AssumeRole, CCP mTLS file-upload
+  bootstrap UX.
+* SIEM: Sentinel Logs Ingestion API (replacement for the 2026-08-31 sunset
+  Data Collector API).
+* Approvals: per-classification routing (compliance officer or owner-of-record
+  per PII / PHI / PCI), escalation v2 (assignment mode with tokenized URL),
+  per-bucket supersession, recursive AND/OR/NOT rule editor.
+* Compliance: API tokens hard-delete + Beat purge.
+* HA: multi-replica api / worker docs + Postgres standby + failover docs
+  (section 12 of `docs/DEPLOYMENT.md`).
+
+The *Deferred Enterprise Backlog* below is now empty of functional items —
+everything previously queued has shipped. The two genuinely-external items
+in the *Pre-existing open tasks* section (Entra ID Connect setup; Cloud
+group management via Microsoft Graph) remain — both deliberately scoped
+outside the application codebase.
 
 ---
 
@@ -533,8 +550,55 @@ pull one when there's a procurement need or a quiet week.
       to the failure state; restart returned to `alive` within ~8s.
 
 ### Conditional approval rules slice 3
-- [ ] Visual editor for deeply-nested compounds (today's UI flattens to
-      1 level + warning).
+- [x] **Visual editor for deeply-nested compounds** *(2026-04-30)*.
+      Slice 1+2 of the conditional-rules editor flattened the rule
+      builder to a single-level `AND`/`OR` of leaves with a yellow
+      "Edit via API to preserve nested structure" warning when the
+      rule had deeper nesting — the engine has supported up to depth
+      8 since slice 1, only the UI was shallow. Slice 3 ships the
+      recursive editor: each compound renders its `AND`/`OR`/`NOT`
+      op selector + a list of child clauses; each leaf renders
+      field/op/value plus a `⊕` "wrap in group" affordance that
+      replaces the leaf with `{op: 'and', clauses: [leaf]}` so the
+      operator can promote a leaf to a sub-tree without retyping.
+      `+ Add condition` appends a sibling leaf; `+ Add group`
+      appends a sibling `AND` group (operator flips the op
+      afterwards). Depth-coloured left borders (blue → amber →
+      emerald → purple → rose) make the tree structure obvious at
+      a glance; each compound's header carries its current depth
+      and a `Remove group` button (root depth 0 doesn't get one —
+      the rule card itself is the remove handle). NOT groups
+      special-case: hide the Add buttons (engine accepts exactly
+      one child), inline hint suggesting AND/OR for multi-clause
+      negations, op-flip from AND/OR-with-many-children → NOT
+      auto-truncates trailing children on save. Server template
+      now emits a `<script type="application/json"
+      id="approval-rules-data">` blob with the canonical condition
+      JSON; on `DOMContentLoaded` the editor hydrates each card
+      via `_renderApprovalRuleCard()` → `renderApprovalCondition()`.
+      Save-time walk via `_readApprovalCondition()` returns the
+      same JSON shape the engine evaluates. The render+read
+      functions are pure on JSON — no listener bookkeeping
+      survives mutations: every "+ Add" / "Remove" / op-flip
+      click reads → mutates the in-memory tree → re-renders. No
+      framework added (no Alpine, no htmx, no build step) — plain
+      vanilla JS recursive component pattern fits cleanly into
+      the existing HTMX + Tailwind stack. Single-leaf root still
+      collapses to flat `{field, op, value}` on save (slice-1
+      back-compat); multi-leaf or any nested group serialises as
+      `{op, clauses}`. Empty / half-edited rows are dropped on
+      save. Smoke-tested live: staged a 3-level nested rule via
+      direct DB UPDATE — `(has_pii AND duration_days > 30) OR
+      (has_pci AND NOT has_phi)` with quorum 2 of 3 reviewers;
+      ran `evaluate_rules` against five synthetic order contexts;
+      all five test cases pass — PII + long duration matches
+      (left AND branch); PII + short duration no match; PCI
+      without PHI matches (right AND with NOT); PCI + PHI no
+      match (NOT blocks); no flags no match. Container template
+      inspection confirms the new symbols are present (15×
+      `renderApprovalCondition`, 8× `_readApprovalCondition`,
+      3× `_renderApprovalRuleCard`, 3× `compound_op`, 15× `depth `
+      label references).
 - [x] **Per-bucket supersession (was: per-bucket reminder optimisation)**
       *(2026-04-30)*. Today (slice 2) when a single quorum bucket meets
       its threshold but other buckets are still pending, the surplus
@@ -2450,12 +2514,14 @@ is faster, deterministic, and works in air-gapped deployments.
     persists.
   * Page renders correctly with the new column + dropdown.
 
-### [open] QA regression sweep — Prio 2 (2026-04-29)
+### [done] QA regression sweep — Prio 2 (2026-04-29 / 2026-04-30)
 Findings from a Claude-Code browser QA pass over `/portal/` and `/ui/`
 (report: `ipsolis-agent-prompt.md`). Walked through all 26 items;
-the survivors below are the ones with verified root causes. False
-flags and items rooted in data (not code) are recorded in the
-decision block underneath rather than as work items.
+the survivors below are the ones with verified root causes. All
+17 survivor items shipped on 2026-04-29 / 2026-04-30. False flags
+and items rooted in data (not code) are recorded in the decision
+block underneath rather than as work items — kept inline so future
+QA rounds don't re-raise them.
 
 **Bugs (real defects):**
 - [x] **B2 — Step duration shows `-0.0s`.** *(2026-04-29)* Both the

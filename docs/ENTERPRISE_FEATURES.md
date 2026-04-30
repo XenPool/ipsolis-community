@@ -21,9 +21,10 @@ explicit *Enterprise license* note appears.
 
 - [Microsoft Teams approval cards](#microsoft-teams-approval-cards)
 - [Approval reminders](#approval-reminders)
-- [Approval escalation](#approval-escalation)
+- [Approval escalation](#approval-escalation) — notify-only or assignment mode (tokenized one-click decide URL per contact)
 - [Approval delegation (admin + portal self-service)](#approval-delegation-admin--portal-self-service)
-- [N-of-M approvals + conditional rules](#n-of-m-approvals--conditional-rules)
+- [N-of-M approvals + conditional rules](#n-of-m-approvals--conditional-rules) — per-bucket supersession + recursive AND/OR/NOT rule editor
+- [Per-classification approval routing](#per-classification-approval-routing) (compliance officer or owner-of-record per PII / PHI / PCI class) — lives under *Field-level data classification*
 - [Auto-decline on extended inactivity](#auto-decline-on-extended-inactivity)
 - [Access certification campaigns](#access-certification-campaigns)
 
@@ -39,9 +40,9 @@ explicit *Enterprise license* note appears.
 
 **Authentication & access control**
 
-- [Per-integration API tokens](#per-integration-api-tokens)
+- [Per-integration API tokens](#per-integration-api-tokens) — includes opt-in hard-delete retention policy
 - [Admin RBAC (roles, ACL grants, SoD, password policy)](#admin-rbac-roles-acl-grants-sod-password-policy)
-- [External secret management (HashiCorp Vault + CyberArk CCP/AIM + Azure Key Vault + AWS Secrets Manager + CyberArk Conjur)](#external-secret-management-hashicorp-vault--cyberark-ccpaim--azure-key-vault--aws-secrets-manager--cyberark-conjur)
+- [External secret management (HashiCorp Vault + CyberArk CCP/AIM + Azure Key Vault + AWS Secrets Manager + CyberArk Conjur)](#external-secret-management-hashicorp-vault--cyberark-ccpaim--azure-key-vault--aws-secrets-manager--cyberark-conjur) — Vault AppRole / Kubernetes JWT, AWS native AssumeRole, Sentinel Logs Ingestion, CCP mTLS file upload, one-shot bulk-migration tool
 
 **Operations**
 
@@ -1633,9 +1634,69 @@ condition matches the order. Rules:
 Admin UI → *Asset Definitions* → edit a definition → **Approval**
 section → rule builder card. The rule editor shows a free-text
 field input with an autocomplete datalist of built-in fields plus
-all `attr.*` keys from the asset type. Deeply-nested compounds (3+
-levels) round-trip correctly but the simple card editor only edits
-top-level clauses; an "edit JSON" mode is on the roadmap.
+all `attr.*` keys from the asset type.
+
+**Slice-3 nested editor**: the rule builder is a recursive
+AND/OR/NOT tree editor that mirrors the engine's full expressiveness
+(up to the `_MAX_DEPTH = 8` limit). Each compound (group) renders
+its op selector + child clauses; each leaf renders the
+field/op/value triple plus a "wrap in group" affordance. Operators
+build complex rules by alternating *Add condition* (sibling leaf)
+and *Add group* (sibling compound) inside the current node; the
+small `⊕` button next to a leaf wraps it in an `AND` group so the
+operator can promote a leaf to a sub-tree without re-creating it.
+
+Visual nesting: each compound carries a depth-coloured left border
+(blue → amber → emerald → purple → rose, cycling past depth 5) so
+the AND/OR/NOT structure is obvious at a glance even when the rule
+gets dense. The header of every group shows its current depth and a
+*Remove group* button (root depth 0 doesn't have one — the rule
+card itself is the remove handle).
+
+Operations:
+
+| Action | Where | Effect |
+|---|---|---|
+| **+ Add condition** | inside any AND/OR group | append an empty leaf as a sibling |
+| **+ Add group** | inside any AND/OR group | append an empty AND group as a sibling (operator can flip to OR/NOT after) |
+| **⊕ Wrap in group** | next to any leaf | replace the leaf with `{op: 'and', clauses: [leaf]}` so the operator can add siblings or flip to NOT |
+| **× Remove this condition** | next to any leaf | delete the leaf from its parent group; if removal empties the group, the group dissolves to an empty leaf |
+| **Remove group** | header of any nested group | replace the group with its first child (the typical "I over-grouped" undo) |
+
+`NOT` groups are special: the engine accepts only one child clause,
+so the editor:
+
+* Hides *Add condition* / *Add group* buttons inside a NOT (the
+  group is full at one child).
+* Renders an inline hint: "NOT applies to exactly one condition.
+  Use AND/OR groups for multi-clause negations."
+* Auto-truncates trailing children when an operator flips an
+  AND/OR group with multiple children to NOT (rare but well-defined:
+  the first child is kept, the rest are dropped on save).
+
+**Hydration model**: the server template renders only the rule-card
+shell + a `<script type="application/json" id="approval-rules-data">`
+blob carrying the canonical condition JSON. On `DOMContentLoaded`,
+the editor's `_renderApprovalRuleCard()` walks the JSON and produces
+the DOM via `renderApprovalCondition(node, depth)`. Save-time inverse
+walk via `_readApprovalCondition(rootEl)` returns the same JSON shape
+the engine evaluates. The two functions are pure on JSON, so no
+listener bookkeeping survives mutations: every "+ Add" / "Remove" /
+op-flip click reads → mutates the in-memory JSON tree → calls
+`renderApprovalCondition` again to rebuild the DOM. This is what a
+React-style component framework does under the hood; the recursive
+plain-JS approach keeps the dependency surface unchanged
+(no Alpine, no htmx, no build step).
+
+**Save semantics**:
+
+* A single-leaf root collapses to a flat `{field, op, value}` shape
+  (back-compat with slice-1 evaluator + cleaner JSON).
+* Multi-leaf or any nested group serialises as the canonical
+  `{op, clauses}` compound.
+* Empty / half-edited rows are dropped at save time — the operator
+  can leave an unfilled `+ Add condition` row in place without
+  invalidating the rule.
 
 ---
 
