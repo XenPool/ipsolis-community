@@ -491,12 +491,21 @@ async def test_teams_webhook(db: AsyncSession = Depends(get_db)) -> dict:
 
 @router.post("/config/secret-backend/test", dependencies=[require_role("admin")])
 async def test_secret_backend(db: AsyncSession = Depends(get_db)) -> dict:
-    """Verify the configured secret backend (Vault or CCP) is reachable.
+    """Verify the configured secret backend (Vault, CCP, or Azure KV) is reachable.
 
     Updates ``secret.last_test_at`` / ``secret.last_test_error`` so the
     Settings UI can show "last verified" state without re-running the
     test. Also clears the in-process resolution cache so the next read
     after a credential rotation goes back to source.
+
+    Per backend the test is the cheapest reachable probe:
+    * Vault → ``/v1/sys/health`` (no token needed).
+    * CCP → ``/api/Verify`` (4xx counts as reachable, since CCP requires
+      a valid AppID for non-error responses on this endpoint).
+    * Azure KV → AAD client_credentials token acquire against
+      ``https://vault.azure.net/.default``. Doesn't probe a specific
+      vault (no vault name in scope) — verifies the SPN itself is
+      configured correctly, which is the most-common failure mode.
     """
     from datetime import datetime, timezone
     from sqlalchemy import text as sa_text

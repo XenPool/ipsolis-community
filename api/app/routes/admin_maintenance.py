@@ -655,16 +655,94 @@ async def _probe_smtp(db: AsyncSession) -> dict:
         return {"ok": False, "detail": str(exc)[:200]}
 
 
+# RedBeat key prefix mirrors ``worker/tasks/__init__.py``. The lock key
+# the leader holds lives at ``<prefix>:lock`` — note the double colon
+# (the prefix already ends in one). Keep this in lockstep with the worker.
+_REDBEAT_LOCK_KEY = "ipsolis:redbeat::lock"
+
+
+def _probe_beat() -> dict:
+    """Check whether a Beat replica holds the RedBeat distributed lock.
+
+    A present lock means a Beat replica is dispatching scheduled tasks.
+    A missing lock for >30 s (the configured ``redbeat_lock_timeout``)
+    means **no** Beat is running and periodic tasks are silently
+    stalled — exactly the failure mode that prompts the alert.
+
+    Returns the tri-state {True, False, None} ``ok`` field consistent
+    with the other probes:
+    * ``True``  — lock present, Beat alive somewhere
+    * ``False`` — Redis reachable but lock missing → real outage
+    * ``None``  — Redis unreachable; redirect attention to the redis probe
+    """
+    try:
+        import redis  # type: ignore[import-not-found]
+    except Exception as exc:
+        return {"ok": False, "detail": f"redis package missing: {exc}"}
+    try:
+        r = redis.Redis.from_url(settings.CELERY_BROKER_URL,
+                                 socket_connect_timeout=2, socket_timeout=2)
+        if not r.exists(_REDBEAT_LOCK_KEY):
+            return {
+                "ok": False,
+                "detail": (
+                    "RedBeat lock key is absent — no Beat replica is dispatching "
+                    "scheduled tasks. Periodic jobs (reminders, snapshots, "
+                    "retention prune, license expiry, threshold alerter) are "
+                    "stalled until a Beat replica recovers."
+                ),
+            }
+        ttl = r.ttl(_REDBEAT_LOCK_KEY)
+        return {"ok": True, "detail": f"Beat leader present (lock TTL ~{ttl}s)"}
+    except Exception as exc:
+        # Redis itself is unreachable — covered by ``redis`` probe.
+        return {"ok": None, "detail": f"redis unreachable: {str(exc)[:160]}"}
+
+
+# Note: SIEM streaming probe lives next to the ``/health`` handler
+# below (``_probe_siem_streaming_async``). Keeping it co-located with
+# the response builder makes the data-flow easier to read for a route
+# that's pure orchestration.
+
+
 @router.get("/health")
 async def health(db: AsyncSession = Depends(get_db)) -> dict:
+    siem = await _probe_siem_streaming_async(db)
     return {
         "database": await _probe_db(db),
         "redis":    _probe_redis(),
+        "beat":     _probe_beat(),
         "entra":    await _probe_entra(db),
         "sccm":     await _probe_sccm(db),
         "smtp":     await _probe_smtp(db),
+        "siem":     siem,
         "checked_at": datetime.now(timezone.utc).isoformat(),
     }
+
+
+async def _probe_siem_streaming_async(db: AsyncSession) -> dict:
+    """Async wrapper around the sync SIEM probe.
+
+    Cleaner than spinning up a sync DB session in this path — we already
+    have an async session, so just translate the SELECT directly.
+    """
+    rows = await db.execute(
+        text(
+            "SELECT key, value FROM app_config "
+            "WHERE key IN ('siem.enabled','siem.last_error','siem.last_success_at')"
+        )
+    )
+    cfg = {k: (v or "") for k, v in rows.all()}
+    enabled = (cfg.get("siem.enabled", "")).strip().lower() in ("1", "true", "yes", "on")
+    if not enabled:
+        return {"ok": None, "detail": "SIEM streaming disabled"}
+    last_error = (cfg.get("siem.last_error") or "").strip()
+    if last_error:
+        return {"ok": False, "detail": f"streaming failure: {last_error[:180]}"}
+    last_success = (cfg.get("siem.last_success_at") or "").strip()
+    if last_success:
+        return {"ok": True, "detail": f"last successful batch at {last_success}"}
+    return {"ok": True, "detail": "enabled, awaiting first successful batch"}
 
 
 # ── Queue inspection ──────────────────────────────────────────────────────────

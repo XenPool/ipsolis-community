@@ -1308,14 +1308,17 @@
     </div>
   </div>
 
-  <!-- ── External Secret Backend (Vault / CyberArk CCP) ─────────────────── -->
+  <!-- ── External Secret Backend (Vault / CCP / Azure KV / AWS SM / Conjur) ── -->
   <div class="bg-surface rounded-xl border border-token-border shadow-sm shadow-slate-900/5 dark:shadow-black/20 p-6 max-w-3xl mb-6">
     <h2 class="text-sm font-semibold text-body mb-1">External Secret Backend</h2>
     <p class="text-xs text-muted/70 mb-4 leading-snug">
       Replace plaintext credentials with references to your secret store. When a backend is enabled, any
       <code class="font-mono bg-surface-raised px-1 rounded">secret.is_secret=true</code> row whose value is
-      <code class="font-mono bg-surface-raised px-1 rounded">vault://&lt;path&gt;</code> or
-      <code class="font-mono bg-surface-raised px-1 rounded">ccp://[&lt;safe&gt;/]&lt;object&gt;</code>
+      <code class="font-mono bg-surface-raised px-1 rounded">vault://&lt;path&gt;</code>,
+      <code class="font-mono bg-surface-raised px-1 rounded">ccp://[&lt;safe&gt;/]&lt;object&gt;</code>,
+      <code class="font-mono bg-surface-raised px-1 rounded">azurekv://&lt;vault&gt;/&lt;secret&gt;</code>,
+      <code class="font-mono bg-surface-raised px-1 rounded">awssm://&lt;secret-id&gt;[#&lt;field&gt;]</code>, or
+      <code class="font-mono bg-surface-raised px-1 rounded">conjur://&lt;identifier&gt;[#&lt;field&gt;]</code>
       gets resolved at read time. Plain string values keep working unchanged — partial migrations are fine.
     </p>
 
@@ -1325,9 +1328,12 @@
         <select id="secret-backend" onchange="onSecretBackendChange()"
                 class="rounded border border-token-border bg-surface text-body text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500">
           {% set _sb = secret_config.get('secret.backend', 'db') if secret_config else 'db' %}
-          <option value="db"     {% if _sb == 'db' %}selected{% endif %}>Database (default — plaintext in app_config)</option>
-          <option value="vault"  {% if _sb == 'vault' %}selected{% endif %}>HashiCorp Vault (KV v2)</option>
-          <option value="ccp"    {% if _sb == 'ccp' %}selected{% endif %}>CyberArk CCP / AIM Web Service</option>
+          <option value="db"      {% if _sb == 'db' %}selected{% endif %}>Database (default — plaintext in app_config)</option>
+          <option value="vault"   {% if _sb == 'vault' %}selected{% endif %}>HashiCorp Vault (KV v2)</option>
+          <option value="ccp"     {% if _sb == 'ccp' %}selected{% endif %}>CyberArk CCP / AIM Web Service</option>
+          <option value="azurekv" {% if _sb == 'azurekv' %}selected{% endif %}>Azure Key Vault</option>
+          <option value="awssm"   {% if _sb == 'awssm' %}selected{% endif %}>AWS Secrets Manager</option>
+          <option value="conjur"  {% if _sb == 'conjur' %}selected{% endif %}>CyberArk Conjur</option>
         </select>
       </div>
 
@@ -1417,6 +1423,159 @@
         <p class="text-[11px] text-muted/70 leading-snug">
           Reference shape: <code class="font-mono bg-surface-raised px-1 rounded">ccp://[&lt;safe&gt;/]&lt;object&gt;</code>.
           ip·Solis returns the account's <code class="font-mono">Content</code> field (the password).
+        </p>
+      </div>
+
+      <!-- Azure Key Vault fields -->
+      <div id="secret-azurekv-fields" class="hidden space-y-3 border-l-2 border-sky-300/40 dark:border-sky-500/30 pl-3">
+        <p class="text-[11px] text-muted/70 leading-snug">
+          Authenticates via an Azure AD service principal (client_credentials flow). The SPN needs
+          <strong>Key Vault Secrets User</strong> (RBAC) or <em>Get</em> on Secrets (vault access policy)
+          on every vault you reference. Independent of the Entra ID SSO config so the KV SPN
+          can carry minimal-necessary access.
+        </p>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-medium text-muted mb-1">Tenant ID</label>
+            <input type="text" id="secret-azurekv-tenant-id"
+                   value="{{ secret_config.get('secret.azurekv.tenant_id', '') if secret_config else '' }}"
+                   placeholder="00000000-0000-0000-0000-000000000000"
+                   class="w-full rounded border border-token-border bg-surface text-body text-sm px-3 py-2 font-mono focus:outline-none focus:ring-1 focus:ring-blue-500">
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-muted mb-1">Client ID</label>
+            <input type="text" id="secret-azurekv-client-id"
+                   value="{{ secret_config.get('secret.azurekv.client_id', '') if secret_config else '' }}"
+                   placeholder="00000000-0000-0000-0000-000000000000"
+                   class="w-full rounded border border-token-border bg-surface text-body text-sm px-3 py-2 font-mono focus:outline-none focus:ring-1 focus:ring-blue-500">
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-muted mb-1">Client Secret</label>
+          <input type="password" id="secret-azurekv-client-secret" value=""
+                 placeholder="{% if secret_config and secret_config.get('secret.azurekv.client_secret') == '***' %}(configured — leave blank to keep current){% else %}service principal client secret{% endif %}"
+                 class="w-full rounded border border-token-border bg-surface text-body text-sm px-3 py-2 font-mono focus:outline-none focus:ring-1 focus:ring-blue-500">
+          <p class="text-[11px] text-muted/60 mt-1">Stored as a secret. Mask <code class="font-mono">***</code> means "configured — leave blank to keep current".</p>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-muted mb-1">API version</label>
+          <input type="text" id="secret-azurekv-api-version"
+                 value="{{ secret_config.get('secret.azurekv.api_version', '7.4') if secret_config else '7.4' }}"
+                 placeholder="7.4"
+                 class="w-32 rounded border border-token-border bg-surface text-body text-sm px-3 py-2 font-mono focus:outline-none focus:ring-1 focus:ring-blue-500">
+          <p class="text-[11px] text-muted/60 mt-1">Default <code class="font-mono">7.4</code> (current GA).</p>
+        </div>
+        <p class="text-[11px] text-muted/70 leading-snug">
+          Reference shape: <code class="font-mono bg-surface-raised px-1 rounded">azurekv://&lt;vault-name&gt;/&lt;secret-name&gt;</code>
+          — e.g. <code class="font-mono bg-surface-raised px-1 rounded">azurekv://kv-prod-ipsolis/ad-bind-password</code>.
+          Append <code class="font-mono">?version=&lt;id&gt;</code> to pin a specific version (rarely needed).
+        </p>
+      </div>
+
+      <!-- AWS Secrets Manager fields -->
+      <div id="secret-awssm-fields" class="hidden space-y-3 border-l-2 border-orange-300/40 dark:border-orange-500/30 pl-3">
+        <p class="text-[11px] text-muted/70 leading-snug">
+          Authenticates via AWS Signature Version 4. The IAM principal needs both
+          <code class="font-mono">secretsmanager:GetSecretValue</code> on each referenced secret
+          AND <code class="font-mono">secretsmanager:ListSecrets</code> for the test-connection probe.
+          Use STS-issued temporary credentials (with session token) where possible.
+        </p>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-medium text-muted mb-1">Region</label>
+            <input type="text" id="secret-awssm-region"
+                   value="{{ secret_config.get('secret.awssm.region', 'us-east-1') if secret_config else 'us-east-1' }}"
+                   placeholder="eu-central-1"
+                   class="w-full rounded border border-token-border bg-surface text-body text-sm px-3 py-2 font-mono focus:outline-none focus:ring-1 focus:ring-blue-500">
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-muted mb-1">Access Key ID</label>
+            <input type="text" id="secret-awssm-access-key-id"
+                   value="{{ secret_config.get('secret.awssm.access_key_id', '') if secret_config else '' }}"
+                   placeholder="AKIA…"
+                   class="w-full rounded border border-token-border bg-surface text-body text-sm px-3 py-2 font-mono focus:outline-none focus:ring-1 focus:ring-blue-500">
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-muted mb-1">Secret Access Key</label>
+          <input type="password" id="secret-awssm-secret-access-key" value=""
+                 placeholder="{% if secret_config and secret_config.get('secret.awssm.secret_access_key') == '***' %}(configured — leave blank to keep current){% else %}IAM secret access key{% endif %}"
+                 class="w-full rounded border border-token-border bg-surface text-body text-sm px-3 py-2 font-mono focus:outline-none focus:ring-1 focus:ring-blue-500">
+          <p class="text-[11px] text-muted/60 mt-1">Stored as a secret. Mask <code class="font-mono">***</code> means "configured — leave blank to keep current".</p>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-muted mb-1">Session Token <span class="text-muted/50">(optional)</span></label>
+          <input type="password" id="secret-awssm-session-token" value=""
+                 placeholder="{% if secret_config and secret_config.get('secret.awssm.session_token') == '***' %}(configured — leave blank to keep current){% else %}STS session token (for AssumeRole / instance profile creds){% endif %}"
+                 class="w-full rounded border border-token-border bg-surface text-body text-sm px-3 py-2 font-mono focus:outline-none focus:ring-1 focus:ring-blue-500">
+          <p class="text-[11px] text-muted/60 mt-1">Required when using STS temporary credentials; leave blank for long-lived IAM user keys.</p>
+        </div>
+        <p class="text-[11px] text-muted/70 leading-snug">
+          Reference shapes:
+          <code class="font-mono bg-surface-raised px-1 rounded">awssm://&lt;secret-name&gt;</code>
+          (returns <code class="font-mono">SecretString</code> as-is) or
+          <code class="font-mono bg-surface-raised px-1 rounded">awssm://&lt;secret-name&gt;#&lt;field&gt;</code>
+          (parses <code class="font-mono">SecretString</code> as JSON, extracts the named field — useful when AWS stores
+          <code class="font-mono">{"username":"…","password":"…"}</code>).
+        </p>
+      </div>
+
+      <!-- CyberArk Conjur fields -->
+      <div id="secret-conjur-fields" class="hidden space-y-3 border-l-2 border-rose-300/40 dark:border-rose-500/30 pl-3">
+        <p class="text-[11px] text-muted/70 leading-snug">
+          Authenticates via Conjur host API-key login (the host's API key is exchanged for a
+          short-lived access token, cached for ~7 minutes). The host needs read permission on every
+          variable that ip·Solis references. Works against on-prem Conjur and Conjur Cloud alike.
+        </p>
+        <div>
+          <label class="block text-xs font-medium text-muted mb-1">Conjur URL</label>
+          <input type="text" id="secret-conjur-url"
+                 value="{{ secret_config.get('secret.conjur.url', '') if secret_config else '' }}"
+                 placeholder="https://conjur.example.com  or  https://&lt;account&gt;.secretsmgr.cyberark.cloud"
+                 class="w-full rounded border border-token-border bg-surface text-body text-sm px-3 py-2 font-mono focus:outline-none focus:ring-1 focus:ring-blue-500">
+          <p class="text-[11px] text-muted/60 mt-1">No trailing slash. Authentication paths are appended automatically.</p>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-medium text-muted mb-1">Account / organisation</label>
+            <input type="text" id="secret-conjur-account"
+                   value="{{ secret_config.get('secret.conjur.account', '') if secret_config else '' }}"
+                   placeholder="cyberark"
+                   class="w-full rounded border border-token-border bg-surface text-body text-sm px-3 py-2 font-mono focus:outline-none focus:ring-1 focus:ring-blue-500">
+            <p class="text-[11px] text-muted/60 mt-1">First path segment in every Conjur API call.</p>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-muted mb-1">Host ID</label>
+            <input type="text" id="secret-conjur-host-id"
+                   value="{{ secret_config.get('secret.conjur.host_id', '') if secret_config else '' }}"
+                   placeholder="ipsolis-prod"
+                   class="w-full rounded border border-token-border bg-surface text-body text-sm px-3 py-2 font-mono focus:outline-none focus:ring-1 focus:ring-blue-500">
+            <p class="text-[11px] text-muted/60 mt-1">The <code class="font-mono">host/</code> prefix is added automatically if missing.</p>
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-muted mb-1">API Key</label>
+          <input type="password" id="secret-conjur-api-key" value=""
+                 placeholder="{% if secret_config and secret_config.get('secret.conjur.api_key') == '***' %}(configured — leave blank to keep current){% else %}host API key{% endif %}"
+                 class="w-full rounded border border-token-border bg-surface text-body text-sm px-3 py-2 font-mono focus:outline-none focus:ring-1 focus:ring-blue-500">
+          <p class="text-[11px] text-muted/60 mt-1">Stored as a secret. Rotate from the Conjur side and paste the new value here.</p>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-muted mb-1">Verify TLS</label>
+          <select id="secret-conjur-verify-tls"
+                  class="rounded border border-token-border bg-surface text-body text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500">
+            {% set _conjur_vt = (secret_config.get('secret.conjur.verify_tls', 'true') if secret_config else 'true').lower() %}
+            <option value="true"  {% if _conjur_vt != 'false' %}selected{% endif %}>Verify (recommended)</option>
+            <option value="false" {% if _conjur_vt == 'false' %}selected{% endif %}>Skip — self-signed lab only</option>
+          </select>
+        </div>
+        <p class="text-[11px] text-muted/70 leading-snug">
+          Reference shapes:
+          <code class="font-mono bg-surface-raised px-1 rounded">conjur://&lt;identifier&gt;</code>
+          (returns the variable's value as-is) or
+          <code class="font-mono bg-surface-raised px-1 rounded">conjur://&lt;identifier&gt;#&lt;field&gt;</code>
+          (parses the value as JSON and extracts the named field). Identifier may include slashes —
+          e.g. <code class="font-mono bg-surface-raised px-1 rounded">conjur://prod/ipsolis/ad-bind-password</code>.
         </p>
       </div>
     </div>
@@ -2091,11 +2250,19 @@ async function testEmailConfig() {
 // ── External Secret Backend (Vault / CyberArk CCP) ─────────────────────────────
 function onSecretBackendChange() {
   var b = document.getElementById('secret-backend').value;
-  var vault = document.getElementById('secret-vault-fields');
-  var ccp = document.getElementById('secret-ccp-fields');
-  if (b === 'vault') { vault.classList.remove('hidden'); ccp.classList.add('hidden'); }
-  else if (b === 'ccp') { vault.classList.add('hidden'); ccp.classList.remove('hidden'); }
-  else { vault.classList.add('hidden'); ccp.classList.add('hidden'); }
+  // Generic show/hide so adding a future backend is one entry, not three lines per case.
+  var groups = {
+    'vault':   document.getElementById('secret-vault-fields'),
+    'ccp':     document.getElementById('secret-ccp-fields'),
+    'azurekv': document.getElementById('secret-azurekv-fields'),
+    'awssm':   document.getElementById('secret-awssm-fields'),
+    'conjur':  document.getElementById('secret-conjur-fields'),
+  };
+  Object.keys(groups).forEach(function(key) {
+    var el = groups[key];
+    if (!el) return;
+    if (key === b) el.classList.remove('hidden'); else el.classList.add('hidden');
+  });
 }
 
 async function saveSecretBackend() {
@@ -2109,11 +2276,28 @@ async function saveSecretBackend() {
     'secret.ccp.app_id':         document.getElementById('secret-ccp-app-id').value.trim(),
     'secret.ccp.safe':           document.getElementById('secret-ccp-safe').value.trim(),
     'secret.ccp.verify_tls':     document.getElementById('secret-ccp-verify-tls').value,
+    'secret.azurekv.tenant_id':  document.getElementById('secret-azurekv-tenant-id').value.trim(),
+    'secret.azurekv.client_id':  document.getElementById('secret-azurekv-client-id').value.trim(),
+    'secret.azurekv.api_version': document.getElementById('secret-azurekv-api-version').value.trim() || '7.4',
+    'secret.awssm.region':         document.getElementById('secret-awssm-region').value.trim() || 'us-east-1',
+    'secret.awssm.access_key_id':  document.getElementById('secret-awssm-access-key-id').value.trim(),
+    'secret.conjur.url':           document.getElementById('secret-conjur-url').value.trim(),
+    'secret.conjur.account':       document.getElementById('secret-conjur-account').value.trim(),
+    'secret.conjur.host_id':       document.getElementById('secret-conjur-host-id').value.trim(),
+    'secret.conjur.verify_tls':    document.getElementById('secret-conjur-verify-tls').value,
   };
   var vaultToken = document.getElementById('secret-vault-token').value;
   if (vaultToken) fields['secret.vault.token'] = vaultToken;
   var ccpPem = document.getElementById('secret-ccp-client-cert-pem').value;
   if (ccpPem) fields['secret.ccp.client_cert_pem'] = ccpPem;
+  var azClientSecret = document.getElementById('secret-azurekv-client-secret').value;
+  if (azClientSecret) fields['secret.azurekv.client_secret'] = azClientSecret;
+  var awsSecretKey = document.getElementById('secret-awssm-secret-access-key').value;
+  if (awsSecretKey) fields['secret.awssm.secret_access_key'] = awsSecretKey;
+  var awsSessionToken = document.getElementById('secret-awssm-session-token').value;
+  if (awsSessionToken) fields['secret.awssm.session_token'] = awsSessionToken;
+  var conjurApiKey = document.getElementById('secret-conjur-api-key').value;
+  if (conjurApiKey) fields['secret.conjur.api_key'] = conjurApiKey;
 
   var errors = [];
   for (var key in fields) {

@@ -67,10 +67,85 @@ pull one when there's a procurement need or a quiet week.
 
 ### External secret management slice 2
 *(originating section: [`External secret management`](#done-external-secret-management--prio-0-show-stopper) further down)*
-- [ ] CyberArk Conjur adapter (REST + token auth, similar shape to Vault).
-- [ ] AWS Secrets Manager adapter.
-- [ ] Azure Key Vault adapter (Entra-bound auth via the same MSAL app
-      already used for portal SSO).
+- [x] **CyberArk Conjur adapter** *(2026-04-30)*. Fifth backend
+      alongside Vault, CCP, Azure KV, AWS SM. New
+      `conjur://<identifier>[#<field>]` reference scheme — the
+      optional `#field` mirrors the Vault / AWS SM convention and
+      pulls a JSON-field out of the variable's value (covers the
+      common pattern of storing `{"username":"…","password":"…"}`
+      as a single Conjur variable). Migration `0086` seeds 5 config
+      keys (url / account / host_id / api_key / verify_tls). Auth
+      via the documented two-step host API-key flow: POST the API
+      key to `/<account>/host/<host_id>/authn` with
+      `Accept-Encoding: base64` to mint a token, then GET
+      `/secrets/<account>/variable/<id>` with `Authorization: Token
+      token="<base64>"`. Stdlib HTTP throughout — no Conjur SDK on
+      either api or worker. Tokens cached for 7 minutes (Conjur's
+      default TTL is 8 minutes; 1-minute clock-skew margin) keyed
+      by `(url, account, host_id)` so a config drift can't
+      cross-pollinate tokens between tenants on a shared resolver
+      process. 401 on a secret read invalidates the cached token
+      immediately and re-mints on the next call. Identifier may
+      contain slashes (`prod/ipsolis/ad-bind-password`) — the
+      resolver URL-encodes it as a single path segment so nested
+      namespacing works without contortions. The host id `host/`
+      prefix is added automatically if missing — operators
+      typically type just the bare id. Test-connection probe
+      exercises the host login flow (mints a fresh access token);
+      doesn't probe a specific variable since the most common
+      operator error is "wrong api_key for this host" rather than
+      "variable missing". Settings UI adds a sixth backend option
+      with url / account / host_id / api_key / verify_tls inputs
+      and a reference-shape help block calling out the on-prem vs
+      Conjur Cloud URL forms. Verified live: fake creds against
+      `conjur.example.invalid` produce `Conjur auth failed: conjur:
+      login endpoint unreachable: [Errno -2] Name or service not
+      known` — descriptive error surfaces all the way to the
+      Settings card; resolver follows the fail-closed-quiet
+      contract (returns empty string + WARNING log on failure,
+      never crashes the calling request).
+- [x] **AWS Secrets Manager adapter** *(2026-04-30)*. Fourth backend
+      alongside Vault, CCP, Azure KV. New `awssm://<secret-id>[#<field>]`
+      reference scheme — the optional `#field` mirrors the Vault
+      convention and pulls a JSON-stringified field out of
+      `SecretString` (covers the common AWS pattern of storing
+      `{"username":"…","password":"…"}` as one secret). Migration
+      `0085` seeds 4 config keys (region / access_key_id /
+      secret_access_key / session_token); session_token is optional
+      and supports STS-issued temporary credentials. Auth via stdlib
+      SigV4 — no boto3 dep on either api or worker. Test connection
+      uses `ListSecrets` with `MaxResults=1` to exercise the SigV4
+      path without depending on a specific secret existing; the
+      docstring + UI explain that the IAM principal needs both
+      `secretsmanager:ListSecrets` AND `secretsmanager:GetSecretValue`
+      for full ipSolis use. Settings UI adds a fifth backend option
+      with region / access-key-id / secret-access-key / session-token
+      inputs. Verified live against real AWS:
+      `UnrecognizedClientException` from a fake access key confirms
+      SigV4 signature shape is correct (otherwise AWS would return
+      `InvalidSignatureException`); resolver follows the
+      fail-closed-quiet contract.
+- [x] **Azure Key Vault adapter** *(2026-04-30)*. New
+      `azurekv://<vault-name>/<secret-name>` reference scheme resolved
+      via Azure AD client_credentials flow. Migration `0084` seeds 4
+      config keys (`secret.azurekv.tenant_id` / `client_id` /
+      `client_secret` / `api_version`); the SPN is independent from
+      `entra.*` so the KV principal can carry minimum-necessary access
+      (`Key Vault Secrets User` only). Stdlib-only auth path (raw
+      OAuth POST against `/oauth2/v2.0/token`) so the worker mirror
+      doesn't pull MSAL into its image. AAD bearer tokens cache
+      separately from the value cache, with a 60-second safety margin
+      against clock skew. Settings UI gets a third backend option
+      ("Azure Key Vault") with tenant-id / client-id / client-secret /
+      api-version inputs; the show/hide toggle generalised to a
+      config-driven loop so future backends slot in cleanly. Test
+      connection acquires a Key Vault scope token from the configured
+      SPN — verifies the most-common config error (SPN itself
+      misconfigured) without needing a vault name. Versioned references
+      (`?version=<id>`) supported. Verified live against real Azure AD:
+      `AADSTS900021` from a fake tenant id confirms the round-trip
+      works end-to-end; resolver follows the fail-closed-quiet contract
+      (returns empty string + WARNING log on resolution failure).
 - [ ] Vault AppRole + Kubernetes-JWT auth methods (slice 1 ships static-token only).
 - [ ] CCP: dedicated mTLS bootstrap UX (today operators paste the PEM).
 - [ ] One-shot migration tool: walk every `is_secret=true` row in `app_config`,
@@ -89,8 +164,16 @@ pull one when there's a procurement need or a quiet week.
 - [ ] Sentinel via the newer Logs Ingestion API (DCE / DCR / service principal)
       — for tenants that have switched off the Data Collector API or want
       DCR-side transformations.
-- [ ] Streaming-failure email alert via the existing health-alert path
-      (currently surfaced only in `siem.last_error` and the UI).
+- [x] **Streaming-failure email alert via the existing health-alert path**
+      *(2026-04-30)*. Added `siem` probe to `/admin/maintenance/health` —
+      reads `siem.last_error` / `siem.last_success_at` from `app_config`
+      and reports `{ok: false, detail: "streaming failure: …"}` when
+      streaming has hit an error since the last successful batch. The
+      existing `check_health_and_alert` Beat task picks up the new
+      service automatically (no code change needed there — it iterates
+      the response's services dict and emails on transitions). Probe
+      returns `ok: None` ("disabled") when SIEM streaming is off so an
+      unconfigured tenant doesn't generate false-positive alerts.
 
 ### Multi-instance HA slice 2
 - [ ] Document Postgres standby setup (logical replication or pgBackRest)
@@ -99,9 +182,20 @@ pull one when there's a procurement need or a quiet week.
       (currently cookie-signed — already stateless, mostly a verification task).
 - [ ] Multi-replica worker: document the scaling pattern + queue-vs-replica
       sizing recommendation table.
-- [ ] Health probe that detects "Beat is alive somewhere" via the RedBeat
-      lock key in Redis — surface in `/health` so a load balancer can alert
-      when no Beat is running.
+- [x] **Beat-alive health probe** *(2026-04-30)*. `GET /health` now
+      returns a `beat: "alive" | "stale"` field driven by the presence
+      of the RedBeat distributed-lock key (`ipsolis:redbeat::lock`) in
+      Redis. Aggregates into the top-level `status` so a load balancer
+      checking the unauthenticated `/health` endpoint sees `degraded`
+      when no Beat replica is dispatching. The same probe also feeds
+      `/admin/maintenance/health` (`beat: {ok, detail}`), which the
+      existing alerter Beat task at `*/5min` picks up automatically —
+      operators get an email on the transition and on every cooldown
+      window while it stays down. Lock TTL is 30s so a hard kill of
+      the active Beat replica shows up as `stale` within ~30-60s, well
+      inside a typical alert window. Verified live: stopping the Beat
+      container flipped both `/health` and `/admin/maintenance/health`
+      to the failure state; restart returned to `alive` within ~8s.
 
 ### Conditional approval rules slice 3
 - [ ] Visual editor for deeply-nested compounds (today's UI flattens to
@@ -367,8 +461,11 @@ enforcement (configurer ≠ approver) split into follow-up slices.
 
 ### [done] External secret management — Prio 0 (show-stopper)
 Slice 1 — Vault + CyberArk CCP/AIM, on-read resolution, no plaintext
-removal — **shipped 2026-04-26**. Conjur, AWS Secrets Manager, Azure
-Key Vault, and the one-shot migration tool stay queued.
+removal — **shipped 2026-04-26**. Slice 2 enrichment shipped Azure
+Key Vault, AWS Secrets Manager, and CyberArk Conjur (2026-04-30) —
+five backends total. Vault AppRole/JWT auth, AWS native AssumeRole,
+CCP mTLS bootstrap UX, and the one-shot migration tool stay queued
+(see *Deferred Enterprise Backlog* at top of file).
 
 **Done — secrets slice 1 (2026-04-26):**
 - Migration `0072_seed_secret_backend_config.py` seeds 11 keys for the
@@ -444,7 +541,7 @@ Key Vault, and the one-shot migration tool stay queued.
     re-reading via `GET /admin/config/ad.password` returns the
     reference in clear (not `***`) — masking exception works.
 
-**Slice-2 enrichments (Conjur, AWS SM, Azure KV, AppRole/JWT, migration tool, residual key coverage) → tracked in *Deferred Enterprise Backlog* (top of file).**
+**Slice-2 enrichments (Conjur, AWS SM, Azure KV all shipped; AppRole/JWT, migration tool, residual key coverage still queued) → tracked in *Deferred Enterprise Backlog* (top of file).**
 
 ### [done] API tokens with scopes — Prio 0
 Slice 1 — table + ORM + bearer auth + Admin UI — **shipped 2026-04-26**.

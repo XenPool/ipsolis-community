@@ -41,7 +41,7 @@ explicit *Enterprise license* note appears.
 
 - [Per-integration API tokens](#per-integration-api-tokens)
 - [Admin RBAC (roles, ACL grants, SoD, password policy)](#admin-rbac-roles-acl-grants-sod-password-policy)
-- [External secret management (HashiCorp Vault + CyberArk CCP/AIM)](#external-secret-management-hashicorp-vault--cyberark-ccpaim)
+- [External secret management (HashiCorp Vault + CyberArk CCP/AIM + Azure Key Vault + AWS Secrets Manager + CyberArk Conjur)](#external-secret-management-hashicorp-vault--cyberark-ccpaim--azure-key-vault--aws-secrets-manager--cyberark-conjur)
 
 **Operations**
 
@@ -1922,21 +1922,27 @@ isolate one credential's activity.
 
 ---
 
-## External secret management (HashiCorp Vault + CyberArk CCP/AIM)
+## External secret management (HashiCorp Vault + CyberArk CCP/AIM + Azure Key Vault + AWS Secrets Manager + CyberArk Conjur)
 
 Replace plaintext credentials in `app_config` with references to
-your secret store. Any secret-typed config row whose value is
-`vault://<path>[#<field>]` or `ccp://[<safe>/]<object>` is
-resolved at read time via the configured backend. Plain string
-values keep working unchanged so partial migrations are safe.
+your secret store. Any secret-typed config row whose value matches
+a known reference scheme is resolved at read time via the configured
+backend. Plain string values keep working unchanged so partial
+migrations are safe.
 
 ### Reference grammar
 
 ```
-vault://ipsolis/ad/password               # KV v2, default field "value"
-vault://ipsolis/ad/password#bind_dn       # KV v2, custom field "bind_dn"
-ccp://OperationsSafe/sccm-svc             # CyberArk CCP with explicit Safe
-ccp://vsphere-svc                         # CCP with default Safe from config
+vault://ipsolis/ad/password                  # KV v2, default field "value"
+vault://ipsolis/ad/password#bind_dn          # KV v2, custom field "bind_dn"
+ccp://OperationsSafe/sccm-svc                # CyberArk CCP with explicit Safe
+ccp://vsphere-svc                            # CCP with default Safe from config
+azurekv://kv-prod-ipsolis/ad-bind-password   # Azure Key Vault, latest version
+azurekv://kv-prod-ipsolis/ad-pw?version=…    # Azure KV, pinned version (rare)
+awssm://prod/ipsolis/ad-bind-password        # AWS Secrets Manager, SecretString
+awssm://prod/ipsolis/ad-creds#password       # AWS SM with JSON-field extract
+conjur://prod/ipsolis/ad-bind-password       # Conjur variable, raw value
+conjur://prod/ipsolis/ad-creds#password      # Conjur variable, JSON-field extract
 ```
 
 ### Where it kicks in
@@ -1951,7 +1957,9 @@ ccp://vsphere-svc                         # CCP with default Safe from config
 
 The worker mirror at `worker/tasks/modules/secrets.py` is sync-only
 (same boundary as `audit_helper.py`) so the worker stays free of
-api package imports.
+api package imports. It supports the same five reference schemes
+and uses stdlib HTTP throughout — no boto3, MSAL, or hvac on the
+worker side.
 
 ### Process-local TTL cache
 
@@ -1985,13 +1993,206 @@ KV v2 envelope is unwrapped automatically (`data.data.<field>`).
 Authentication is AppID + IP allow-list (the standard CCP install)
 or optional mTLS via the configured client cert.
 
+### Azure Key Vault setup
+
+| Config key | Purpose |
+|---|---|
+| `secret.backend` | `azurekv` |
+| `secret.azurekv.tenant_id` | Azure AD tenant id (GUID) hosting the KV SPN |
+| `secret.azurekv.client_id` | Application (client) id of the SPN |
+| `secret.azurekv.client_secret` | Client secret for the SPN (stored as `is_secret`) |
+| `secret.azurekv.api_version` | Key Vault REST API version, default `7.4` |
+
+**Service principal setup**:
+
+1. Azure portal → *Microsoft Entra ID → App registrations → New registration*.
+   Name it ``ipsolis-keyvault`` (or whatever your naming convention is).
+2. *Certificates & secrets → New client secret*. Copy the **Value**
+   (you only see it once); paste into ``secret.azurekv.client_secret``.
+3. Note the **Application (client) ID** and **Directory (tenant) ID**
+   from the app overview page.
+4. Grant the SPN access to your Key Vault. Two ways:
+   * **RBAC** (recommended): on the vault's *Access control (IAM)* blade,
+     assign **Key Vault Secrets User** to the SPN.
+   * **Vault access policies** (legacy): on the vault's *Access policies*
+     blade, add a policy granting **Get** on Secrets to the SPN.
+5. In ip·Solis: *Settings → Compliance → External Secret Backend*,
+   pick **Azure Key Vault**, paste the three values, click **Save**,
+   then **Test connection**. The test acquires a Key Vault scope token
+   from Azure AD; success means the SPN itself is configured correctly.
+
+**Why a separate SPN from Entra ID SSO?** The SSO SPN typically has
+``User.Read`` (delegated, low privilege) — granting it Key Vault
+Secrets User would over-permission a credential that's already used
+for browser-side flows. Keep the KV SPN's role assignment narrow:
+``Key Vault Secrets User`` on the specific vault(s) ip·Solis
+references, nothing else.
+
+**Independent of Entra ID config**: ``secret.azurekv.tenant_id`` is a
+separate config key from ``entra.tenant_id`` even when they're the
+same value. This lets ops run the SSO SPN out of one tenant and the
+KV SPN out of another (M&A scenarios, isolated KV tenants for
+sensitive workloads) without contortions.
+
+**Versioned references**: append ``?version=<id>`` to pin a specific
+secret version. Rarely needed — Azure KV's "latest" pointer is the
+canonical "current production password" address; pinning a version
+breaks rotation. Mostly useful for incident-response replay where
+you need to verify what was active at a past timestamp.
+
+**Token cache**: AAD bearer tokens are short-lived (~1h) and shared
+across all secrets read with the same SPN. Cached in the API/worker
+process at acquisition time with a 60-second safety margin against
+clock skew. Process restart wipes the cache cleanly.
+
+### AWS Secrets Manager setup
+
+| Config key | Purpose |
+|---|---|
+| `secret.backend` | `awssm` |
+| `secret.awssm.region` | AWS region of the Secrets Manager endpoint (e.g. `eu-central-1`) |
+| `secret.awssm.access_key_id` | IAM access key id |
+| `secret.awssm.secret_access_key` | IAM secret access key (stored as `is_secret`) |
+| `secret.awssm.session_token` | Optional STS session token (for AssumeRole / instance-profile creds) |
+
+**IAM policy**: the principal needs **both** of these actions —
+`secretsmanager:GetSecretValue` (called per resolution) and
+`secretsmanager:ListSecrets` (called once by the test endpoint). The
+common mistake is granting only `GetSecretValue` and then seeing the
+test report 403 — narrow the resource ARNs in your policy if you
+need to, but don't drop `ListSecrets` from the action list.
+
+Minimum-privilege policy template:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ipsolisRead",
+      "Effect": "Allow",
+      "Action": [
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:ListSecrets"
+      ],
+      "Resource": [
+        "arn:aws:secretsmanager:eu-central-1:123456789012:secret:ipsolis/*"
+      ]
+    }
+  ]
+}
+```
+
+`Resource: "*"` works too if you need to read secrets across multiple
+prefixes; tighten to the specific ARN list when you can.
+
+**Authentication options**:
+
+* **Long-lived IAM user** — create an IAM user, attach the policy
+  above, generate access keys (`AKIA…` + secret), paste into ipSolis.
+  Easiest for on-prem deployments where rotating keys via STS isn't
+  feasible. Rotate the key at your normal cadence.
+* **STS-issued temporary credentials** — use AssumeRole or instance
+  profile to mint short-lived `ASIA…` keys plus a session token.
+  Paste all three into ipSolis. STS keys typically last 1 hour to
+  12 hours; ipSolis will fail with `ExpiredToken` after expiry, at
+  which point your token-rotation automation needs to push a refreshed
+  trio. (Slice 2 will add native AssumeRole support so ipSolis can
+  refresh tokens itself.)
+* **EKS / IRSA / EC2 instance profile** — same as STS-issued
+  temporary credentials; whatever your container orchestration
+  injects into the env, paste into the three config keys.
+
+**Reference shapes**:
+
+* `awssm://<secret-id>` — returns the full `SecretString` as-is.
+* `awssm://<secret-id>#<field>` — parses `SecretString` as JSON,
+  extracts the named key. Useful for AWS's common pattern of storing
+  `{"username":"…","password":"…"}` as a single secret.
+
+`<secret-id>` is the friendly name (e.g. `ipsolis/ad/bind-password`)
+or the secret-name portion of a full ARN. Cross-region references
+via explicit ARN are queued for slice 2.
+
+**SigV4 signing**: stdlib-only (`hmac` + `hashlib` + `urllib`) so
+neither the api nor worker image pulls boto3. The four-step signing
+key derivation, canonical-request hash, and string-to-sign assembly
+follow AWS's documented procedure verbatim. Each request is signed
+fresh — no cached signatures (they're tied to a specific timestamp).
+
+### CyberArk Conjur setup
+
+| Config key | Purpose |
+|---|---|
+| `secret.backend` | `conjur` |
+| `secret.conjur.url` | API base URL — on-prem `https://conjur.example.com` or Conjur Cloud `https://<account>.secretsmgr.cyberark.cloud` (no trailing slash) |
+| `secret.conjur.account` | Conjur account / organisation name (the first path segment in every API call — often `cyberark`, `default`, or a tenant-specific name) |
+| `secret.conjur.host_id` | Host identity that authenticates ip·Solis (e.g. `ipsolis-prod` — the `host/` prefix is added automatically) |
+| `secret.conjur.api_key` | API key for the configured host (stored as `is_secret`) |
+| `secret.conjur.verify_tls` | Verify the Conjur endpoint TLS cert (default `true`) |
+
+**Authentication**: two-step flow. Step 1: POST the host's API key
+to `<url>/<account>/host/<host_id>/authn` with
+`Accept-Encoding: base64` — Conjur returns a Base64 access token in
+the response body. Step 2: GET
+`<url>/secrets/<account>/variable/<identifier>` with
+`Authorization: Token token="<base64>"`. Tokens default to an
+8-minute TTL on Conjur side; the resolver caches them for 7 minutes
+to leave a 1-minute clock-skew margin and re-mints on 401.
+
+**Host setup** (Conjur side):
+
+1. Define a host policy (or use an existing one) that grants
+   ``read`` on every variable ip·Solis needs. Example policy snippet:
+   ```yaml
+   - !host ipsolis-prod
+   - !permit
+     role: !host ipsolis-prod
+     privilege: [ read, execute ]
+     resource: !variable prod/ipsolis/ad-bind-password
+   ```
+2. Capture the host's API key when the policy is loaded
+   (``conjur policy load`` prints it once). Paste into
+   ``secret.conjur.api_key`` in ip·Solis.
+
+**Reference shapes**:
+
+* `conjur://<identifier>` — returns the variable's value as-is.
+* `conjur://<identifier>#<field>` — parses the value as JSON,
+  extracts the named key. Useful for the common pattern of storing
+  `{"username":"…","password":"…"}` as a single Conjur variable.
+
+`<identifier>` may include slashes — e.g.
+`conjur://prod/ipsolis/ad-bind-password`. The resolver URL-encodes
+the identifier as a single path segment, so nested namespacing
+works without contortions.
+
+**On-prem vs Conjur Cloud**: same code path either way. The only
+difference is the `secret.conjur.url` value — point at the on-prem
+appliance or at `https://<account>.secretsmgr.cyberark.cloud`. TLS
+verification stays on for both unless you're testing against a
+self-signed lab install.
+
+**Token cache**: keyed by `(url, account, host_id)` so a config
+drift can't cross-pollinate tokens between tenants on a shared
+resolver process. Process restart wipes the cache cleanly. A 401
+on a secret read invalidates the cached token immediately and
+re-mints on the next call.
+
 ### Test connection
 
 `POST /admin/config/secret-backend/test` clears the process cache,
-hits the right probe (`/v1/sys/health` for Vault, `/api/Verify`
-for CCP), and stamps `secret.last_test_at` on success or
-`secret.last_test_error` on failure. Visible inline in the
-*Settings → Compliance → External Secret Backend* card.
+hits the right probe per backend, and stamps `secret.last_test_at`
+on success or `secret.last_test_error` on failure. Visible inline
+in the *Settings → Compliance → External Secret Backend* card.
+
+| Backend | Probe |
+|---|---|
+| Vault | `/v1/sys/health` (no token needed) |
+| CCP | `/api/Verify` (4xx counts as reachable since the path requires a body) |
+| Azure KV | AAD client_credentials token acquire against `https://vault.azure.net/.default` (verifies the SPN itself; doesn't probe a specific vault) |
+| AWS SM | SigV4-signed `ListSecrets` with `MaxResults=1` (verifies signing path + IAM principal; result content discarded) |
+| Conjur | Host API-key login against `/<account>/host/<host_id>/authn` (verifies the host credential by minting a fresh access token; doesn't probe a specific variable) |
 
 ### Failure semantics
 
@@ -2003,19 +2204,34 @@ auth-failure error is the user-visible signal.
 ### Masking exception
 
 `GET /admin/config/<key>` masks secrets as `***` by default, **but**
-reference-shaped values (`vault://…`, `ccp://…`) stay in clear so
-admins can see *which* store entry each row points to. Knowing the
-path doesn't grant access. Genuine secrets
-(`secret.vault.token`, `secret.ccp.client_cert_pem`) are still
-masked.
+reference-shaped values (`vault://…`, `ccp://…`, `azurekv://…`,
+`awssm://…`, `conjur://…`) stay in clear so admins can see *which*
+store entry each row points to. Knowing the path doesn't grant
+access. Genuine secrets (`secret.vault.token`,
+`secret.ccp.client_cert_pem`, `secret.azurekv.client_secret`,
+`secret.awssm.secret_access_key`, `secret.awssm.session_token`,
+`secret.conjur.api_key`) are still masked.
 
-### Slice 2 (queued)
+### Remaining slice 2 work
 
-CyberArk Conjur, AWS Secrets Manager, Azure Key Vault adapters;
-Vault AppRole / Kubernetes-JWT auth methods; CCP mTLS bootstrap UX;
-one-shot migration tool that walks every `is_secret=true` row and
-writes the value into the chosen backend. Track in *Deferred
-Enterprise Backlog* (top of `TASKS.md`).
+Five backends shipped (Vault + CCP + Azure KV + AWS SM + Conjur).
+Still queued:
+
+* **Vault AppRole + Kubernetes-JWT** auth methods (slice 1 ships
+  static-token only).
+* **AWS native AssumeRole** — today operators paste STS-issued
+  credentials, which expire and need rotation. Native AssumeRole
+  with cached refresh would let ipSolis manage the rotation itself.
+* **CCP mTLS bootstrap UX** — today operators paste the PEM blob;
+  a guided "upload cert + key" form would be friendlier.
+* **One-shot migration tool**: walk every `is_secret=true` row in
+  `app_config`, write the value into the chosen backend, replace
+  the row's value with the matching reference, audit the swap.
+* Make all remaining secret-bearing config keys go through the
+  resolver — slice 1 covered AD, Entra, SMTP, vSphere/XenServer;
+  SCCM password and the various webhook tokens still read raw.
+
+Track in *Deferred Enterprise Backlog* (top of `TASKS.md`).
 
 ---
 
@@ -2131,6 +2347,44 @@ lock-handover window.
 keys so multiple ip·Solis tenants on a shared Redis don't collide.
 Override via `redbeat_key_prefix` in `worker/tasks/__init__.py` if
 you run more than one tenant on the same Redis.
+
+### Beat-alive health probe
+
+**`GET /health`** (unauthenticated, load-balancer-friendly) checks for
+the RedBeat distributed-lock key in Redis and reports
+``beat: "alive" | "stale"`` alongside ``database`` and ``redis``. Top-level
+``status`` aggregates: ``ok`` only when **every** subsystem is healthy.
+A load balancer hitting ``/health`` every few seconds will see
+``status: degraded, beat: stale`` within ~30-60s of a hard kill (the
+``redbeat_lock_timeout`` window).
+
+**`GET /admin/maintenance/health`** (auditor+) carries the full
+``{ok, detail}`` shape per subsystem, including a ``beat`` entry whose
+``detail`` explains *why* dispatch is stalled when ``ok=false``.
+The existing health-alert Beat task (`check_health_and_alert`,
+runs every 5 min) picks up the new ``beat`` and ``siem`` services
+automatically — operators receive an email on every state transition
+respecting the ``health.alert_cooldown_minutes`` window.
+
+```jsonc
+// healthy
+{"status": "ok", "database": "ok", "redis": "ok", "beat": "alive", ...}
+
+// no Beat replica running (lock missing)
+{"status": "degraded", "database": "ok", "redis": "ok", "beat": "stale", ...}
+```
+
+### SIEM streaming probe
+
+Same `/admin/maintenance/health` response carries a ``siem`` entry that
+reflects the current state of the SIEM streamer Beat task (``last_error`` /
+``last_success_at`` from ``app_config``). Fires the same email alert on
+streaming failures so a broken Splunk HEC token / Sentinel shared-key
+rotation surfaces operationally rather than silently piling up audit rows
+in the local DB.
+
+The probe returns ``ok: None`` ("disabled") when SIEM streaming is off,
+so an unconfigured tenant never generates false-positive alerts.
 
 ---
 
