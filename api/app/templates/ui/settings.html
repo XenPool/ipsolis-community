@@ -993,14 +993,15 @@
   <div class="bg-surface rounded-xl border border-token-border shadow-sm shadow-slate-900/5 dark:shadow-black/20 p-6 max-w-2xl mb-6">
     <h2 class="text-sm font-semibold text-body mb-1">Per-classification approval routing</h2>
     <p class="text-xs text-muted/70 mb-4 leading-snug">
-      Auto-add a compliance-officer approval step on orders whose asset type carries
-      attributes classified as <strong>PII</strong>, <strong>PHI</strong>, or <strong>PCI</strong>.
-      Defaults to <code class="font-mono">none</code> on every class — existing approval flows
-      (manager / app-owner / conditional rules) stay unchanged. Activation precedence is
-      strictest-first (PCI &gt; PHI &gt; PII): an order touching multiple classes still gets
-      one compliance step, attributed to the strictest match. The compliance officer is
-      de-duped against existing approvers so a manager who's also the officer doesn't
-      receive two approval requests.
+      Auto-add an approval step on orders whose asset type carries attributes classified as
+      <strong>PII</strong>, <strong>PHI</strong>, or <strong>PCI</strong>. Two routing modes per class:
+      <strong>Compliance officer</strong> (one step at the global officer email below — standard for
+      centralised compliance teams) or <strong>Owner of record</strong> (one step <em>per entry</em>
+      in the asset type's <em>Approval Owners</em> list — standard for HIPAA-style workflows where
+      the data steward who actually owns the regulated surface must sign off, not a generic team).
+      Defaults to <code class="font-mono">none</code> on every class. Activation precedence is
+      strictest-first (PCI &gt; PHI &gt; PII); only one policy fires per order. All steps are
+      de-duped against existing approvers so the same person never gets two approval requests.
     </p>
 
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
@@ -1010,8 +1011,9 @@
         {% set _val = (approval_config.get('approval.classification_policy.' + _cls, 'none') if approval_config else 'none').lower() %}
         <select id="approval-class-policy-{{ _cls }}"
                 class="w-full rounded border border-token-border bg-surface text-body text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500">
-          <option value="none"               {% if _val != 'compliance_officer' %}selected{% endif %}>None — existing flow</option>
-          <option value="compliance_officer" {% if _val == 'compliance_officer' %}selected{% endif %}>Add compliance officer step</option>
+          <option value="none"               {% if _val == 'none' or (_val != 'compliance_officer' and _val != 'owner_of_record') %}selected{% endif %}>None — existing flow</option>
+          <option value="compliance_officer" {% if _val == 'compliance_officer' %}selected{% endif %}>Compliance officer (centralised)</option>
+          <option value="owner_of_record"    {% if _val == 'owner_of_record' %}selected{% endif %}>Owner of record (asset's approval owners)</option>
         </select>
       </div>
       {% endfor %}
@@ -2995,13 +2997,16 @@ async function saveClassificationPolicy() {
   // Soft-validate on the client: if any class is "compliance_officer" the
   // email must be set. The order-creation path also guards against this
   // (no email → no auto-step), but a clear save-time message is friendlier.
-  var anyOn = ['pii', 'phi', 'pci'].some(function(c) {
+  // The owner_of_record mode doesn't need the global email; it routes
+  // to the asset type's approval_owners list, validated per-order at
+  // dispatch time (silent skip + INFO log when the list is empty).
+  var anyComplianceOfficer = ['pii', 'phi', 'pci'].some(function(c) {
     return fields['approval.classification_policy.' + c] === 'compliance_officer';
   });
-  if (anyOn && !fields['approval.compliance_officer_email']) {
+  if (anyComplianceOfficer && !fields['approval.compliance_officer_email']) {
     showComplianceBanner({
       ok: false,
-      message: 'Set the compliance officer email when any classification is set to "Add compliance officer step".',
+      message: 'Set the compliance officer email when any classification is set to "Compliance officer (centralised)".',
     });
     return;
   }

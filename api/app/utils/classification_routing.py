@@ -2,7 +2,7 @@
 
 Inspects an asset type's attribute classifications, consults the
 ``approval.classification_policy.*`` config keys, and returns the
-compliance-officer approver dict to inject — or ``None`` when no
+list of approver dicts to inject — or an empty list when no
 classification on the asset type is configured for auto-routing.
 
 The conditional approval rules engine in ``approval_rules.py`` already
@@ -12,13 +12,32 @@ path: a one-click toggle that fires regardless of whether rules are
 configured, de-duped against the manager / owner / rule approvers
 on the calling side.
 
-Activation precedence: PCI > PHI > PII. Even when multiple classes
-fire, only one compliance-officer step is added — there's a single
-configured ``compliance_officer_email`` and the column-30-char
-``approver_type`` value (``compliance_officer``) doesn't carry
-which class triggered it. The audit row carries the full
-classification of the asset type, so retention / forensic queries
-can still distinguish a PHI-triggered step from a PII-triggered one.
+Two policy values per class:
+
+* ``compliance_officer`` — auto-add ONE step pointing at the global
+  ``approval.compliance_officer_email`` contact. Standard for
+  centralised compliance teams (one inbox handles every regulated
+  request, regardless of which asset type).
+
+* ``owner_of_record`` — auto-add one step PER entry in the asset
+  type's ``approval_owners`` list. Standard for HIPAA-style
+  workflows where the data steward who actually owns the PHI
+  surface must sign off, not a generic compliance team. The
+  approver_type is ``owner_of_record`` (distinct from the static
+  ``application_owner`` flag) so audit-log queries can tell whether
+  an owner step was triggered by the static toggle or by a
+  classification policy.
+
+Activation precedence: PCI > PHI > PII (strictest wins). Even when
+multiple classes fire, only one *policy* is applied — the one bound
+to the strictest matching class. The number of approval rows added
+depends on which policy fires:
+
+* ``compliance_officer`` always emits one row.
+* ``owner_of_record`` emits N rows, one per entry in
+  ``asset_type.approval_owners``. An asset type with no owners
+  configured silently skips the step (logged at INFO so operators
+  can debug).
 """
 from __future__ import annotations
 
@@ -82,32 +101,91 @@ def asset_type_classifications(asset_type: Any) -> set[str]:
     return present
 
 
-def compliance_officer_approver(
+def classification_approvers(
     asset_type: Any,
     policy: dict[str, str],
-) -> dict[str, str] | None:
-    """Decide whether the order needs a compliance-officer step.
+) -> list[dict[str, str]]:
+    """Decide which approver row(s) the classification policy should inject.
 
-    Returns ``{"email": ..., "name": ..., "trigger_class": ...}`` when
-    the asset type carries at least one classification configured
-    for ``compliance_officer`` and the email is set; ``None``
-    otherwise.
+    Returns a list of approver dicts (possibly empty). Each entry:
 
-    ``trigger_class`` is the strictest matching class — useful for
-    the audit trail / log lines so operators can see *why* the
-    extra step was added.
+    * ``email``         — recipient
+    * ``name``          — display name (falls back to email)
+    * ``trigger_class`` — strictest classification on the asset type
+                          that matched a non-``none`` policy
+    * ``policy``        — ``compliance_officer`` or ``owner_of_record``;
+                          drives the ``approver_type`` on the persisted
+                          row at the call site
+
+    Empty list when no classification on the asset type matches a
+    non-``none`` policy, or when the policy fires but the resolved
+    target list is empty (compliance_officer mode with no email,
+    owner_of_record mode with no ``approval_owners`` on the asset
+    type) — both cases log a hint at INFO from the call site so
+    operators can debug a "policy is set but no extra step appeared"
+    surprise.
+
+    Strictest-first iteration: when an asset type carries both PII
+    and PHI fields and both classes have non-``none`` policies, the
+    PHI policy wins (PHI > PII in ``_CLASSIFICATIONS_STRICT_FIRST``).
+    Only one policy fires per order.
     """
     present = asset_type_classifications(asset_type)
     if not present:
-        return None
-    email = policy.get("compliance_officer_email", "").strip()
-    if not email:
-        return None
+        return []
+
     for cls in _CLASSIFICATIONS_STRICT_FIRST:
-        if cls in present and policy.get(cls) == "compliance_officer":
-            return {
+        if cls not in present:
+            continue
+        chosen = (policy.get(cls) or "none").lower()
+        if chosen == "compliance_officer":
+            email = policy.get("compliance_officer_email", "").strip()
+            if not email:
+                logger.info(
+                    "classification_routing: policy=%s for class=%s but "
+                    "compliance_officer_email is empty — skipping auto-step",
+                    chosen, cls,
+                )
+                return []
+            return [{
                 "email": email,
                 "name": policy.get("compliance_officer_name") or email,
                 "trigger_class": cls,
-            }
-    return None
+                "policy": "compliance_officer",
+            }]
+        if chosen == "owner_of_record":
+            owners = list(getattr(asset_type, "approval_owners", None) or [])
+            if not owners:
+                logger.info(
+                    "classification_routing: policy=%s for class=%s but "
+                    "asset type has no approval_owners — skipping auto-step",
+                    chosen, cls,
+                )
+                return []
+            out: list[dict[str, str]] = []
+            seen: set[str] = set()
+            for owner in owners:
+                if not isinstance(owner, dict):
+                    continue
+                email = (owner.get("email") or "").strip()
+                if not email:
+                    continue
+                key = email.lower()
+                if key in seen:
+                    continue
+                seen.add(key)
+                out.append({
+                    "email": email,
+                    "name": (owner.get("name") or email).strip(),
+                    "trigger_class": cls,
+                    "policy": "owner_of_record",
+                })
+            return out
+        # ``none`` or any unknown value — no auto-step from this
+        # class; fall through to the next less-strict class. The
+        # existing "strictest CONFIGURED wins" contract: when the
+        # asset type carries PCI + PHI fields but only PHI is set
+        # to a non-none policy, the PHI policy applies even though
+        # PCI is technically the strictest class present.
+        continue
+    return []

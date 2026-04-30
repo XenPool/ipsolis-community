@@ -1338,66 +1338,88 @@ Unset = `internal` (the default).
 
 Operators in regulated industries can flip a *one-click* switch:
 "any order whose asset type carries PII / PHI / PCI fields auto-adds
-a compliance-officer approval step." The conditional approval rules
-engine has supported this for a while via the
-`has_pii / has_phi / has_pci` context fields, but only when an
-admin writes the rules explicitly. The classification-driven
-defaults path bypasses that — operators just pick a policy per
-class.
+an approval step." The conditional approval rules engine has
+supported this for a while via the `has_pii / has_phi / has_pci`
+context fields, but only when an admin writes the rules explicitly.
+The classification-driven defaults path bypasses that — operators
+just pick a routing mode per class.
+
+**Two routing modes** per class:
+
+* **Compliance officer (centralised)** — adds *one* step pointing
+  at the global `approval.compliance_officer_email` contact.
+  Standard for centralised compliance teams: one inbox handles
+  every regulated request, regardless of which asset type
+  triggered it. The contact's `approver_type` is
+  `compliance_officer` so audit-log queries can filter on it.
+* **Owner of record (asset's approval owners)** — adds *one step
+  per entry* in the asset type's `approval_owners` list. Standard
+  for HIPAA-style workflows where the data steward who actually
+  owns the regulated surface must sign off, not a generic team.
+  Each step's `approver_type` is `owner_of_record`, distinct
+  from the `application_owner` rows produced by the static
+  *Requires application-owner approval* flag — same emails, but
+  audit-log queries can tell whether the step was triggered by
+  the static toggle or by a classification policy.
 
 Admin UI → *Settings → Compliance → Per-classification approval
 routing*:
 
 | Setting | Options |
 |---|---|
-| **PII policy** | `None — existing flow` / `Add compliance officer step` |
+| **PII policy** | `None — existing flow` / `Compliance officer (centralised)` / `Owner of record (asset's approval owners)` |
 | **PHI policy** | same |
 | **PCI policy** | same |
-| **Compliance officer email** | the email the auto-step targets |
-| **Display name** | shown in approval emails / portal pending page |
+| **Compliance officer email** | The email the centralised mode targets. Required when any class is set to *Compliance officer*; ignored entirely in *Owner of record* mode. |
+| **Display name** | Shown in approval emails / portal pending page (centralised mode only). |
 
 **Activation precedence** is *strictest-first* (PCI > PHI > PII).
-An order touching multiple classes still gets *one* compliance
-step, attributed (via the audit row's `classification`) to the
-strictest matching class. The rule evaluator's de-dup-by-email
-contract still applies — a compliance officer named in a
-conditional rule plus configured globally still gets just one
-approval row per order.
+Only one policy fires per order — when the asset type carries both
+PHI and PCI fields and both classes have non-`none` policies, the
+PCI policy wins. The number of rows added depends on the *winning*
+policy:
+
+* `compliance_officer` always emits **one** row.
+* `owner_of_record` emits **N** rows (one per entry in
+  `asset_type.approval_owners`). An asset type with no owners
+  configured silently skips the step (logged at INFO so operators
+  can debug a "PHI policy is set but no extra step appeared"
+  surprise).
 
 **Interaction with other approval sources**:
 
-* The compliance officer is **de-duped** against the manager,
-  application owners, and rule-driven approvers. A manager who
-  *is* the compliance officer doesn't receive two approval
-  requests.
-* The compliance officer step is added even when the static
-  manager / app-owner toggles are off — a PII-tagged asset type
-  with no manager approval needed still triggers the
-  compliance-officer step. Order status flips to
-  `pending_approval` correctly.
-* The classification-routing path runs **on top of** the
-  conditional approval rules engine — an admin can keep using
-  rules for fine-grained logic (e.g. "PII only requires
-  compliance approval when monthly_cost > €1000") and the
-  defaults path for the simple "any PII → compliance step" case.
+* Both modes are **de-duped** against the manager, application
+  owners, and rule-driven approvers. A manager who *is* the
+  compliance officer doesn't receive two approval requests; an
+  owner-of-record contact who's already an `application_owner` row
+  via the static toggle keeps just one row (with the
+  `application_owner` type, since that path runs first).
+* The classification step is added even when the static manager /
+  app-owner toggles are off — a PHI-tagged asset type with no
+  manager approval needed still triggers the policy step. Order
+  status flips to `pending_approval` correctly.
+* The classification-routing path runs **on top of** the conditional
+  approval rules engine — an admin can keep using rules for
+  fine-grained logic (e.g. "PHI requires owner sign-off only when
+  `monthly_cost > €1000`") and the defaults path for the simple
+  "any PHI → owner sign-off" case.
 
-**No-email guard**: setting any class to `Add compliance officer
-step` without filling in the email surfaces a Settings-time error
-("Set the compliance officer email when any classification is set
-to..."). The order-creation path also skips the auto-step silently
-when the email is empty — defense in depth, but the Settings-time
-guard is the primary signal so operators can't accidentally ship
-a half-configured policy.
+**No-email guard**: setting any class to *Compliance officer
+(centralised)* without filling in the email surfaces a
+Settings-time error. *Owner of record* mode doesn't need the
+global email; it routes to `asset_type.approval_owners`, validated
+per-order at dispatch time (silent skip + INFO log when the list is
+empty for a particular asset type).
 
 **Stored config keys**:
 
 | Key | Default | Notes |
 |---|---|---|
-| `approval.classification_policy.pii` | `none` | Per-class policy (PII) |
-| `approval.classification_policy.phi` | `none` | Per-class policy (PHI) |
-| `approval.classification_policy.pci` | `none` | Per-class policy (PCI) |
-| `approval.compliance_officer_email`  | (empty) | Single email or DL address |
-| `approval.compliance_officer_name`   | `Compliance Officer` | Display name in emails / portal |
+| `approval.classification_policy.pii` | `none` | Per-class policy (PII). `none` / `compliance_officer` / `owner_of_record`. |
+| `approval.classification_policy.phi` | `none` | Same options (PHI). HIPAA-style `owner_of_record` is the canonical fit here. |
+| `approval.classification_policy.pci` | `none` | Same options (PCI). |
+| `approval.compliance_officer_email`  | (empty) | Single email or DL address. Required for `compliance_officer` mode only. |
+| `approval.compliance_officer_name`   | `Compliance Officer` | Display name in emails / portal (`compliance_officer` mode only). |
 
 ---
 

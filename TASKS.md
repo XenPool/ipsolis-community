@@ -661,11 +661,60 @@ pull one when there's a procurement need or a quiet week.
       for fine-grained logic ("PII *and* monthly_cost > €1000")
       while the defaults path covers the simple "any PII →
       compliance step" case in one click.
-- [ ] PHI-specific *owner-of-record acknowledgement* — separate from
-      the global compliance officer; auto-routes the auto-step to
-      the asset's listed business owner instead of the centralised
-      officer. Useful when HIPAA controls require the data steward
-      (not just a generic compliance team) to sign off.
+- [x] **Owner-of-record acknowledgement** *(2026-04-30)*. Extends the
+      per-classification routing slice with a second policy mode
+      alongside the existing `compliance_officer`: `owner_of_record`
+      auto-routes the classification-driven step to the asset type's
+      `approval_owners` list — one approval row per listed owner —
+      instead of the centralised compliance officer. HIPAA's
+      canonical use case ("the data steward who actually owns this
+      PHI surface must sign off, not a generic compliance team")
+      maps directly; same plumbing also applies to PII / PCI for
+      tenants whose data-owner accountability sits per-system rather
+      than per-team. No new migration, no new config key — same
+      `approval.classification_policy.{pii,phi,pci}` keys gain a
+      third valid value `owner_of_record`. Refactored
+      `app/utils/classification_routing.py`: the single-dict helper
+      `compliance_officer_approver()` is replaced by
+      `classification_approvers()` returning a *list* of approver
+      dicts (compliance_officer = 1 dict, owner_of_record = N dicts
+      from the asset type's `approval_owners`, none = empty list).
+      Each dict carries `policy` (`compliance_officer` /
+      `owner_of_record`) + `trigger_class` (the strictest matching
+      class) so the call site can distinguish the two paths. The
+      portal order-creation site iterates the returned list, sets
+      `approver_type` from `policy` (`compliance_officer` /
+      `owner_of_record` — both fit the `String(30)` column), and
+      de-dups against the existing `seen_emails` set so an
+      owner-of-record contact already covered by the static
+      *Requires application-owner approval* flag (which uses
+      `approver_type='application_owner'`) keeps just one row, not
+      two. Strictest-first precedence preserved: when the asset type
+      carries both PCI and PHI fields and both classes have non-none
+      policies, the PCI policy wins (only *one* policy fires per
+      order). The "skip on `none`" loop logic uses `continue` so
+      "PCI=none + PHI=owner_of_record" still picks PHI. Settings UI
+      dropdown gains the third option (*Owner of record (asset's
+      approval owners)*) on all three class dropdowns; the
+      compliance-officer-email Settings-time validation only fires
+      when *Compliance officer* mode is selected (owner_of_record
+      doesn't need the global email). The order-creation path skips
+      silently + logs INFO when an owner_of_record policy fires but
+      the asset type's `approval_owners` is empty — defense in
+      depth, since the per-asset-type validation can't reasonably
+      live in the global policy save handler. Smoke-tested live
+      across 6 helper scenarios on a real asset type stamped with
+      various classifications + owners: default policy returns `[]`;
+      PHI=compliance_officer + no email returns `[]` + INFO log;
+      PHI=compliance_officer + email returns 1 dict trigger=phi
+      policy=compliance_officer; PHI=owner_of_record returns 2
+      dicts (one per `approval_owners` entry, with their
+      individual emails / display names);
+      PCI=compliance_officer + PHI=owner_of_record on a type with
+      both classes returns 1 PCI compliance_officer step
+      (strictest-first wins — proves the
+      `continue`-past-`none` logic in the loop). PCI=owner_of_record
+      with no `approval_owners` returns `[]` + INFO log.
 
 ---
 
