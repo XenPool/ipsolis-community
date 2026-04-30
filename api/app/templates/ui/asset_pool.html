@@ -438,13 +438,13 @@ function buildRow(a) {
     ? '<a href="/ui/orders/' + a.current_order_id + '" class="text-blue-600 hover:underline">#' + a.current_order_id + '</a>'
     : '<span class="text-muted/70">–</span>';
   var inUse = (a.status === 'reserved' || a.status === 'busy');
-  var forceBtn = '<button onclick="openForceDeleteModal(' + a.id + ')" title="Force Delete"'
-    + ' class="text-muted/50 hover:text-red-500 ml-1" style="font-size:15px;line-height:1">⊗</button>';
-  var revokeBtn = '<button onclick="openRevokeModal(' + a.id + ')" title="Revoke &amp; Release"'
-    + ' class="text-muted/50 hover:text-orange-500 ml-1" style="font-size:15px;line-height:1">↩</button>';
+  var forceBtn = '<button onclick="openForceDeleteModal(' + a.id + ')" title="Force Delete" aria-label="Force delete asset"'
+    + ' class="text-muted/50 hover:text-red-500 ml-1" style="font-size:15px;line-height:1"><span aria-hidden="true">⊗</span></button>';
+  var revokeBtn = '<button onclick="openRevokeModal(' + a.id + ')" title="Revoke &amp; Release" aria-label="Revoke and release asset"'
+    + ' class="text-muted/50 hover:text-orange-500 ml-1" style="font-size:15px;line-height:1"><span aria-hidden="true">↩</span></button>';
   var actionsHtml = canEdit
-    ? '<button onclick="startEdit(' + a.id + ')" title="Edit" class="text-muted/70 hover:text-blue-600 mr-2">✏</button>'
-      + '<button onclick="deleteAsset(' + a.id + ', \'' + _esc(a.name) + '\')" title="Delete" class="text-muted/70 hover:text-red-600">×</button>'
+    ? '<button onclick="startEdit(' + a.id + ')" title="Edit" aria-label="Edit asset" class="text-muted/70 hover:text-blue-600 mr-2"><span aria-hidden="true">✏</span></button>'
+      + '<button onclick="deleteAsset(' + a.id + ', \'' + _esc(a.name) + '\')" title="Delete" aria-label="Delete asset" class="text-muted/70 hover:text-red-600"><span aria-hidden="true">×</span></button>'
       + forceBtn
     : (inUse ? revokeBtn : '') + forceBtn;
   var tr = document.createElement('tr');

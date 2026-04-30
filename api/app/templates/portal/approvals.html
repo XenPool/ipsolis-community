@@ -92,8 +92,9 @@
   </table>
 </div>
 {% elif not show_recent %}
-<div class="bg-surface rounded-lg border border-token-border p-12 text-center text-muted/70 text-sm" data-i18n="portal.approvals.empty_pending">
-  No pending approvals.
+<div class="bg-surface rounded-lg border border-token-border p-12 text-center">
+  <div class="mx-auto mb-3 w-14 h-14 rounded-full bg-surface-raised flex items-center justify-center text-3xl text-green-500/70 dark:text-green-400/60" aria-hidden="true">✓</div>
+  <p class="text-base text-muted" data-i18n="portal.approvals.empty_pending">No pending approvals.</p>
 </div>
 {% endif %}
 
@@ -135,8 +136,9 @@
 </div>
 {% elif show_recent %}
 <h2 class="text-sm font-semibold text-body mb-3 mt-6" data-i18n="portal.approvals.recent_heading">Recent Decisions</h2>
-<div class="bg-surface rounded-lg border border-token-border p-8 text-center text-muted/70 text-sm" data-i18n="portal.approvals.empty_recent">
-  No recent decisions.
+<div class="bg-surface rounded-lg border border-token-border p-8 text-center">
+  <div class="mx-auto mb-2 w-10 h-10 rounded-full bg-surface-raised flex items-center justify-center text-xl text-muted/40" aria-hidden="true">⌛</div>
+  <p class="text-sm text-muted" data-i18n="portal.approvals.empty_recent">No recent decisions.</p>
 </div>
 {% endif %}
 

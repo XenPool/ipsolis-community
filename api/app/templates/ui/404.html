@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block title %}Page not found – {{ app_title }}{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto py-16 text-center">
+  <div class="mx-auto mb-6 w-20 h-20 rounded-full bg-surface flex items-center justify-center text-4xl text-muted/40 border border-token-border" aria-hidden="true">404</div>
+  <h1 class="text-2xl font-semibold text-heading mb-2">Page not found</h1>
+  <p class="text-sm text-muted mb-6 max-w-md mx-auto">
+    The admin page <code class="font-mono bg-surface-raised px-1.5 py-0.5 rounded text-xs">{{ requested_path }}</code>
+    does not exist. Use the navigation on the left, or jump back to the dashboard.
+  </p>
+  <a href="/ui/"
+     class="inline-block px-5 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700">
+    ← Back to dashboard
+  </a>
+</div>
+{% endblock %}

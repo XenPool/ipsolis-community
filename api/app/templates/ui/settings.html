@@ -228,11 +228,13 @@
         {% if updates_config and updates_config.get('updates.latest_version') %}
           · Latest seen: <span class="font-mono">{{ updates_config.get('updates.latest_version') }}</span>
         {% endif %}
-        {% if updates_config and updates_config.get('updates.check_error') %}
-          · <span class="text-red-600 dark:text-red-400">Error: {{ updates_config.get('updates.check_error') }}</span>
-        {% endif %}
       </span>
     </div>
+    {% if updates_config and updates_config.get('updates.check_error') %}
+    <div class="mt-3 px-3 py-2 rounded bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 text-xs text-red-700 dark:text-red-300">
+      Last check failed — token may be missing or invalid. See server logs for details.
+    </div>
+    {% endif %}
   </div>
 
   <!-- Order Settings -->

@@ -1178,3 +1178,18 @@ async def admin_users_page(request: Request) -> HTMLResponse:
         "ui/admin_users.html",
         {"active_page": "admin-users"},
     )
+
+
+# ── /ui catch-all 404 ─────────────────────────────────────────────────────────
+# Renders an HTML page (admin nav + branded message) for any unmatched
+# /ui/<...> path so users typing a guess in the address bar don't see
+# FastAPI's raw JSON 404. Must stay LAST in the router so all real
+# routes take precedence. (cf. QA report 2026-04-29 A3)
+@router.get("/{path:path}", response_class=HTMLResponse, include_in_schema=False)
+async def ui_catch_all_404(request: Request, path: str) -> HTMLResponse:
+    return templates.TemplateResponse(
+        request,
+        "ui/404.html",
+        {"active_page": None, "requested_path": "/ui/" + path},
+        status_code=status.HTTP_404_NOT_FOUND,
+    )

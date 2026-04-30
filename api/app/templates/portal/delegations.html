@@ -148,7 +148,7 @@ async function loadList() {
   }
   body.innerHTML = rows.map(function(r) {
     var revokeBtn = (r.status === 'revoked' || r.status === 'expired')
-      ? '<span class="text-muted/60 text-xs">' + (r.status === 'revoked' ? 'revoked' : 'window closed') + '</span>'
+      ? '<span class="text-muted/40 text-xs" aria-hidden="true">—</span>'
       : '<button onclick="revokeDelegation(' + r.id + ')" class="text-red-500 hover:text-red-700 text-xs" data-i18n="portal.delegations.revoke_button">Revoke</button>';
     return '<tr ' + ((r.status === 'revoked' || r.status === 'expired') ? 'class="opacity-60"' : '') + '>'
       + '<td class="px-4 py-3"><div class="font-medium text-heading">' + escapeHtml(r.delegate_name || r.delegate_email) + '</div><div class="text-[11px] text-muted/60 font-mono">' + escapeHtml(r.delegate_email) + '</div></td>'
