@@ -24,7 +24,14 @@ from app.utils.auth import require_admin_key
 from app.utils.features import require_enterprise
 from app.utils.rbac import require_role
 
-_ENT = require_enterprise("advanced_maintenance")
+# Backups + health probes + queue inspection + alert config are
+# community-tier — they're operational hygiene every install needs.
+# The *audit-retention policy* knob is the only Enterprise gate left
+# in this router; per-classification PII/PHI/PCI windows are the
+# compliance feature, while routine prune behaviour with the global
+# default is community.
+_ENT = Depends(lambda: None)               # legacy alias — kept for back-compat with any in-flight code
+_ENT_RETENTION = require_enterprise("audit_retention")
 
 logger = logging.getLogger(__name__)
 
@@ -473,7 +480,7 @@ async def get_retention(db: AsyncSession = Depends(get_db)) -> dict:
     return out
 
 
-@router.put("/retention", dependencies=[_ENT, _WRITE_GATE])
+@router.put("/retention", dependencies=[_ENT_RETENTION, _WRITE_GATE])
 async def set_retention(
     payload: RetentionUpdate, db: AsyncSession = Depends(get_db)
 ) -> dict:

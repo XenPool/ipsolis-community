@@ -30,6 +30,11 @@ ENTERPRISE_FEATURES: dict[str, str] = {
     "app_branding":             "App Branding",
     "global_variables":         "Global Variables",
     "audit_log_viewer":         "Audit Log Viewer",
+    # Per-classification audit retention windows (PII / PHI / PCI kept
+    # 7+ years vs. 90-day routine config rows). Backups + health probes
+    # + queue inspection are community-tier; the *retention policy* knob
+    # itself is the Enterprise compliance feature.
+    "audit_retention":          "Audit Log Retention Policy",
     "change_log_viewer":        "Order Change Log Viewer",
     "advanced_maintenance":     "Advanced Maintenance",
     "custom_deprovision":       "Custom Deprovision Policy",
@@ -42,6 +47,16 @@ ENTERPRISE_FEATURES: dict[str, str] = {
     "rbac_token_role_binding":  "Role-Bound API Tokens",
     "rbac_sod_enforcement":     "Separation-of-Duties Enforcement",
     "password_policy":          "Password Rotation & Lockout Policy",
+    # ── Compliance & integration extensions ────────────────────────────
+    # Per-integration API tokens: named, scoped, role-bound bearer
+    # tokens with audit attribution. Community installs keep the legacy
+    # ``X-Admin-Key`` fallback for backwards-compatible integrations.
+    "api_token_management":     "Per-Integration API Tokens",
+    # Access certification campaigns (ISO 27001 / SOX / PCI access reviews).
+    "certifications":           "Access Certification Campaigns",
+    # HR leaver events viewer — read-side of the HR webhook + SCIM
+    # provisioning features (both already Enterprise-gated).
+    "hr_leaver_events":         "HR Leaver Events Viewer",
 }
 
 

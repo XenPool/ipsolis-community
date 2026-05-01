@@ -14,8 +14,28 @@ Usage:
 #}
 
 
-{# Small grayed-out sidebar item with lock icon + ENT badge. #}
-{% macro nav_locked(label, icon_svg='') -%}
+{# Grayed-out sidebar item with lock icon + ENT badge.
+   When ``href`` is provided, renders as a clickable <a> so the operator
+   lands on the gated page (which is expected to render its own
+   teaser_pane). When omitted, falls back to a non-clickable <div> for
+   back-compat with callers that have no real teaser destination. #}
+{% macro nav_locked(label, href='', icon_svg='') -%}
+{% if href %}
+<a href="{{ href }}"
+   class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-muted/60 hover:text-muted hover:bg-surface-raised/40 transition-colors"
+   title="{{ label }} – preview the Enterprise feature">
+  {% if icon_svg %}
+    {{ icon_svg|safe }}
+  {% else %}
+    <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+    </svg>
+  {% endif %}
+  <span class="flex-1">{{ label }}</span>
+  <span class="text-[9px] tracking-widest uppercase bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 px-1.5 py-0.5 rounded font-semibold">ENT</span>
+</a>
+{% else %}
 <div class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-muted/60 cursor-not-allowed select-none"
      title="{{ label }} – requires ip·Solis Enterprise license">
   {% if icon_svg %}
@@ -29,6 +49,7 @@ Usage:
   <span class="flex-1">{{ label }}</span>
   <span class="text-[9px] tracking-widest uppercase bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 px-1.5 py-0.5 rounded font-semibold">ENT</span>
 </div>
+{% endif %}
 {%- endmacro %}
 
 

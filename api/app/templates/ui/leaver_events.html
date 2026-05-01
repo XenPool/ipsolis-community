@@ -1,8 +1,15 @@
 {% extends "base.html" %}
+{% from "_partials/enterprise_teaser.html" import teaser_pane %}
 
 {% block title %}Leaver Events – {{ app_title }}{% endblock %}
 
 {% block content %}
+{% if not is_enterprise %}
+{{ teaser_pane(
+    "HR Leaver Events Viewer",
+    "Audit table of every termination signal that hit ip·Solis — via the HR webhook (Workday / SAP SuccessFactors / Microsoft Graph subscription notifications) or via SCIM 2.0 (Okta / SailPoint / Ping deprovisioning workflows). Each event records who left, when, which adapter delivered the signal, and exactly what ip·Solis did in response: orders revoked, pending approvals superseded, certification reviews reassigned. Searchable by email + paginated. Pairs with the unified leaver flow so the same forensic story is one query away during a SOC 2 / ISO 27001 access review. Requires the HR webhook or SCIM 2.0 endpoint to be configured (both Enterprise features); on a community install this table is always empty."
+) }}
+{% else %}
 <div class="mb-6">
   <h1 class="text-lg font-semibold text-heading">Leaver Events</h1>
   <p class="text-xs text-muted/70 mt-1 max-w-2xl">
@@ -120,4 +127,5 @@ function onFilterChange() {
 
 document.addEventListener('DOMContentLoaded', loadEvents);
 </script>
+{% endif %}
 {% endblock %}

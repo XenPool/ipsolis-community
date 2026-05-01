@@ -1154,12 +1154,31 @@ async def approval_delegations_page(request: Request) -> HTMLResponse:
 
 
 @router.get("/certifications", response_class=HTMLResponse)
-async def certifications_page(request: Request) -> HTMLResponse:
-    """Access certification campaigns — list + per-campaign drill-down."""
+async def certifications_page(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> HTMLResponse:
+    """Access certification campaigns — list + per-campaign drill-down.
+
+    Loads the asset-type list (id + name + is_active) so the campaign
+    create / edit modal can render a multi-select picker rather than
+    asking operators to type comma-separated IDs.
+    """
+    at_rows = (await db.execute(
+        select(AssetType.id, AssetType.name, AssetType.is_active)
+        .order_by(AssetType.name)
+    )).all()
+    asset_type_options = [
+        {"id": r.id, "name": r.name, "is_active": r.is_active}
+        for r in at_rows
+    ]
     return templates.TemplateResponse(
         request,
         "ui/certifications.html",
-        {"active_page": "certifications"},
+        {
+            "active_page": "certifications",
+            "asset_type_options": asset_type_options,
+        },
     )
 
 

@@ -18,14 +18,10 @@
             class="tab-btn px-4 py-2 text-sm font-medium border-b-2 border-blue-600 text-blue-700">
       Health
     </button>
-    {% if is_enterprise %}
     <button onclick="showTab('backups')" id="tab-btn-backups"
             class="tab-btn px-4 py-2 text-sm font-medium border-b-2 border-transparent text-muted hover:text-body">
       Backups
     </button>
-    {% else %}
-    {{ tab_locked("Backups", "backups") }}
-    {% endif %}
     <button onclick="showTab('queue')" id="tab-btn-queue"
             class="tab-btn px-4 py-2 text-sm font-medium border-b-2 border-transparent text-muted hover:text-body">
       Queue
@@ -64,8 +60,7 @@
     <div class="text-sm text-muted/70">Loading…</div>
   </div>
 
-  {% if is_enterprise %}
-  <!-- Alert settings (Enterprise: advanced_maintenance) -->
+  <!-- Alert settings — community-tier as of 2026-04-30 (was advanced_maintenance) -->
   <div class="bg-surface rounded-lg border border-token-border p-5 mt-6 max-w-3xl">
     <div class="flex items-center justify-between mb-3">
       <h3 class="text-sm font-semibold text-body">Email alerts on probe failures</h3>
@@ -101,17 +96,10 @@
       </button>
     </div>
   </div>
-  {% else %}
-  {{ card_teaser(
-      "Health Alerts via Email",
-      "Get notified the moment a service (PostgreSQL, Redis, SMTP, Entra ID, SCCM) flips OK→FAILED — with a configurable cooldown window so you don't get spammed during outages."
-  ) }}
-  {% endif %}
 </div>
 
 <!-- ── Tab: Backups ─────────────────────────────────────────────────────── -->
 <div id="tab-backups" class="hidden">
-{% if is_enterprise %}
   <!-- Schedule panel -->
   <div class="bg-surface rounded-lg border border-token-border p-5 mb-6 max-w-3xl">
     <div class="flex items-center justify-between mb-3">
@@ -317,12 +305,6 @@
       </div>
     </div>
   </div>
-{% else %}
-{{ teaser_pane(
-    "Scheduled Database Backups",
-    "Automate nightly PostgreSQL backups with a configurable cron schedule, per-backup retention policy, and one-click manual create / download / delete from the Admin UI. Includes alerting on failure."
-) }}
-{% endif %}
 </div>
 
 <!-- ── Tab: Queue ───────────────────────────────────────────────────────── -->

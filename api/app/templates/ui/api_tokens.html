@@ -1,8 +1,15 @@
 {% extends "base.html" %}
+{% from "_partials/enterprise_teaser.html" import teaser_pane %}
 
 {% block title %}API Tokens – {{ app_title }}{% endblock %}
 
 {% block content %}
+{% if not is_enterprise %}
+{{ teaser_pane(
+    "Per-integration API tokens",
+    "Replace the single shared X-Admin-Key with named, expiring, revocable bearer tokens — each scoped to the endpoints a specific integration actually needs (e.g. ServiceNow needs only 'webhook:in', a reporting tool only 'orders:read'). Token-role binding caps the privilege a token can wield even when the calling endpoint is broader. Every audit-log row records which token drove the change ('token:servicenow-int') so a compliance review can trace any mutation back to the specific integration. Optional hard-delete retention purges revoked tokens after a configurable window for tenants under strict record-retention rules. Community installs keep the legacy X-Admin-Key fallback so existing scripts don't break — you upgrade for the auditability."
+) }}
+{% else %}
 <div class="mb-6 flex items-center justify-between">
   <div>
     <h1 class="text-lg font-semibold text-heading">API Tokens</h1>
@@ -461,4 +468,5 @@ document.addEventListener('DOMContentLoaded', async function() {
   await loadPurgePolicy();
 });
 </script>
+{% endif %}
 {% endblock %}

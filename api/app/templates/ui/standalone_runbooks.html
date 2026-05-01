@@ -1,8 +1,15 @@
 {% extends "base.html" %}
+{% from "_partials/enterprise_teaser.html" import teaser_pane %}
 
 {% block title %}Runbooks – {{ app_title }}{% endblock %}
 
 {% block content %}
+{% if not is_enterprise %}
+{{ teaser_pane(
+    "Standalone Runbooks",
+    "Ad-hoc and cron-scheduled runbooks that aren't tied to an asset type — perfect for housekeeping jobs (nightly LDAP sync, weekly orphan-VM cleanup), one-off operations (decommission a project, mass-rotate service-account passwords), or scheduled compliance reports. Per-run history with structured JSON step logs; cron-schedule editor with timezone-aware preview; the same PowerShell module store + global variable bindings as asset-type runbooks so a script you write here behaves identically when invoked from an order workflow. Manual execution from the UI for testing, plus full audit attribution on every run."
+) }}
+{% else %}
 <div class="flex items-center justify-between mb-6">
   <div>
     <h1 class="text-lg font-semibold text-heading">Runbooks</h1>
@@ -131,4 +138,5 @@ async function deleteRunbook(id, name) {
 loadRunbooks();
 {% endraw %}
 </script>
+{% endif %}
 {% endblock %}

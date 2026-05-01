@@ -25,6 +25,7 @@ from app.utils.api_tokens import (
     status as token_status,
 )
 from app.utils.auth import require_admin_key
+from app.utils.features import require_enterprise
 from app.utils.license import is_feature_enabled
 from app.utils.rbac import VALID_ROLES, role_at_least, require_role
 
@@ -32,13 +33,18 @@ logger = logging.getLogger(__name__)
 router = APIRouter(
     prefix="/admin/api-tokens",
     tags=["admin-api-tokens"],
-    # RBAC slice 4: relaxed from ``superadmin`` to ``admin`` so operational
-    # admins can mint their own narrow integration tokens without escalating.
-    # The mint guard (creator role ≥ requested token role) in
-    # ``create_api_token`` is now the operative defense — an ``admin`` cannot
-    # forge a superadmin-bound token, so the worst they can do is mint a
-    # token at-or-below their own privilege, which they already have anyway.
-    dependencies=[Depends(require_admin_key), require_role("admin")],
+    # Enterprise-gated: per-integration named tokens with scopes / role
+    # binding / audit attribution are an Enterprise feature. Community
+    # installs keep the legacy ``X-Admin-Key`` fallback so existing
+    # integrations don't break.
+    # RBAC: ``admin`` is the operational floor; the mint guard
+    # (creator role ≥ requested token role) in ``create_api_token``
+    # defends against privilege escalation via token issuance.
+    dependencies=[
+        Depends(require_admin_key),
+        require_enterprise("api_token_management"),
+        require_role("admin"),
+    ],
 )
 
 

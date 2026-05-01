@@ -1,8 +1,15 @@
 {% extends "base.html" %}
+{% from "_partials/enterprise_teaser.html" import teaser_pane %}
 
 {% block title %}Access Certifications – {{ app_title }}{% endblock %}
 
 {% block content %}
+{% if not is_enterprise %}
+{{ teaser_pane(
+    "Access Certification Campaigns",
+    "Required for ISO 27001 / SOX / PCI compliance audits. Create a campaign with a scope filter (asset definitions / cost centers / departments / requester emails), kick it off to materialise one review row per (matching order, reviewer = the order's manager). Reviewers get a kickoff email + Teams card with a signed-token URL that opens a no-login review queue. Per row they pick Confirm (user keeps access) or Revoke (ip·Solis pulls access immediately via the deprovision runbook). Daily Beat reminders at configurable offsets, an overdue email past due, escalation summary to a contact list, and opt-in auto-revoke on overdue close the loop. Keeps your audit trail evidence-ready without a separate GRC tool."
+) }}
+{% else %}
 <div class="mb-6 flex items-start justify-between gap-4">
   <div>
     <h1 class="text-lg font-semibold text-heading">Access Certifications</h1>
@@ -103,24 +110,61 @@
         <legend class="px-1 text-xs font-medium text-muted">Scope filter <span class="text-muted/50 font-normal">(empty fields = wildcards; AND across keys, OR within)</span></legend>
         <div class="space-y-3 mt-2">
           <div>
-            <label class="block text-[11px] font-medium text-muted mb-1">Asset definition IDs (comma-separated)</label>
-            <input id="c-scope-asset-types" type="text" placeholder="e.g. 16, 27"
-                   class="w-full rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500">
+            <label class="block text-[11px] font-medium text-muted mb-1">Asset definitions <span class="text-muted/50 font-normal">(empty = all)</span></label>
+            <!-- Chip picker — search the asset-type catalog by name + click
+                 to add as a chip; click a chip's × to remove. The hidden
+                 input ``#c-scope-asset-types`` carries the comma-separated
+                 ID list as a back-compat shim so the existing save handler
+                 doesn't change. -->
+            <div class="rounded border border-token-border bg-surface focus-within:ring-1 focus-within:ring-blue-500">
+              <div id="c-scope-at-chips" class="flex flex-wrap items-center gap-1 px-2 pt-2"></div>
+              <div class="relative">
+                <input id="c-scope-at-search" type="text" autocomplete="off"
+                       placeholder="Type a name to search…"
+                       class="w-full bg-transparent text-body placeholder:text-muted/60 text-sm px-2 py-1.5 focus:outline-none">
+                <div id="c-scope-at-dropdown"
+                     class="hidden absolute left-0 right-0 top-full z-10 mt-1 max-h-48 overflow-y-auto rounded border border-token-border bg-surface shadow-lg"></div>
+              </div>
+            </div>
+            <input id="c-scope-asset-types" type="hidden" value="">
+            <p class="text-[10px] text-muted/60 mt-1">
+              Empty = include every asset definition. Inactive definitions are still selectable here so historical campaigns can target them.
+            </p>
+          </div>
+          <!-- Asset-type catalog snapshot — written by the server route handler
+               so the picker doesn't need an extra round-trip on modal-open. -->
+          <script type="application/json" id="asset-type-options-data">
+            {{ asset_type_options | tojson if asset_type_options is defined else '[]' }}
+          </script>
+          <div>
+            <label class="block text-[11px] font-medium text-muted mb-1">Provider cost centers <span class="text-muted/50 font-normal">(empty = all)</span></label>
+            <div class="rounded border border-token-border bg-surface focus-within:ring-1 focus-within:ring-blue-500">
+              <div id="c-scope-cc-chips" class="flex flex-wrap items-center gap-1 px-2 pt-2"></div>
+              <input id="c-scope-cc-search" type="text" autocomplete="off"
+                     placeholder="Type and press Enter to add (e.g. CC-IT-2100)…"
+                     class="w-full bg-transparent text-body placeholder:text-muted/60 text-sm px-2 py-1.5 focus:outline-none">
+            </div>
+            <input id="c-scope-cost-centers" type="hidden" value="">
           </div>
           <div>
-            <label class="block text-[11px] font-medium text-muted mb-1">Provider cost centers (comma-separated)</label>
-            <input id="c-scope-cost-centers" type="text" placeholder="e.g. CC-IT-2100, CC-RnD-3300"
-                   class="w-full rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500">
+            <label class="block text-[11px] font-medium text-muted mb-1">Requester departments <span class="text-muted/50 font-normal">(empty = all)</span></label>
+            <div class="rounded border border-token-border bg-surface focus-within:ring-1 focus-within:ring-blue-500">
+              <div id="c-scope-dept-chips" class="flex flex-wrap items-center gap-1 px-2 pt-2"></div>
+              <input id="c-scope-dept-search" type="text" autocomplete="off"
+                     placeholder="Type and press Enter to add (e.g. Engineering)…"
+                     class="w-full bg-transparent text-body placeholder:text-muted/60 text-sm px-2 py-1.5 focus:outline-none">
+            </div>
+            <input id="c-scope-departments" type="hidden" value="">
           </div>
           <div>
-            <label class="block text-[11px] font-medium text-muted mb-1">Requester departments (comma-separated)</label>
-            <input id="c-scope-departments" type="text" placeholder="e.g. Engineering, Finance"
-                   class="w-full rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500">
-          </div>
-          <div>
-            <label class="block text-[11px] font-medium text-muted mb-1">Requester emails (comma-separated)</label>
-            <input id="c-scope-emails" type="text" placeholder="alice@example.com, bob@example.com"
-                   class="w-full rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500">
+            <label class="block text-[11px] font-medium text-muted mb-1">Requester emails <span class="text-muted/50 font-normal">(empty = all)</span></label>
+            <div class="rounded border border-token-border bg-surface focus-within:ring-1 focus-within:ring-blue-500">
+              <div id="c-scope-email-chips" class="flex flex-wrap items-center gap-1 px-2 pt-2"></div>
+              <input id="c-scope-email-search" type="text" autocomplete="off"
+                     placeholder="Type and press Enter to add (e.g. alice@example.com)…"
+                     class="w-full bg-transparent text-body placeholder:text-muted/60 text-sm px-2 py-1.5 focus:outline-none">
+            </div>
+            <input id="c-scope-emails" type="hidden" value="">
           </div>
         </div>
       </fieldset>
@@ -313,15 +357,293 @@ function renderReviews() {
   }).join('');
 }
 
+// ── Generic chip picker ─────────────────────────────────────────────────
+// Two modes:
+//
+//   1. catalog mode (asset types) — finite list loaded from a server-
+//      rendered JSON blob; user types to filter, click to add.
+//   2. freetext mode (cost centers / departments / emails) — no preset
+//      catalog; user types and presses Enter / comma to add a chip.
+//
+// The picker maintains a ``Set`` of selected values per instance and
+// mirrors them as a comma-separated string into a hidden input so the
+// existing save handler (_csvList / _csvIntList) reads them unchanged.
+//
+// One module-level click handler (``_chipClickAway``) closes any open
+// dropdown when the operator clicks outside any picker. Bound exactly
+// once on first init — the per-modal _initChipPicker calls are
+// idempotent thanks to a dataset.bound flag on the search input.
+
+var _chipPickers = {};   // id → picker state
+
+function _esc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+var _chipClickAwayBound = false;
+function _bindChipClickAway() {
+  if (_chipClickAwayBound) return;
+  _chipClickAwayBound = true;
+  // mousedown (not click) so we close BEFORE the dropdown's option-click
+  // handler runs and replaces the dropdown DOM. Without this, the
+  // event-bubbles-after-DOM-replacement race makes the dropdown briefly
+  // close itself when the user picks an option.
+  document.addEventListener('mousedown', function(e) {
+    Object.keys(_chipPickers).forEach(function(key) {
+      var p = _chipPickers[key];
+      var search = document.getElementById(p.searchId);
+      var dd = p.dropdownId ? document.getElementById(p.dropdownId) : null;
+      if (!search || !dd) return;
+      // If the click is on the search input itself OR inside the dropdown
+      // OR inside the chips area, leave the dropdown alone.
+      var chips = document.getElementById(p.chipsId);
+      if (e.target === search) return;
+      if (dd.contains(e.target)) return;
+      if (chips && chips.contains(e.target)) return;
+      dd.classList.add('hidden');
+    });
+  });
+}
+
+function _renderChips(id) {
+  var p = _chipPickers[id];
+  if (!p) return;
+  var box = document.getElementById(p.chipsId);
+  var hidden = document.getElementById(p.hiddenId);
+  if (!box || !hidden) return;
+  box.innerHTML = '';
+  var values = Array.from(p.selected);
+  if (values.length === 0) {
+    var hint = document.createElement('span');
+    hint.className = 'text-[11px] text-muted/60 italic';
+    hint.textContent = p.emptyHint || 'No filter — all included.';
+    box.appendChild(hint);
+  } else {
+    values.forEach(function(v) {
+      var label = (p.mode === 'catalog')
+        ? (function() {
+            var o = (p.options || []).find(function(o) { return String(o.id) === String(v); });
+            return o
+              ? (_esc(o.name) + ' <span class="text-blue-700/60 dark:text-blue-300/60 font-mono">#' + o.id + '</span>'
+                  + (o.is_active ? '' : ' <span class="text-[9px] uppercase tracking-wider text-muted/70">inactive</span>'))
+              : ('<span class="font-mono">#' + _esc(v) + '</span>');
+          })()
+        : _esc(v);
+      var chip = document.createElement('span');
+      chip.className = 'inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300 text-[11px] font-medium';
+      chip.innerHTML = '<span>' + label + '</span>';
+      var x = document.createElement('button');
+      x.type = 'button';
+      x.className = 'ml-1 text-blue-700/60 hover:text-red-600 leading-none';
+      x.textContent = '×';
+      x.title = 'Remove';
+      x.onclick = function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        p.selected.delete(v);
+        _renderChips(id);
+        if (p.dropdownId) _renderDropdown(id);
+      };
+      chip.appendChild(x);
+      box.appendChild(chip);
+    });
+  }
+  // Mirror to the hidden input so _csvList / _csvIntList picks it up.
+  hidden.value = values.join(', ');
+}
+
+function _renderDropdown(id) {
+  var p = _chipPickers[id];
+  if (!p || !p.dropdownId) return;
+  var dd = document.getElementById(p.dropdownId);
+  var search = document.getElementById(p.searchId);
+  if (!dd || !search) return;
+  var q = (search.value || '').trim().toLowerCase();
+  var matches = (p.options || [])
+    .filter(function(o) { return !p.selected.has(o.id); })
+    .filter(function(o) {
+      if (!q) return true;
+      return o.name.toLowerCase().indexOf(q) !== -1 || String(o.id) === q;
+    })
+    .slice(0, 50);
+  if (!matches.length) {
+    dd.innerHTML = '<div class="px-3 py-2 text-[11px] text-muted/70 italic">'
+      + (q ? 'No matching entries.' : 'All catalog entries already selected.')
+      + '</div>';
+  } else {
+    dd.innerHTML = matches.map(function(o) {
+      return '<button type="button" data-opt-id="' + _esc(o.id) + '"'
+        + ' class="w-full text-left px-3 py-1.5 hover:bg-surface-raised text-xs flex items-center justify-between">'
+        + '<span class="text-body">' + _esc(o.name) + (o.is_active ? '' : ' <span class="text-[9px] uppercase tracking-wider text-muted/70 ml-1">inactive</span>') + '</span>'
+        + '<span class="text-muted/60 font-mono">#' + _esc(o.id) + '</span>'
+        + '</button>';
+    }).join('');
+    // Use mousedown so the option fires BEFORE the search input loses
+    // focus; otherwise focus moves to body and the dropdown disappears
+    // before the click event registers.
+    Array.from(dd.querySelectorAll('button[data-opt-id]')).forEach(function(btn) {
+      btn.addEventListener('mousedown', function(e) {
+        e.preventDefault();   // keep focus on search
+        e.stopPropagation();  // don't trigger _bindChipClickAway
+        p.selected.add(parseInt(btn.dataset.optId, 10));
+        search.value = '';
+        _renderChips(id);
+        _renderDropdown(id);
+        search.focus();
+      });
+    });
+  }
+  dd.classList.remove('hidden');
+}
+
+function _initChipPicker(config) {
+  // config: {id, mode, chipsId, searchId, hiddenId, dropdownId?, options?, emptyHint?}
+  _chipPickers[config.id] = {
+    id: config.id,
+    mode: config.mode || 'freetext',
+    chipsId: config.chipsId,
+    searchId: config.searchId,
+    hiddenId: config.hiddenId,
+    dropdownId: config.dropdownId || null,
+    options: config.options || [],
+    emptyHint: config.emptyHint || null,
+    selected: new Set(),
+  };
+  _bindChipClickAway();
+  var search = document.getElementById(config.searchId);
+  if (!search || search.dataset.chipBound === '1') {
+    _renderChips(config.id);
+    if (config.dropdownId) _renderDropdown(config.id);
+    return;
+  }
+  search.dataset.chipBound = '1';
+  var p = _chipPickers[config.id];
+
+  if (p.mode === 'catalog') {
+    search.addEventListener('focus', function() { _renderDropdown(config.id); });
+    search.addEventListener('input', function() { _renderDropdown(config.id); });
+  }
+
+  search.addEventListener('keydown', function(e) {
+    if (e.key === 'Backspace' && !search.value && p.selected.size > 0) {
+      var last = Array.from(p.selected).pop();
+      p.selected.delete(last);
+      _renderChips(config.id);
+      if (config.dropdownId) _renderDropdown(config.id);
+      return;
+    }
+    if (e.key === 'Escape') {
+      if (config.dropdownId) {
+        var dd = document.getElementById(config.dropdownId);
+        if (dd) dd.classList.add('hidden');
+      }
+      return;
+    }
+    // Freetext: Enter or comma commits the typed value as a new chip.
+    // Catalog: Enter selects the first match in the dropdown (keyboard
+    // power-user shortcut so the picker is usable without a mouse).
+    if (e.key === 'Enter' || (p.mode === 'freetext' && e.key === ',')) {
+      e.preventDefault();
+      if (p.mode === 'freetext') {
+        var val = (search.value || '').trim().replace(/,$/, '').trim();
+        if (val) {
+          p.selected.add(val);
+          search.value = '';
+          _renderChips(config.id);
+        }
+      } else {
+        var dd = document.getElementById(config.dropdownId);
+        if (dd) {
+          var first = dd.querySelector('button[data-opt-id]');
+          if (first) {
+            // Synthesize a mousedown so the existing handler runs.
+            first.dispatchEvent(new MouseEvent('mousedown'));
+          }
+        }
+      }
+    }
+  });
+
+  search.addEventListener('blur', function() {
+    // Freetext mode: commit any unconfirmed text on blur so an operator
+    // who types and tabs away doesn't silently lose the value. Catalog
+    // mode: do nothing — operators must explicitly pick from the list.
+    if (p.mode !== 'freetext') return;
+    var val = (search.value || '').trim();
+    if (val) {
+      p.selected.add(val);
+      search.value = '';
+      _renderChips(config.id);
+    }
+  });
+
+  _renderChips(config.id);
+  if (config.dropdownId) _renderDropdown(config.id);
+}
+
+function _setChipPickerValues(id, values) {
+  var p = _chipPickers[id];
+  if (!p) return;
+  if (p.mode === 'catalog') {
+    p.selected = new Set((values || [])
+      .map(function(n) { return parseInt(n, 10); })
+      .filter(function(n) { return !isNaN(n); }));
+  } else {
+    p.selected = new Set((values || []).map(function(s) { return String(s).trim(); }).filter(function(s) { return s.length > 0; }));
+  }
+  _renderChips(id);
+  if (p.dropdownId) _renderDropdown(id);
+}
+
+function _loadAtOptionsBlob() {
+  var blob = document.getElementById('asset-type-options-data');
+  if (!blob) return [];
+  try { return JSON.parse(blob.textContent || '[]'); } catch (e) { return []; }
+}
+
+function _initAllChipPickers() {
+  _initChipPicker({
+    id: 'at',
+    mode: 'catalog',
+    chipsId: 'c-scope-at-chips',
+    searchId: 'c-scope-at-search',
+    hiddenId: 'c-scope-asset-types',
+    dropdownId: 'c-scope-at-dropdown',
+    options: _loadAtOptionsBlob(),
+    emptyHint: 'No filter — every asset definition included.',
+  });
+  _initChipPicker({
+    id: 'cc', mode: 'freetext',
+    chipsId: 'c-scope-cc-chips', searchId: 'c-scope-cc-search',
+    hiddenId: 'c-scope-cost-centers',
+    emptyHint: 'No filter — every cost center included.',
+  });
+  _initChipPicker({
+    id: 'dept', mode: 'freetext',
+    chipsId: 'c-scope-dept-chips', searchId: 'c-scope-dept-search',
+    hiddenId: 'c-scope-departments',
+    emptyHint: 'No filter — every department included.',
+  });
+  _initChipPicker({
+    id: 'email', mode: 'freetext',
+    chipsId: 'c-scope-email-chips', searchId: 'c-scope-email-search',
+    hiddenId: 'c-scope-emails',
+    emptyHint: 'No filter — every requester included.',
+  });
+}
+
 // ── Create / edit ───────────────────────────────────────────────────────────
 function openCreateModal() {
   _editingCampaign = null;
   document.getElementById('campaign-modal-title').textContent = 'New certification campaign';
   document.getElementById('campaign-modal-submit').textContent = 'Create';
-  ['c-name', 'c-description', 'c-scope-asset-types', 'c-scope-cost-centers',
-   'c-scope-departments', 'c-scope-emails'].forEach(function(id) {
+  ['c-name', 'c-description'].forEach(function(id) {
     document.getElementById(id).value = '';
   });
+  _initAllChipPickers();
+  ['at', 'cc', 'dept', 'email'].forEach(function(k) { _setChipPickerValues(k, []); });
   // Default due date = 14 days from now, 17:00 local.
   var d = new Date();
   d.setDate(d.getDate() + 14);
@@ -342,10 +664,11 @@ function editCampaign(campaignId) {
   document.getElementById('c-description').value = c.description || '';
   document.getElementById('c-due-at').value = _toLocalIso(new Date(c.due_at));
   var scope = c.scope || {};
-  document.getElementById('c-scope-asset-types').value = (scope.asset_type_ids || []).join(', ');
-  document.getElementById('c-scope-cost-centers').value = (scope.cost_centers || []).join(', ');
-  document.getElementById('c-scope-departments').value = (scope.departments || []).join(', ');
-  document.getElementById('c-scope-emails').value = (scope.requester_emails || []).join(', ');
+  _initAllChipPickers();
+  _setChipPickerValues('at',    scope.asset_type_ids || []);
+  _setChipPickerValues('cc',    scope.cost_centers || []);
+  _setChipPickerValues('dept',  scope.departments || []);
+  _setChipPickerValues('email', scope.requester_emails || []);
   document.getElementById('campaign-modal-error').classList.add('hidden');
   document.getElementById('campaign-modal').classList.remove('hidden');
 }
@@ -541,4 +864,5 @@ async function submitDecision() {
 
 document.addEventListener('DOMContentLoaded', loadCampaigns);
 </script>
+{% endif %}
 {% endblock %}

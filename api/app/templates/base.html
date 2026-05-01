@@ -114,8 +114,8 @@
         Runbooks
       </a>
       {% else %}
-      {{ nav_locked("PS Modules") }}
-      {{ nav_locked("Runbooks") }}
+      {{ nav_locked("PS Modules", "/ui/ps-modules") }}
+      {{ nav_locked("Runbooks", "/ui/standalone-runbooks") }}
       {% endif %}
       <a href="/ui/settings"
          class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors
@@ -149,6 +149,7 @@
         </svg>
         Cost Report
       </a>
+      {% if is_enterprise %}
       <a href="/ui/audit-log"
          class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors
                 {% if active_page == 'audit-log' %}bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300{% else %}text-muted hover:bg-surface-raised hover:text-body{% endif %}">
@@ -158,6 +159,9 @@
         </svg>
         Audit Log
       </a>
+      {% else %}
+      {{ nav_locked("Audit Log", "/ui/audit-log") }}
+      {% endif %}
       {% endif %}
 
       {# ── Authority-level — superadmin only ───────────────────────────── #}
@@ -171,6 +175,7 @@
         </svg>
         License
       </a>
+      {% if is_enterprise %}
       <a href="/ui/api-tokens"
          class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors
                 {% if active_page == 'api-tokens' %}bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300{% else %}text-muted hover:bg-surface-raised hover:text-body{% endif %}">
@@ -180,6 +185,9 @@
         </svg>
         API Tokens
       </a>
+      {% else %}
+      {{ nav_locked("API Tokens", "/ui/api-tokens") }}
+      {% endif %}
       <a href="/ui/admin-users"
          class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors
                 {% if active_page == 'admin-users' %}bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300{% else %}text-muted hover:bg-surface-raised hover:text-body{% endif %}">
@@ -210,6 +218,7 @@
          page is fully usable but the write actions hide themselves for
          non-admin roles via inline checks against `current_admin_role`. #}
       {% if admin_role_at_least(request, 'auditor') %}
+      {% if is_enterprise %}
       <a href="/ui/certifications"
          class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors
                 {% if active_page == 'certifications' %}bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300{% else %}text-muted hover:bg-surface-raised hover:text-body{% endif %}">
@@ -228,6 +237,10 @@
         </svg>
         Leaver Events
       </a>
+      {% else %}
+      {{ nav_locked("Certifications", "/ui/certifications") }}
+      {{ nav_locked("Leaver Events", "/ui/leaver-events") }}
+      {% endif %}
       {% endif %}
 
       {# ── Personal — visible to everyone ──────────────────────────────── #}
