@@ -26,6 +26,10 @@
             class="tab-btn px-4 py-2 text-sm font-medium border-b-2 border-transparent text-muted hover:text-body">
       Queue
     </button>
+    <button onclick="showTab('schedule')" id="tab-btn-schedule"
+            class="tab-btn px-4 py-2 text-sm font-medium border-b-2 border-transparent text-muted hover:text-body">
+      Recurring Tasks
+    </button>
     {% if is_enterprise %}
     <button onclick="showTab('retention')" id="tab-btn-retention"
             class="tab-btn px-4 py-2 text-sm font-medium border-b-2 border-transparent text-muted hover:text-body">
@@ -332,6 +336,55 @@
   </div>
 </div>
 
+<!-- ── Tab: Recurring Tasks ─────────────────────────────────────────────── -->
+<div id="tab-schedule" class="hidden">
+  <div class="flex items-start justify-between mb-3 gap-4">
+    <div>
+      <h2 class="text-sm font-semibold text-body mb-1">Recurring background tasks</h2>
+      <p class="text-xs text-muted/70 leading-snug max-w-3xl">
+        Read-only view of every Beat-scheduled task in this install — what it does, how
+        often it runs, which queue it lands on, and which <code class="font-mono">app_config</code>
+        knobs influence it. The schedule itself is baked into the worker image; rescheduling
+        requires editing <code class="font-mono">worker/tasks/__init__.py</code> and rebuilding.
+        The <em>Configuration knobs</em> column is where most operational tuning lives — for
+        example, <em>approval reminders</em> respects
+        <code class="font-mono">approval.reminder_after_hours</code> + <code class="font-mono">max_reminders</code>
+        without changing the hourly trigger.
+      </p>
+    </div>
+    <button onclick="loadBeatSchedule()"
+            class="text-xs px-3 py-1.5 rounded border border-token-border bg-surface hover:bg-surface-raised text-body whitespace-nowrap">
+      Refresh
+    </button>
+  </div>
+
+  <div class="bg-surface rounded-lg border border-token-border overflow-hidden">
+    <table class="min-w-full text-sm">
+      <thead class="bg-surface-raised">
+        <tr>
+          <th class="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-muted">Task</th>
+          <th class="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-muted">Cadence</th>
+          <th class="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-muted">Queue</th>
+          <th class="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-muted">What it does</th>
+          <th class="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-muted">Configuration knobs</th>
+        </tr>
+      </thead>
+      <tbody id="beat-schedule-rows" class="divide-y divide-token-border">
+        <tr><td colspan="5" class="px-4 py-6 text-center text-muted/70 text-xs">Loading…</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p class="text-[11px] text-muted/60 mt-3 leading-snug max-w-3xl">
+    All times are in <strong>Europe/Berlin</strong> — set in the worker's Celery config.
+    Tasks marked <span class="text-[9px] tracking-widest uppercase bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 px-1.5 py-0.5 rounded font-semibold align-middle">ENT</span>
+    are no-ops on community installs (the underlying feature is gated).
+    Need a different cadence? See <em>Tuning Beat schedules</em> in
+    <a href="/docs" class="text-blue-600 hover:underline">DEPLOYMENT.md §12</a> — or
+    open a feature request for an editable scheduler if your use case is recurring.
+  </p>
+</div>
+
 <!-- ── Tab: Retention ───────────────────────────────────────────────────── -->
 <div id="tab-retention" class="hidden">
 {% if is_enterprise %}
@@ -400,7 +453,7 @@
   <div id="cleanup-result" class="mt-4 max-w-3xl"></div>
 {% else %}
 {{ teaser_pane(
-    "Retention &amp; Cleanup",
+    "Retention & Cleanup",
     "Keep the database lean with configurable retention windows for orders, audit log, standalone-runbook runs, and backup files. Dry-run preview before execution; scheduled cleanup built in."
 ) }}
 {% endif %}
@@ -432,7 +485,7 @@
   var refreshTimer = null;
 
   function showTab(name) {
-    ['health', 'backups', 'queue', 'retention', 'seed'].forEach(function(n) {
+    ['health', 'backups', 'queue', 'schedule', 'retention', 'seed'].forEach(function(n) {
       var panel = document.getElementById('tab-' + n);
       var btn = document.getElementById('tab-btn-' + n);
       if (!panel || !btn) return;
@@ -449,7 +502,78 @@
     if (name === 'health')    { loadHealth(); loadAlerts(); }
     if (name === 'backups')   { loadBackups(); loadSchedule(); }
     if (name === 'queue')     loadQueue();
+    if (name === 'schedule')  loadBeatSchedule();
     if (name === 'retention') loadRetention();
+  }
+
+  // ── Recurring Tasks (Beat schedule) — read-only catalog ────────────────
+  var _beatLoaded = false;
+  async function loadBeatSchedule() {
+    if (_beatLoaded) return;   // catalog is static; one fetch per page load is enough
+    var tbody = document.getElementById('beat-schedule-rows');
+    try {
+      var resp = await fetch('/admin/maintenance/beat-schedule');
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      var rows = await resp.json();
+      if (!Array.isArray(rows) || rows.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-center text-muted/70 text-xs">No scheduled tasks registered.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = rows.map(_renderBeatRow).join('');
+      _beatLoaded = true;
+    } catch (e) {
+      tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-center text-red-600 text-xs">Failed to load: ' + _escBeat(e.message || String(e)) + '</td></tr>';
+    }
+  }
+
+  // Set at render time so the renderer knows whether to dim ENT-locked rows.
+  var _isEnterprise = {{ 'true' if is_enterprise else 'false' }};
+
+  function _renderBeatRow(r) {
+    var queueClass = {
+      provision:     'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300',
+      notifications: 'bg-purple-100 text-purple-700 dark:bg-purple-500/15 dark:text-purple-300',
+      reclaim:       'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300',
+      'default':     'bg-surface-raised text-muted',
+    }[r.queue] || 'bg-surface-raised text-muted';
+    // ENT-locked: task is gated behind an Enterprise feature. On community installs
+    // it no-ops on every tick — dim the row and swap the ENT badge for an explicit
+    // "No-op" indicator so operators understand the difference between
+    // "this fires but does nothing" and "this fires normally".
+    var entLocked = !r.community;
+    var entBadge = '';
+    if (entLocked) {
+      entBadge = _isEnterprise
+        ? ' <span class="text-[9px] tracking-widest uppercase bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 px-1.5 py-0.5 rounded font-semibold align-middle ml-1">ENT</span>'
+        : ' <span class="text-[10px] italic text-muted/70 align-middle ml-2">No-op — feature locked</span>';
+    }
+    var rowClass = (entLocked && !_isEnterprise)
+      ? 'opacity-50 hover:bg-surface-raised/20'
+      : 'hover:bg-surface-raised/30';
+    var configKnobs = (r.config_keys || []).length === 0
+      ? '<span class="text-[11px] text-muted/50 italic">no operator knobs</span>'
+      : (r.config_keys || []).map(function(k) {
+          return '<code class="font-mono text-[10px] bg-surface-raised px-1 py-0.5 rounded mr-0.5 inline-block">' + _escBeat(k) + '</code>';
+        }).join(' ');
+    return ''
+      + '<tr class="' + rowClass + '">'
+      +   '<td class="px-4 py-3 align-top">'
+      +     '<div class="font-medium text-body text-sm">' + _escBeat(r.name) + entBadge + '</div>'
+      +     '<div class="text-[10px] text-muted/60 font-mono mt-0.5 break-all">' + _escBeat(r.task) + '</div>'
+      +   '</td>'
+      +   '<td class="px-4 py-3 align-top whitespace-nowrap text-xs text-body">' + _escBeat(r.cadence) + '</td>'
+      +   '<td class="px-4 py-3 align-top">'
+      +     '<span class="inline-block px-2 py-0.5 rounded text-[11px] font-medium ' + queueClass + '">' + _escBeat(r.queue) + '</span>'
+      +   '</td>'
+      +   '<td class="px-4 py-3 align-top text-xs text-muted leading-snug max-w-md">' + _escBeat(r.description) + '</td>'
+      +   '<td class="px-4 py-3 align-top max-w-xs">' + configKnobs + '</td>'
+      + '</tr>';
+  }
+
+  function _escBeat(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 
   function banner(msg, kind) {

@@ -480,6 +480,24 @@ async def get_retention(db: AsyncSession = Depends(get_db)) -> dict:
     return out
 
 
+@router.get("/beat-schedule")
+async def list_beat_schedule() -> list[dict]:
+    """Return the static catalog of every Beat-scheduled task.
+
+    Sourced from ``app.utils.beat_inventory.BEAT_INVENTORY`` — a
+    hand-maintained mirror of the worker's ``beat_schedule`` dict so
+    the api ↔ worker code stays decoupled. The page that consumes
+    this is read-only: operators get a "what runs when" overview
+    plus links to the relevant config keys, but can't reschedule
+    from here (footgun avoidance — see notes in beat_inventory.py).
+    """
+    from app.utils.beat_inventory import BEAT_INVENTORY
+    # Return a list of plain dicts (TypedDict instances are dicts at
+    # runtime, but FastAPI's response serialiser is happier with this
+    # explicit list comprehension).
+    return [dict(entry) for entry in BEAT_INVENTORY]
+
+
 @router.put("/retention", dependencies=[_ENT_RETENTION, _WRITE_GATE])
 async def set_retention(
     payload: RetentionUpdate, db: AsyncSession = Depends(get_db)
