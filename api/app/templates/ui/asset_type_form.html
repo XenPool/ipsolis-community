@@ -361,11 +361,11 @@
              class="w-full max-w-lg rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono">
     </div>
 
-    <!-- Eligible Requestors (Enterprise: eligible_requestors) -->
+    <!-- Eligible Requestors (Business: eligible_requestors) -->
     <div id="section-access" class="scroll-mt-4 border-t border-token-border pt-5">
       <label class="block text-xs font-medium text-muted mb-2">
         Eligible Requestors
-        {% if not is_enterprise %}{{ ent_badge() }}{% endif %}
+        {% if not is_business %}{{ ent_badge(tier="business") }}{% endif %}
       </label>
       <p class="text-xs text-muted/70 mb-2">
         Optional AD group (as Distinguished Name) whose members may request this asset definition.
@@ -374,8 +374,8 @@
       <input type="text" id="eligible-requestors-dn"
              value="{{ asset_type.eligible_requestors_dn or '' if asset_type else '' }}"
              placeholder="CN=VDI-Users,OU=Groups,DC=example,DC=com"
-             {% if not is_enterprise %}disabled{% endif %}
-             class="w-full max-w-lg rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono {% if not is_enterprise %}opacity-60 cursor-not-allowed{% endif %}">
+             {% if not is_business %}disabled{% endif %}
+             class="w-full max-w-lg rounded border border-token-border bg-surface text-body placeholder:text-muted/60 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono {% if not is_business %}opacity-60 cursor-not-allowed{% endif %}">
     </div>
 
     <!-- Approval Workflow -->
@@ -394,15 +394,15 @@
           <span class="text-xs text-muted/70">(looked up from the user's AD manager attribute)</span>
         </label>
 
-        <!-- Application Owner Approval Toggle + Owner List (Enterprise: app_owner_approval) -->
-        <label class="flex items-center gap-2 text-sm {% if is_enterprise %}text-body cursor-pointer{% else %}text-muted/70 cursor-not-allowed{% endif %}">
+        <!-- Application Owner Approval Toggle + Owner List (Business: app_owner_approval) -->
+        <label class="flex items-center gap-2 text-sm {% if is_business %}text-body cursor-pointer{% else %}text-muted/70 cursor-not-allowed{% endif %}">
           <input type="checkbox" id="requires-owner-approval-cb"
                  {% if asset_type and asset_type.requires_owner_approval %}checked{% endif %}
-                 {% if not is_enterprise %}disabled{% endif %}
+                 {% if not is_business %}disabled{% endif %}
                  onchange="toggleOwnerSection()"
-                 class="rounded border-token-border text-blue-600 focus:ring-blue-500 {% if not is_enterprise %}opacity-50{% endif %}">
+                 class="rounded border-token-border text-blue-600 focus:ring-blue-500 {% if not is_business %}opacity-50{% endif %}">
           Requires Application Owner Approval
-          {% if not is_enterprise %}{{ ent_badge() }}{% endif %}
+          {% if not is_business %}{{ ent_badge(tier="business") }}{% endif %}
         </label>
 
         <!-- Owner input section (shown when toggle is checked) -->
@@ -454,15 +454,15 @@
           </p>
         </div>
 
-        <!-- Re-approval on Modify Toggle (Enterprise: reapproval_on_modify) -->
-        <label class="flex items-center gap-2 text-sm {% if is_enterprise %}text-body cursor-pointer{% else %}text-muted/70 cursor-not-allowed{% endif %} mt-2 pt-2 border-t border-token-border">
+        <!-- Re-approval on Modify Toggle (Business: reapproval_on_modify) -->
+        <label class="flex items-center gap-2 text-sm {% if is_business %}text-body cursor-pointer{% else %}text-muted/70 cursor-not-allowed{% endif %} mt-2 pt-2 border-t border-token-border">
           <input type="checkbox" id="requires-approval-on-modify-cb"
                  {% if asset_type and asset_type.requires_approval_on_modify %}checked{% endif %}
-                 {% if not is_enterprise %}disabled{% endif %}
-                 class="rounded border-token-border text-blue-600 focus:ring-blue-500 {% if not is_enterprise %}opacity-50{% endif %}">
+                 {% if not is_business %}disabled{% endif %}
+                 class="rounded border-token-border text-blue-600 focus:ring-blue-500 {% if not is_business %}opacity-50{% endif %}">
           Require Re-Approval on Asset Modification
           <span class="text-xs text-muted/70">(RDP/Admin user changes need new approval)</span>
-          {% if not is_enterprise %}{{ ent_badge() }}{% endif %}
+          {% if not is_business %}{{ ent_badge(tier="business") }}{% endif %}
         </label>
 
         <!-- Conditional approval rules — extra approvers driven by order properties -->

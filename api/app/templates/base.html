@@ -255,17 +255,17 @@
         </summary>
         <div class="mt-1 space-y-0.5">
           {% if admin_role_at_least(request, 'admin') %}
-            {{ nav_locked("PS Modules", "/ui/ps-modules") }}
-            {{ nav_locked("Runbooks", "/ui/standalone-runbooks") }}
+            {{ nav_locked("PS Modules", "/ui/ps-modules", tier="business") }}
+            {{ nav_locked("Runbooks", "/ui/standalone-runbooks", tier="business") }}
           {% endif %}
           {% if admin_role_at_least(request, 'auditor') %}
-            {{ nav_locked("Audit Log", "/ui/audit-log") }}
+            {{ nav_locked("Audit Log", "/ui/audit-log", tier="business") }}
           {% endif %}
           {% if admin_role_at_least(request, 'superadmin') %}
-            {{ nav_locked("API Tokens", "/ui/api-tokens") }}
+            {{ nav_locked("API Tokens", "/ui/api-tokens", tier="business") }}
           {% endif %}
           {% if admin_role_at_least(request, 'auditor') %}
-            {{ nav_locked("Certifications", "/ui/certifications") }}
+            {{ nav_locked("Certifications", "/ui/certifications", tier="business") }}
             {{ nav_locked("Leaver Events", "/ui/leaver-events") }}
           {% endif %}
         </div>

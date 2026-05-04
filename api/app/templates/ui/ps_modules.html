@@ -18,10 +18,11 @@
 {% endmacro %}
 
 {% block content %}
-{% if not is_enterprise %}
+{% if not is_business %}
 {{ teaser_pane(
     "PowerShell Module Management",
-    "Install PowerShell modules from the public PSGallery (or upload custom .zip bundles for air-gapped installs) directly from the Admin UI — no SSH'ing into the worker container, no scp dance. Each module carries a Linux-compatibility flag (Linux ✓ / Windows only ✕ / Unverified ?) so operators know upfront whether a module marked PSEdition_Desktop will load in the worker's PowerShell 7-on-Linux runtime; click the badge to flip the flag inline. Used by every PowerShell-based runbook step that calls Microsoft.PowerShell.SecretManagement, ActiveDirectory, VMware.PowerCLI, dbatools, etc. Without this, every module add is a manual file copy + worker-container rebuild."
+    "Install PowerShell modules from the public PSGallery (or upload custom .zip bundles for air-gapped installs) directly from the Admin UI — no SSH'ing into the worker container, no scp dance. Each module carries a Linux-compatibility flag (Linux ✓ / Windows only ✕ / Unverified ?) so operators know upfront whether a module marked PSEdition_Desktop will load in the worker's PowerShell 7-on-Linux runtime; click the badge to flip the flag inline. Used by every PowerShell-based runbook step that calls Microsoft.PowerShell.SecretManagement, ActiveDirectory, VMware.PowerCLI, dbatools, etc. Without this, every module add is a manual file copy + worker-container rebuild.",
+    tier="business"
 ) }}
 {% else %}
 <div class="flex items-center justify-between mb-4">

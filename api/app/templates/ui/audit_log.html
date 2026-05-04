@@ -4,10 +4,11 @@
 {% block title %}Audit Log – {{ app_title }}{% endblock %}
 
 {% block content %}
-{% if not is_enterprise %}
+{% if not is_business %}
 {{ teaser_pane(
     "Audit Log Viewer",
-    "Filterable audit-log explorer in the browser — search by entity type, entity id, triggered-by substring, or time range; coloured actor badges show at a glance whether each row was driven by a bearer token, an admin session, the legacy X-Admin-Key, or a webhook; expand any row for the JSON before/after diff. The audit log table itself is always present (every install needs the trail for forensic queries via direct DB access), and tamper-evident triggers protect it on every install — Enterprise unlocks the in-app browser-friendly viewer, the SIEM streaming integrations (Splunk HEC / Microsoft Sentinel / generic webhook), and per-classification retention windows so PII / PHI / PCI rows can be kept 7+ years while routine config changes drop after 90 days."
+    "Filterable audit-log explorer in the browser — search by entity type, entity id, triggered-by substring, or time range; coloured actor badges show at a glance whether each row was driven by a bearer token, an admin session, the legacy X-Admin-Key, or a webhook; expand any row for the JSON before/after diff. The audit log table itself is always present (every install needs the trail for forensic queries via direct DB access), and tamper-evident triggers protect it on every install — Business unlocks the in-app browser-friendly viewer; Enterprise adds per-classification retention windows so PII / PHI / PCI rows can be kept 7+ years while routine config changes drop after 90 days.",
+    tier="business"
 ) }}
 {% else %}
 <div class="mb-6">
