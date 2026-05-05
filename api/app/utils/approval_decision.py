@@ -172,6 +172,7 @@ async def apply_approval_decision(
     comment: str | None,
     *,
     actor: str | None = None,
+    bypass_sod: bool = False,
 ) -> DecisionResult:
     """Record ``decision`` on ``approval`` and trigger downstream effects.
 
@@ -216,7 +217,7 @@ async def apply_approval_decision(
     # decision is allowed to proceed. This keeps small/single-team
     # installs unblocked while still letting auditors see "this
     # approver was also the configurer".
-    if decision == "approve" and not getattr(approval, "sod_exempt", False):
+    if decision == "approve" and not bypass_sod and not getattr(approval, "sod_exempt", False):
         is_config, excerpt = await is_configurer_of_asset_type(
             db, order.asset_type_id, approval.approver_email,
         )
@@ -229,6 +230,11 @@ async def apply_approval_decision(
                 "(upgrade to Enterprise to enforce)",
                 approval.approver_email, order.asset_type_id,
             )
+    elif decision == "approve" and bypass_sod:
+        logger.warning(
+            "SoD bypassed by superadmin: actor=%s approval_id=%s order_id=%s",
+            actor, approval.id, approval.order_id,
+        )
 
     norm = "approved" if decision == "approve" else "declined"
     approval.status = norm

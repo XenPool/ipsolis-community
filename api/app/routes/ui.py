@@ -14,6 +14,7 @@ from app.models.asset import AssetPool, AssetStatus, AssetType
 from app.models.config import AppConfig
 from app.models.global_var import GlobalVar
 from app.models.ps_module import PsModule
+from app.models.approval import OrderApproval
 from app.models.order import Order, OrderAction, OrderStatus
 from app.models.runbook import RunbookDefinition, RunbookStep
 from app.models.script_module import ScriptModule
@@ -383,6 +384,16 @@ async def order_detail(
             duration = "< 1s" if secs < 0.05 else f"{secs:.1f}s"
         steps_with_duration.append({"step": step, "duration": duration})
 
+    # Load pending approvals so the admin UI can show a force-decide panel
+    approvals_result = await db.execute(
+        select(OrderApproval)
+        .where(OrderApproval.order_id == order_id)
+        .order_by(OrderApproval.id)
+    )
+    approvals = approvals_result.scalars().all()
+
+    is_superadmin = request.session.get("admin_role") == "superadmin"
+
     return templates.TemplateResponse(
         request, "order_detail.html",
         {
@@ -392,8 +403,54 @@ async def order_detail(
             "steps_with_duration": steps_with_duration,
             "status_colors": _STATUS_COLORS,
             "step_colors": _STEP_COLORS,
+            "approvals": approvals,
+            "is_superadmin": is_superadmin,
         },
     )
+
+
+# ── Superadmin Force-Decide ───────────────────────────────────────────────────
+
+@router.post("/orders/{order_id}/approvals/{approval_id}/force-decide")
+async def force_decide_approval(
+    request: Request,
+    order_id: int,
+    approval_id: int,
+    decision: str = Form(...),
+    comment: str = Form(default=""),
+    db: AsyncSession = Depends(get_db),
+):
+    """Superadmin-only: approve or decline a pending approval bypassing SoD.
+
+    Restricted to the ``superadmin`` role. The audit row carries a
+    ``[sod_bypass]`` suffix so the override is distinguishable from a normal
+    approval decision in the audit log.
+    """
+    from app.utils.approval_decision import SoDViolation, apply_approval_decision
+
+    if request.session.get("admin_role") != "superadmin":
+        raise HTTPException(status_code=403, detail="superadmin role required for force-decide")
+
+    if decision not in ("approve", "decline"):
+        raise HTTPException(status_code=422, detail="decision must be 'approve' or 'decline'")
+
+    approval = await db.get(OrderApproval, approval_id)
+    if not approval or approval.order_id != order_id:
+        raise HTTPException(status_code=404, detail="Approval not found")
+
+    admin_user = request.session.get("admin_user") or "superadmin"
+    actor = f"admin:session:{admin_user}:superadmin [sod_bypass]"
+
+    try:
+        await apply_approval_decision(
+            db, approval, decision, comment or None,
+            actor=actor, bypass_sod=True,
+        )
+    except SoDViolation:
+        # bypass_sod=True should prevent this, but guard defensively
+        raise HTTPException(status_code=409, detail="SoD violation could not be bypassed")
+
+    return RedirectResponse(url=f"/ui/orders/{order_id}", status_code=303)
 
 
 # ── Admin Order Actions ────────────────────────────────────────────────────────

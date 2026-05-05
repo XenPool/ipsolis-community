@@ -178,6 +178,76 @@
   {% endif %}
 </div>
 
+<!-- Approvals Panel -->
+{% if approvals %}
+<div class="mt-8 bg-surface rounded-lg border border-token-border p-5">
+  <h2 class="text-sm font-semibold text-body mb-4">Approvals</h2>
+  <div class="space-y-3">
+    {% for a in approvals %}
+    <div class="flex items-start justify-between gap-4 rounded-lg border border-token-border px-4 py-3
+      {% if a.status == 'pending' %}bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/30
+      {% elif a.status == 'approved' %}bg-green-50 dark:bg-green-500/10 border-green-200 dark:border-green-500/30
+      {% elif a.status == 'declined' %}bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/30
+      {% else %}bg-surface{% endif %}">
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="text-sm font-medium text-heading">{{ a.approver_name }}</span>
+          <span class="text-xs text-muted">{{ a.approver_email }}</span>
+          <span class="text-xs px-1.5 py-0.5 rounded font-medium
+            {% if a.approver_type == 'manager' %}bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300
+            {% else %}bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300{% endif %}">
+            {{ a.approver_type | replace('_', ' ') | title }}
+          </span>
+          <span class="text-xs px-1.5 py-0.5 rounded font-semibold
+            {% if a.status == 'pending' %}bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-200
+            {% elif a.status == 'approved' %}bg-green-100 text-green-800 dark:bg-green-500/20 dark:text-green-200
+            {% elif a.status == 'declined' %}bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-200
+            {% else %}bg-surface-raised text-muted{% endif %}">
+            {{ a.status | title }}
+          </span>
+        </div>
+        {% if a.comment %}
+        <p class="mt-1 text-xs text-muted italic">{{ a.comment }}</p>
+        {% endif %}
+        {% if a.decided_at %}
+        <p class="mt-0.5 text-xs text-muted/70">{{ a.decided_at.strftime("%d.%m.%Y %H:%M") }} UTC</p>
+        {% endif %}
+      </div>
+
+      {% if a.status == 'pending' and is_superadmin %}
+      <div class="flex-shrink-0">
+        <details class="group relative">
+          <summary class="cursor-pointer px-3 py-1.5 text-xs font-medium rounded border border-orange-400 text-orange-700 dark:text-orange-300 dark:border-orange-500 hover:bg-orange-50 dark:hover:bg-orange-500/10 list-none select-none">
+            Force decide ▾
+          </summary>
+          <div class="absolute right-0 mt-1 z-10 w-64 bg-surface rounded-lg border border-token-border shadow-lg p-3 space-y-2">
+            <p class="text-xs text-amber-700 dark:text-amber-300 font-medium">⚠ SoD bypass — superadmin only. Recorded in audit log.</p>
+            <form method="post" action="/ui/orders/{{ order.id }}/approvals/{{ a.id }}/force-decide" class="space-y-2">
+              <input type="hidden" name="decision" value="approve">
+              <textarea name="comment" rows="2" placeholder="Reason (optional)"
+                class="w-full text-xs rounded border border-token-border bg-surface px-2 py-1.5 font-mono focus:outline-none focus:ring-1 focus:ring-green-500"></textarea>
+              <button type="submit" onclick="return confirm('Force-approve as superadmin? This bypasses SoD and is recorded in the audit log.')"
+                class="w-full px-3 py-1.5 bg-green-600 text-white text-xs rounded hover:bg-green-700">
+                Force Approve
+              </button>
+            </form>
+            <form method="post" action="/ui/orders/{{ order.id }}/approvals/{{ a.id }}/force-decide">
+              <input type="hidden" name="decision" value="decline">
+              <button type="submit" onclick="return confirm('Force-decline this approval?')"
+                class="w-full px-3 py-1.5 bg-red-600 text-white text-xs rounded hover:bg-red-700">
+                Force Decline
+              </button>
+            </form>
+          </div>
+        </details>
+      </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
 <!-- Admin Actions -->
 {% if order.status.value in ("delivered", "provisioned") %}
 <div id="admin-actions" class="mt-8 bg-surface rounded-lg border border-token-border p-5">
