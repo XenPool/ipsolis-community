@@ -55,8 +55,28 @@ def _license_info_dict() -> dict[str, Any]:
     restart. Without this the file changes but every rendered template
     keeps the startup-frozen edition forever.
     """
+    from app.license.trusted_keys import TRUSTED_KEYS_BY_ID
+    from datetime import date
+
     info = license_utils.load_license(force_reload=True)
     set_license_globals(info)
+
+    verified_by: dict[str, Any] | None = None
+    if info.verified_by_key_id:
+        key = TRUSTED_KEYS_BY_ID.get(info.verified_by_key_id)
+        deprecation_warning: str | None = None
+        if key and key.deprecated_after and date.today() > key.deprecated_after:
+            deprecation_warning = (
+                f"This license was signed by a key that has been deprecated as of "
+                f"{key.deprecated_after.isoformat()}. Please request a re-issued license "
+                f"signed by the current key."
+            )
+        verified_by = {
+            "key_id": info.verified_by_key_id,
+            "description": info.verified_by_description,
+            "deprecation_warning": deprecation_warning,
+        }
+
     return {
         "license_id": info.license_id,
         "licensee": info.licensee,
@@ -76,7 +96,26 @@ def _license_info_dict() -> dict[str, Any]:
         # license so we can bake it into the next .lic.
         "install_uuid": info.install_uuid,
         "local_install_uuid": license_utils.get_install_uuid(),
+        "verified_by": verified_by,
     }
+
+
+@router.get("/trust-list")
+async def license_trust_list() -> list[dict[str, Any]]:
+    """Return all trusted public keys (no raw key material) for the admin UI."""
+    from app.license.trusted_keys import TRUSTED_KEYS
+    return [
+        {
+            "key_id": k.key_id,
+            "algorithm": k.algorithm,
+            "description": k.description,
+            "accepted_license_types": sorted(k.accepted_license_types),
+            "rsa_padding": k.rsa_padding,
+            "rsa_hash": k.rsa_hash,
+            "deprecated_after": k.deprecated_after.isoformat() if k.deprecated_after else None,
+        }
+        for k in TRUSTED_KEYS
+    ]
 
 
 @router.get("")

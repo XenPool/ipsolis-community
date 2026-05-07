@@ -35,8 +35,9 @@ itsdangerous>=2.2.0   # required by starlette SessionMiddleware
 # Email
 aiosmtplib==3.0.2
 
-# License (Ed25519 signature verification)
+# License (Ed25519 + RSA signature verification, operator key YAML overrides)
 cryptography>=43.0.0
+PyYAML>=6.0
 
 # Markdown rendering (asset definition help_text → sanitized HTML)
 markdown==3.7

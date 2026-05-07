@@ -2,7 +2,7 @@
 
 Offline, trust-based license system:
 - Reads a signed JSON license file at ``/app/license/ipsolis.lic``
-- Verifies an Ed25519 signature against the embedded public key
+- Verifies the signature against the multi-key trust list in ``tasks.license``
 - Checks expiry
 - Optionally enforces an install-bound ``install_uuid`` (see below)
 - Caches the result in a process-local variable
@@ -20,7 +20,8 @@ Community with an explanatory message. Licenses without ``install_uuid``
 remain valid — backwards-compat for legacy issuances.
 
 KEEP IN SYNC: api/app/utils/license.py <-> worker/tasks/utils/license.py
-(byte-identical copies — Docker build contexts are separate so we duplicate).
+(byte-identical copies except for the package prefix in trust-list imports —
+Docker build contexts are separate so we duplicate).
 """
 from __future__ import annotations
 
@@ -35,12 +36,6 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict
 
 logger = logging.getLogger(__name__)
-
-# ── Embedded public key (Ed25519, 32 bytes hex-encoded) ──────────────────────
-# Generate with: python tools/license/generate_keypair.py
-# Paste the hex output below. Until set, all signature verification fails and
-# the instance runs as Community edition.
-PUBLIC_KEY_HEX: str = "e2b380f0d1c5205b119c96e7802165b55398c15f5b429e60c334a0e63315f23d"
 
 # ── License file location ───────────────────────────────────────────────────
 LICENSE_PATH = Path(os.environ.get("IPSOLIS_LICENSE_PATH", "/app/license/ipsolis.lic"))
@@ -84,6 +79,10 @@ class LicenseInfo(BaseModel):
     install_uuid: str | None = None  # set when the license is install-bound
     valid: bool = True
     message: str = ""
+    # Trust list entry that successfully verified the signature.
+    # None for Community fallback (no license file) or verification failures.
+    verified_by_key_id: str | None = None
+    verified_by_description: str | None = None
 
 
 _COMMUNITY_FALLBACK = LicenseInfo()
@@ -130,27 +129,18 @@ def _current_mtime() -> float | None:
 
 
 def _verify_signature(payload: dict, signature_b64: str) -> bool:
-    """Ed25519 signature verification over canonically-serialized payload bytes."""
-    if not PUBLIC_KEY_HEX:
-        return False
-    try:
-        from cryptography.exceptions import InvalidSignature
-        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
-    except ImportError:
-        logger.warning("cryptography library not available; cannot verify license")
-        return False
+    """Backwards-compatible shim — delegates to the trust-list verifier.
 
+    Kept so existing callers continue to work without changes.
+    New code should use ``verify_license_payload`` directly.
+    """
+    from tasks.license.verify import verify_license_payload
     try:
-        public_key_bytes = bytes.fromhex(PUBLIC_KEY_HEX)
-        if len(public_key_bytes) != 32:
-            return False
-        key = Ed25519PublicKey.from_public_bytes(public_key_bytes)
-        signature = base64.b64decode(signature_b64)
-        message = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
-        key.verify(signature, message)
-        return True
-    except (InvalidSignature, ValueError, TypeError):
+        sig_bytes = base64.b64decode(signature_b64)
+    except Exception:
         return False
+    result = verify_license_payload(payload, sig_bytes)
+    return result.verified
 
 
 def _parse_datetime(value: str | None) -> datetime | None:
@@ -208,9 +198,19 @@ def load_license(force_reload: bool = False) -> LicenseInfo:
         return _CACHED_INFO
 
     signature_b64 = data.pop("signature")
-    if not _verify_signature(data, signature_b64):
-        logger.warning("License signature verification failed")
-        _CACHED_INFO = _community("License signature invalid")
+    try:
+        sig_bytes = base64.b64decode(signature_b64)
+    except Exception:
+        logger.warning("License signature field is not valid base64")
+        _CACHED_INFO = _community("License signature malformed")
+        _CACHED_MTIME = current_mtime
+        return _CACHED_INFO
+
+    from tasks.license.verify import verify_license_payload
+    verification = verify_license_payload(data, sig_bytes)
+    if not verification.verified:
+        logger.warning("License signature verification failed: %s", verification.reason)
+        _CACHED_INFO = _community(f"License signature invalid: {verification.reason}")
         _CACHED_MTIME = current_mtime
         return _CACHED_INFO
 
@@ -302,6 +302,8 @@ def load_license(force_reload: bool = False) -> LicenseInfo:
         install_uuid=license_install_uuid or None,
         valid=True,
         message="",
+        verified_by_key_id=verification.key.key_id if verification.key else None,
+        verified_by_description=verification.key.description if verification.key else None,
     )
     logger.info(
         "License loaded: edition=%s licensee=%s expires=%s",
