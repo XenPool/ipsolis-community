@@ -218,6 +218,10 @@ jobs:
           # Commit as a release snapshot (squash — mirror has no history to protect)
           git commit -m "release: ${{ github.ref_name }}"
 
+          # actions/checkout injects a global credential for github.com that overrides
+          # any token embedded in a remote URL. Unset it so our PAT takes effect.
+          git config --local --unset http.https://github.com/.extraheader || true
+
           git remote add mirror \
             "https://x-access-token:${COMMUNITY_REPO_TOKEN}@github.com/xenpool/ipsolis-community.git"
 
