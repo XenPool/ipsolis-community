@@ -150,6 +150,80 @@ jobs:
           cache-from: type=gha,scope=pro-worker
           cache-to: type=gha,scope=pro-worker,mode=max
 
+  # ── Community mirror ──────────────────────────────────────────────────────────
+  # Pushes a filtered copy of the source tree to the public community repo
+  # (github.com/xenpool/ipsolis) with Business-only files removed.
+  #
+  # Requires a repo secret: COMMUNITY_REPO_TOKEN
+  #   A classic PAT (from any XenPool org member account) with scope: repo
+  #   Target repo: github.com/xenpool/ipsolis
+  #   How to add: Settings → Secrets and variables → Actions → New repository secret
+  community-mirror:
+    name: Push community mirror
+    needs: community   # only mirror after community images build cleanly
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Remove Business-only files
+        run: |
+          # API routes
+          rm -f \
+            api/app/routes/webhook.py \
+            api/app/routes/scim.py \
+            api/app/routes/hr_webhook.py \
+            api/app/routes/admin_certifications.py \
+            api/app/routes/certifications_external.py \
+            api/app/routes/portal_certifications.py
+
+          # API templates
+          rm -f \
+            api/app/templates/ui/certifications.html \
+            api/app/templates/ui/leaver_events.html \
+            api/app/templates/_partials/enterprise_teaser.html
+
+          # Worker workflows and modules
+          rm -f \
+            worker/tasks/workflows/sccm_probe.py \
+            worker/tasks/workflows/siem_streamer.py \
+            worker/tasks/workflows/certification_notifications.py \
+            worker/tasks/workflows/certification_reminders.py \
+            worker/tasks/modules/siem_export.py
+
+          # Pro Dockerfiles (community users only need Dockerfile.community)
+          rm -f api/Dockerfile.pro worker/Dockerfile.pro
+
+          # Internal ops tooling not relevant to community users
+          rm -rf tools/license tools/registry
+
+          # Pro customer onboarding docs
+          rm -rf docs/onboarding
+
+          # This pipeline: replace with the community-only workflow
+          # (stored as .github/community-release.yml in the private repo so the
+          #  expressions inside are never evaluated by the outer workflow)
+          cp .github/community-release.yml .github/workflows/release.yml
+          rm  .github/community-release.yml
+
+      - name: Push to community mirror
+        env:
+          COMMUNITY_REPO_TOKEN: ${{ secrets.COMMUNITY_REPO_TOKEN }}
+        run: |
+          git config user.email "ci@xenpool.de"
+          git config user.name "ipSolis CI"
+
+          # Stage all deletions and the new workflow file
+          git add -A
+
+          # Commit as a release snapshot (squash — mirror has no history to protect)
+          git commit -m "release: ${{ github.ref_name }}"
+
+          git remote add mirror \
+            "https://x-access-token:${COMMUNITY_REPO_TOKEN}@github.com/xenpool/ipsolis.git"
+
+          # Force-push: mirror always reflects the latest release, no history needed
+          git push mirror HEAD:main --force
+
   # ── Release summary ───────────────────────────────────────────────────────────
   summary:
     name: Print image tags
