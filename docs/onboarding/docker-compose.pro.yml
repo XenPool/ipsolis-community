@@ -1,0 +1,177 @@
+# ip·Solis Business Edition — docker-compose.pro.yml
+#
+# Pull-based deployment: all images come from the XenPool container registry.
+# No source code or build toolchain needed on your server.
+#
+# Usage:
+#   docker compose -f docker-compose.pro.yml up -d
+#
+# Prerequisites:
+#   1. docker login ghcr.io -u ipsolis-deploy --password-stdin  (use your registry token)
+#   2. Copy .env.example → .env and fill in every value
+#   3. Place your signed .lic file in ./licenses/ (or configure the path below)
+
+services:
+
+  # ─────────────────────────────────────────────────────────────────
+  # PostgreSQL
+  # ─────────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: ipsolis-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-ipsolis}
+      POSTGRES_USER: ${POSTGRES_USER:-xpuser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-xpuser} -d ${POSTGRES_DB:-ipsolis}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ─────────────────────────────────────────────────────────────────
+  # Redis (Celery Broker + Backend)
+  # ─────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: ipsolis-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  # ─────────────────────────────────────────────────────────────────
+  # FastAPI – Dispatcher + Admin UI + Portal
+  # ─────────────────────────────────────────────────────────────────
+  api:
+    image: ghcr.io/xenpool/ipsolis-pro-api:${IPSOLIS_VERSION:-latest}
+    container_name: ipsolis-api
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-xpuser}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-ipsolis}
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backups:/app/backups
+      - ./licenses:/app/license
+      - ./locales:/app/locales:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ─────────────────────────────────────────────────────────────────
+  # Celery Worker
+  # ─────────────────────────────────────────────────────────────────
+  worker:
+    image: ghcr.io/xenpool/ipsolis-pro-worker:${IPSOLIS_VERSION:-latest}
+    container_name: ipsolis-worker
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-xpuser}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-ipsolis}
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      - ./backups:/app/backups
+      - ./licenses:/app/license:ro
+      - ps_user_modules:/root/.local/share/powershell/Modules
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: >
+      celery -A tasks worker
+      --loglevel=info
+      --pool=prefork
+      --concurrency=4
+      --queues=default,provision,reclaim,notifications
+
+  # ─────────────────────────────────────────────────────────────────
+  # Celery Beat – Scheduler
+  # ─────────────────────────────────────────────────────────────────
+  beat:
+    image: ghcr.io/xenpool/ipsolis-pro-worker:${IPSOLIS_VERSION:-latest}
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-xpuser}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-ipsolis}
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+    volumes:
+      - ./licenses:/app/license:ro
+      - ps_user_modules:/root/.local/share/powershell/Modules
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: >
+      celery -A tasks beat
+      --loglevel=info
+      --scheduler redbeat.RedBeatScheduler
+
+  # ─────────────────────────────────────────────────────────────────
+  # Flower – Celery Monitoring UI (internal access only)
+  # ─────────────────────────────────────────────────────────────────
+  flower:
+    image: ghcr.io/xenpool/ipsolis-pro-worker:${IPSOLIS_VERSION:-latest}
+    container_name: ipsolis-flower
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      FLOWER_BASIC_AUTH: ${FLOWER_USER:-admin}:${FLOWER_PASSWORD:?FLOWER_PASSWORD is required}
+    ports:
+      - "127.0.0.1:5555:5555"
+    depends_on:
+      - redis
+    command: >
+      celery -A tasks flower
+      --port=5555
+      --broker=redis://redis:6379/0
+
+  # ─────────────────────────────────────────────────────────────────
+  # Nginx – Reverse Proxy + TLS Termination
+  # ─────────────────────────────────────────────────────────────────
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: ipsolis-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  redis_data:
+  ps_user_modules:

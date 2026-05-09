@@ -3033,8 +3033,8 @@ Feature flags in code (`require_enterprise`, `require_business`, `BUSINESS_FEATU
 - [x] **Simplify license mechanism:** Keep Ed25519 signature and install UUID (for expiry dates + user limits), but remove feature control via license file — the license only controls `max_users`, `max_asset_types`, `expires_at`
 - [x] **GitHub Actions pipeline:** CI automatically builds both images on every release and pushes them to the private registry; community mirror repo is automatically populated with filtered files
 - [x] **Registry token management:** Pro customers get a revocable registry token; define process for issuance (after purchase) and revocation (on cancellation)
-- [ ] **Customer onboarding docs:** `docker-compose.yml` + `.env.example` + installation guide for Business customers (docker login → compose up, done)
-- [ ] **Set up public community repo:** github.com/xenpool/ipsolis as a public mirror without Business modules
+- [x] **Customer onboarding docs:** `docker-compose.yml` + `.env.example` + installation guide for Business customers (docker login → compose up, done)
+- [x] **Set up public community repo:** github.com/xenpool/ipsolis as a public mirror without Business modules
 
 ---
 
