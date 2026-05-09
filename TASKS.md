@@ -3031,7 +3031,7 @@ Feature flags in code (`require_enterprise`, `require_business`, `BUSINESS_FEATU
 - [x] **Two Dockerfiles:** Build `Dockerfile.community` (copies only Community files) and `Dockerfile.pro` (copies everything) from a shared mono-repo
 - [x] **Remove feature gates:** Remove `require_enterprise()`, `require_business()`, `BUSINESS_FEATURE_KEYS`, `ENTERPRISE_ONLY_FEATURE_KEYS` from code; clean up `is_feature_enabled()` and all `{% if is_enterprise %}` / `{% if is_business %}` template checks
 - [x] **Simplify license mechanism:** Keep Ed25519 signature and install UUID (for expiry dates + user limits), but remove feature control via license file — the license only controls `max_users`, `max_asset_types`, `expires_at`
-- [ ] **GitHub Actions pipeline:** CI automatically builds both images on every release and pushes them to the private registry; community mirror repo is automatically populated with filtered files
+- [x] **GitHub Actions pipeline:** CI automatically builds both images on every release and pushes them to the private registry; community mirror repo is automatically populated with filtered files
 - [ ] **Registry token management:** Pro customers get a revocable registry token; define process for issuance (after purchase) and revocation (on cancellation)
 - [ ] **Customer onboarding docs:** `docker-compose.yml` + `.env.example` + installation guide for Business customers (docker login → compose up, done)
 - [ ] **Set up public community repo:** github.com/xenpool/ipsolis as a public mirror without Business modules

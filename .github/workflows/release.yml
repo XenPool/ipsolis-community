@@ -1,0 +1,174 @@
+name: Build & push release images
+
+# Triggered by pushing a semver tag, e.g.:
+#   git tag v0.4.3 && git push origin v0.4.3
+#
+# Produces four GHCR images per release:
+#   Community (public):
+#     ghcr.io/xenpool/ipsolis-api:<version>
+#     ghcr.io/xenpool/ipsolis-worker:<version>
+#   Pro (private):
+#     ghcr.io/xenpool/ipsolis-pro-api:<version>
+#     ghcr.io/xenpool/ipsolis-pro-worker:<version>
+#
+# First-time setup (once per package, in GitHub org package settings):
+#   - Set ipsolis-api / ipsolis-worker packages to PUBLIC visibility so
+#     community users can pull without auth.
+#   - Leave ipsolis-pro-api / ipsolis-pro-worker as PRIVATE; issue
+#     per-customer deploy tokens via Settings → Packages → Manage access.
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+permissions:
+  contents: read
+  packages: write   # needed to push to ghcr.io/xenpool/*
+
+jobs:
+  # ── Sanity check ─────────────────────────────────────────────────────────────
+  # Fail fast if someone tagged v0.5.0 while VERSION still says 0.4.3.
+  validate-version:
+    name: Validate tag matches VERSION file
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compare tag to VERSION
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          FILE_VER="$(tr -d '[:space:]' < VERSION)"
+          echo "Tag   : $TAG"
+          echo "File  : $FILE_VER"
+          if [ "$TAG" != "$FILE_VER" ]; then
+            echo "::error::Git tag ($TAG) does not match VERSION file ($FILE_VER). Bump VERSION before tagging."
+            exit 1
+          fi
+
+  # ── Community images ──────────────────────────────────────────────────────────
+  # Built from Dockerfile.community — Business-only files stripped at build time.
+  # Set these packages to PUBLIC in GitHub org settings so anyone can pull them.
+  community:
+    name: Build community images
+    needs: validate-version
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        id: ver
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & push community API image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./api
+          file: ./api/Dockerfile.community
+          push: true
+          platforms: linux/amd64
+          tags: |
+            ghcr.io/xenpool/ipsolis-api:${{ steps.ver.outputs.version }}
+            ghcr.io/xenpool/ipsolis-api:latest
+          build-args: APP_VERSION=${{ steps.ver.outputs.version }}
+          cache-from: type=gha,scope=community-api
+          cache-to: type=gha,scope=community-api,mode=max
+
+      - name: Build & push community Worker image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./worker
+          file: ./worker/Dockerfile.community
+          push: true
+          platforms: linux/amd64
+          tags: |
+            ghcr.io/xenpool/ipsolis-worker:${{ steps.ver.outputs.version }}
+            ghcr.io/xenpool/ipsolis-worker:latest
+          cache-from: type=gha,scope=community-worker
+          cache-to: type=gha,scope=community-worker,mode=max
+
+  # ── Pro images ────────────────────────────────────────────────────────────────
+  # Built from Dockerfile.pro — all modules included.
+  # These packages stay PRIVATE; distribute access via per-customer deploy tokens.
+  pro:
+    name: Build pro images
+    needs: validate-version
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        id: ver
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & push pro API image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./api
+          file: ./api/Dockerfile.pro
+          push: true
+          platforms: linux/amd64
+          tags: |
+            ghcr.io/xenpool/ipsolis-pro-api:${{ steps.ver.outputs.version }}
+            ghcr.io/xenpool/ipsolis-pro-api:latest
+          build-args: APP_VERSION=${{ steps.ver.outputs.version }}
+          cache-from: type=gha,scope=pro-api
+          cache-to: type=gha,scope=pro-api,mode=max
+
+      - name: Build & push pro Worker image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./worker
+          file: ./worker/Dockerfile.pro
+          push: true
+          platforms: linux/amd64
+          tags: |
+            ghcr.io/xenpool/ipsolis-pro-worker:${{ steps.ver.outputs.version }}
+            ghcr.io/xenpool/ipsolis-pro-worker:latest
+          cache-from: type=gha,scope=pro-worker
+          cache-to: type=gha,scope=pro-worker,mode=max
+
+  # ── Release summary ───────────────────────────────────────────────────────────
+  summary:
+    name: Print image tags
+    needs: [community, pro]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Summary
+        run: |
+          VER="${GITHUB_REF_NAME#v}"
+          echo "### Release $GITHUB_REF_NAME" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Community (public)**" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          echo "ghcr.io/xenpool/ipsolis-api:${VER}" >> "$GITHUB_STEP_SUMMARY"
+          echo "ghcr.io/xenpool/ipsolis-worker:${VER}" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Pro (private)**" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          echo "ghcr.io/xenpool/ipsolis-pro-api:${VER}" >> "$GITHUB_STEP_SUMMARY"
+          echo "ghcr.io/xenpool/ipsolis-pro-worker:${VER}" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
