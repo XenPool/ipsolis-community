@@ -226,7 +226,7 @@ jobs:
             "https://x-access-token:${COMMUNITY_REPO_TOKEN}@github.com/xenpool/ipsolis-community.git"
 
           # Force-push: mirror always reflects the latest release, no history needed
-          git push mirror HEAD:main --force
+          git push mirror HEAD:refs/heads/main --force
 
   # ── Release summary ───────────────────────────────────────────────────────────
   summary:
