@@ -14,6 +14,30 @@ the full upgrade procedure including DB backup recommendations.
 
 ## [Unreleased]
 
+## [0.4.7] — 2026-05-11
+
+### Added
+
+- **Community example scripts (migration 0096).** Three ready-to-use PowerShell
+  script modules — `Example - Provision Asset`, `Example - Change Asset`, and
+  `Example - Deprovision Asset` — are now seeded on every fresh install. They
+  demonstrate the standard module pattern (param block, `$VARS` access, JSON
+  output, try/catch) for use in asset-type runbooks.
+
+### Changed
+
+- **Standalone Runbooks are now PRO-only.** The sidebar nav item shows a locked
+  PRO badge on Community installs; navigating to `/ui/standalone-runbooks`
+  renders an upgrade teaser instead of the runbook list. The API route
+  (`admin_standalone_runbooks.py`) and the Celery worker task
+  (`standalone_runner.py`) are stripped from Community images at build time,
+  and the Beat cron-schedule entry is omitted when the task is absent.
+- **Script module seed data split by edition.** The full set of production
+  script modules (AD, SCCM, XenServer/XCP-ng, VMware, SQL) is PRO-only seed
+  material. The community mirror now ships only `scripts/modules/examples/`;
+  the `scripts/runbooks/` directory (Virtual Machine Recycler etc.) is also
+  excluded from Community builds.
+
 ## [0.4.6] — 2026-05-10
 
 ### Fixed
