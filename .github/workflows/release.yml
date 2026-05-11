@@ -1,21 +1,4 @@
-name: Build & push release images
-
-# Triggered by pushing a semver tag, e.g.:
-#   git tag v0.4.3 && git push origin v0.4.3
-#
-# Produces four GHCR images per release:
-#   Community (public):
-#     ghcr.io/xenpool/ipsolis-api:<version>
-#     ghcr.io/xenpool/ipsolis-worker:<version>
-#   Pro (private):
-#     ghcr.io/xenpool/ipsolis-pro-api:<version>
-#     ghcr.io/xenpool/ipsolis-pro-worker:<version>
-#
-# First-time setup (once per package, in GitHub org package settings):
-#   - Set ipsolis-api / ipsolis-worker packages to PUBLIC visibility so
-#     community users can pull without auth.
-#   - Leave ipsolis-pro-api / ipsolis-pro-worker as PRIVATE; issue
-#     per-customer deploy tokens via Settings → Packages → Manage access.
+name: Build & push community images
 
 on:
   push:
@@ -24,54 +7,28 @@ on:
 
 permissions:
   contents: read
-  packages: write   # needed to push to ghcr.io/xenpool/*
+  packages: write
 
 jobs:
-  # ── Sanity check ─────────────────────────────────────────────────────────────
-  # Fail fast if someone tagged v0.5.0 while VERSION still says 0.4.3.
-  validate-version:
-    name: Validate tag matches VERSION file
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Compare tag to VERSION
-        run: |
-          TAG="${GITHUB_REF_NAME#v}"
-          FILE_VER="$(tr -d '[:space:]' < VERSION)"
-          echo "Tag   : $TAG"
-          echo "File  : $FILE_VER"
-          if [ "$TAG" != "$FILE_VER" ]; then
-            echo "::error::Git tag ($TAG) does not match VERSION file ($FILE_VER). Bump VERSION before tagging."
-            exit 1
-          fi
-
-  # ── Community images ──────────────────────────────────────────────────────────
-  # Built from Dockerfile.community — Business-only files stripped at build time.
-  # Set these packages to PUBLIC in GitHub org settings so anyone can pull them.
-  community:
+  build:
     name: Build community images
-    needs: validate-version
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
 
-      - name: Extract version from tag
+      - name: Extract version
         id: ver
         run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v3
 
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
+      - uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build & push community API image
+      - name: Build & push API image
         uses: docker/build-push-action@v6
         with:
           context: ./api
@@ -85,7 +42,7 @@ jobs:
           cache-from: type=gha,scope=community-api
           cache-to: type=gha,scope=community-api,mode=max
 
-      - name: Build & push community Worker image
+      - name: Build & push Worker image
         uses: docker/build-push-action@v6
         with:
           context: ./worker
@@ -97,175 +54,3 @@ jobs:
             ghcr.io/xenpool/ipsolis-worker:latest
           cache-from: type=gha,scope=community-worker
           cache-to: type=gha,scope=community-worker,mode=max
-
-  # ── Pro images ────────────────────────────────────────────────────────────────
-  # Built from Dockerfile.pro — all modules included.
-  # These packages stay PRIVATE; distribute access via per-customer deploy tokens.
-  pro:
-    name: Build pro images
-    needs: validate-version
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Extract version from tag
-        id: ver
-        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build & push pro API image
-        uses: docker/build-push-action@v6
-        with:
-          context: ./api
-          file: ./api/Dockerfile.pro
-          push: true
-          platforms: linux/amd64
-          tags: |
-            ghcr.io/xenpool/ipsolis-pro-api:${{ steps.ver.outputs.version }}
-            ghcr.io/xenpool/ipsolis-pro-api:latest
-          build-args: APP_VERSION=${{ steps.ver.outputs.version }}
-          cache-from: type=gha,scope=pro-api
-          cache-to: type=gha,scope=pro-api,mode=max
-
-      - name: Build & push pro Worker image
-        uses: docker/build-push-action@v6
-        with:
-          context: ./worker
-          file: ./worker/Dockerfile.pro
-          push: true
-          platforms: linux/amd64
-          tags: |
-            ghcr.io/xenpool/ipsolis-pro-worker:${{ steps.ver.outputs.version }}
-            ghcr.io/xenpool/ipsolis-pro-worker:latest
-          cache-from: type=gha,scope=pro-worker
-          cache-to: type=gha,scope=pro-worker,mode=max
-
-  # ── Community mirror ──────────────────────────────────────────────────────────
-  # Pushes a filtered copy of the source tree to the public community repo
-  # (github.com/xenpool/ipsolis) with Business-only files removed.
-  #
-  # Requires a repo secret: COMMUNITY_REPO_TOKEN
-  #   A classic PAT (from any XenPool org member account) with scope: repo
-  #   Target repo: github.com/xenpool/ipsolis
-  #   How to add: Settings → Secrets and variables → Actions → New repository secret
-  community-mirror:
-    name: Push community mirror
-    needs: community   # only mirror after community images build cleanly
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0   # full history needed — shallow clone breaks the push
-
-      - name: Remove Business-only files
-        run: |
-          # API routes
-          rm -f \
-            api/app/routes/webhook.py \
-            api/app/routes/scim.py \
-            api/app/routes/hr_webhook.py \
-            api/app/routes/admin_certifications.py \
-            api/app/routes/certifications_external.py \
-            api/app/routes/portal_certifications.py
-
-          # API templates
-          rm -f \
-            api/app/templates/ui/certifications.html \
-            api/app/templates/ui/leaver_events.html
-
-          # Worker workflows and modules
-          rm -f \
-            worker/tasks/workflows/sccm_probe.py \
-            worker/tasks/workflows/siem_streamer.py \
-            worker/tasks/workflows/certification_notifications.py \
-            worker/tasks/workflows/certification_reminders.py \
-            worker/tasks/modules/siem_export.py
-
-          # PRO-only script modules — Community ships with examples/ only
-          rm -rf \
-            scripts/modules/ad \
-            scripts/modules/sccm \
-            scripts/modules/xenserver \
-            scripts/modules/vmware \
-            scripts/modules/sql \
-            scripts/modules/test
-
-          # PRO-only standalone runbooks (Community edition lacks the feature)
-          rm -rf scripts/runbooks
-
-          # PRO-only API routes and templates
-          rm -f \
-            api/app/routes/admin_standalone_runbooks.py \
-            api/app/templates/ui/standalone_runbook_editor.html \
-            api/app/templates/ui/standalone_runbook_runs.html
-
-          # Pro Dockerfiles (community users only need Dockerfile.community)
-          rm -f api/Dockerfile.pro worker/Dockerfile.pro
-
-          # Internal ops tooling not relevant to community users
-          rm -rf tools/license tools/registry
-
-          # Pro customer onboarding docs
-          rm -rf docs/onboarding
-
-          # This pipeline: replace with the community-only workflow
-          # (stored as .github/community-release.yml in the private repo so the
-          #  expressions inside are never evaluated by the outer workflow)
-          cp .github/community-release.yml .github/workflows/release.yml
-          rm  .github/community-release.yml
-
-      - name: Push to community mirror
-        env:
-          COMMUNITY_REPO_TOKEN: ${{ secrets.COMMUNITY_REPO_TOKEN }}
-        run: |
-          git config user.email "ci@xenpool.de"
-          git config user.name "ipSolis CI"
-
-          # Stage all deletions and the new workflow file
-          git add -A
-
-          # Commit as a release snapshot (squash — mirror has no history to protect)
-          git commit -m "release: ${{ github.ref_name }}"
-
-          # actions/checkout injects a global credential for github.com that overrides
-          # any token embedded in a remote URL. Unset it so our PAT takes effect.
-          git config --local --unset http.https://github.com/.extraheader || true
-
-          git remote add mirror \
-            "https://x-access-token:${COMMUNITY_REPO_TOKEN}@github.com/xenpool/ipsolis-community.git"
-
-          # Force-push: mirror always reflects the latest release, no history needed
-          git push mirror HEAD:refs/heads/main --force
-
-  # ── Release summary ───────────────────────────────────────────────────────────
-  summary:
-    name: Print image tags
-    needs: [community, pro]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Summary
-        run: |
-          VER="${GITHUB_REF_NAME#v}"
-          echo "### Release $GITHUB_REF_NAME" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "**Community (public)**" >> "$GITHUB_STEP_SUMMARY"
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
-          echo "ghcr.io/xenpool/ipsolis-api:${VER}" >> "$GITHUB_STEP_SUMMARY"
-          echo "ghcr.io/xenpool/ipsolis-worker:${VER}" >> "$GITHUB_STEP_SUMMARY"
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "**Pro (private)**" >> "$GITHUB_STEP_SUMMARY"
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
-          echo "ghcr.io/xenpool/ipsolis-pro-api:${VER}" >> "$GITHUB_STEP_SUMMARY"
-          echo "ghcr.io/xenpool/ipsolis-pro-worker:${VER}" >> "$GITHUB_STEP_SUMMARY"
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
