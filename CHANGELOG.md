@@ -14,6 +14,15 @@ the full upgrade procedure including DB backup recommendations.
 
 ## [Unreleased]
 
+## [0.4.8] — 2026-05-11
+
+### Changed
+
+- **Update Notifier simplified.** The configurable "Repository (GitHub API)"
+  and "GitHub token" fields have been removed from Settings. The Community
+  edition repo is now public on GitHub, so no token is required and the
+  endpoint is hardcoded. Only the enabled / disabled toggle remains.
+
 ## [0.4.7] — 2026-05-11
 
 ### Added
